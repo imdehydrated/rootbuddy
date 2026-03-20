@@ -10,6 +10,9 @@ func TestGameStateCreation(t *testing.T) {
 		Adj:        []int{2, 3},
 		Ruins:      true,
 	}
+	sampleMap := Map{
+		Clearings: []Clearing{sampleClearing},
+	}
 	sampleCats := MarquiseState{
 		CardsInHand:      []int{1, 2, 3},
 		WarriorSupply:    25,
@@ -18,13 +21,13 @@ func TestGameStateCreation(t *testing.T) {
 		RecruitersPlaced: 1,
 	}
 	sampleGame := GameState{
-		Clearings:    []Clearing{sampleClearing},
+		Map:          sampleMap,
 		FactionTurn:  Marquise,
 		CurrentPhase: Birdsong,
 		Marquise:     sampleCats,
 	}
-	if len(sampleGame.Clearings) != 1 {
-		t.Fatalf("Expected 1 clearing, got %v", len(sampleGame.Clearings))
+	if len(sampleGame.Map.Clearings) != 1 {
+		t.Fatalf("Expected 1 clearing, got %v", len(sampleGame.Map.Clearings))
 	}
 	if sampleGame.Marquise.WarriorSupply != 25 {
 		t.Fatalf("Expected 25 warriors, got %v", sampleGame.Marquise.WarriorSupply)

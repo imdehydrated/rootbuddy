@@ -1,7 +1,7 @@
 package game
 
 type GameState struct {
-	Clearings    []Clearing
+	Map          Map
 	FactionTurn  Faction
 	CurrentPhase Phase
 	Marquise     MarquiseState
