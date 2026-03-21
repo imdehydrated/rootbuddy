@@ -36,13 +36,13 @@ func TestValidMovementActions(t *testing.T) {
 							game.Marquise:         3,
 							game.WoodlandAlliance: 1,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 					{
 						ID:        2,
 						Adj:       []int{1},
 						Warriors:  map[game.Faction]int{},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func TestValidMovementActions(t *testing.T) {
 							game.Marquise:         2,
 							game.WoodlandAlliance: 3,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 					{
 						ID:  2,
@@ -78,8 +78,8 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 1,
 						},
-						Buildings: map[game.Faction]int{
-							game.Marquise: 1,
+						Buildings: []game.Building{
+							{Faction: game.Marquise, Type: game.Sawmill},
 						},
 					},
 				},
@@ -108,7 +108,7 @@ func TestValidMovementActions(t *testing.T) {
 							game.Marquise:         1,
 							game.WoodlandAlliance: 2,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 					{
 						ID:  2,
@@ -116,7 +116,7 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Eyrie: 1,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -143,13 +143,13 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 2,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 					{
 						ID:        2,
 						Adj:       []int{},
 						Warriors:  map[game.Faction]int{},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -176,13 +176,13 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 2,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 					{
 						ID:        2,
 						Adj:       []int{1},
 						Warriors:  map[game.Faction]int{},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -220,15 +220,15 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 0,
 						},
-						Buildings: map[game.Faction]int{
-							game.Marquise: 1,
+						Buildings: []game.Building{
+							{Faction: game.Marquise, Type: game.Sawmill},
 						},
 					},
 					{
 						ID:        2,
 						Adj:       []int{1},
 						Warriors:  map[game.Faction]int{},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},

@@ -21,7 +21,7 @@ func TestRuler(t *testing.T) {
 					game.Eyrie:            1,
 					game.WoodlandAlliance: 1,
 				},
-				Buildings: map[game.Faction]int{},
+				Buildings: []game.Building{},
 			},
 			wantFaction:  game.Marquise,
 			wantHasRuler: true,
@@ -33,8 +33,8 @@ func TestRuler(t *testing.T) {
 					game.Marquise:         2,
 					game.WoodlandAlliance: 2,
 				},
-				Buildings: map[game.Faction]int{
-					game.Marquise: 1,
+				Buildings: []game.Building{
+					{Faction: game.Marquise, Type: game.Sawmill},
 				},
 			},
 			wantFaction:  game.Marquise,
@@ -47,8 +47,8 @@ func TestRuler(t *testing.T) {
 					game.Marquise:         1,
 					game.WoodlandAlliance: 2,
 				},
-				Buildings: map[game.Faction]int{
-					game.Marquise: 1,
+				Buildings: []game.Building{
+					{Faction: game.Marquise, Type: game.Sawmill},
 				},
 			},
 			wantHasRuler: false,
@@ -59,7 +59,7 @@ func TestRuler(t *testing.T) {
 				Warriors: map[game.Faction]int{
 					game.Eyrie: 1,
 				},
-				Buildings: map[game.Faction]int{},
+				Buildings: []game.Building{},
 			},
 			wantFaction:  game.Eyrie,
 			wantHasRuler: true,
@@ -68,7 +68,7 @@ func TestRuler(t *testing.T) {
 			name: "empty clearing has no ruler",
 			clearing: game.Clearing{
 				Warriors:  map[game.Faction]int{},
-				Buildings: map[game.Faction]int{},
+				Buildings: []game.Building{},
 			},
 			wantHasRuler: false,
 		},

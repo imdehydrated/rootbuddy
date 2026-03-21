@@ -6,6 +6,7 @@ type Clearing struct {
 	BuildSlots int
 	Adj        []int
 	Ruins      bool
+	Wood       int
 	Warriors   map[Faction]int
-	Buildings  map[Faction]int
+	Buildings  []Building
 }

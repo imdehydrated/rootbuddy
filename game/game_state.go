@@ -5,4 +5,5 @@ type GameState struct {
 	FactionTurn  Faction
 	CurrentPhase Phase
 	Marquise     MarquiseState
+	TurnProgress TurnProgress
 }

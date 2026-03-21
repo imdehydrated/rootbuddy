@@ -2,6 +2,16 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
+func buildingCountByFaction(c game.Clearing, faction game.Faction) int {
+	count := 0
+	for _, building := range c.Buildings {
+		if building.Faction == faction {
+			count++
+		}
+	}
+	return count
+}
+
 func Ruler(c game.Clearing) (game.Faction, bool) {
 	scores := map[game.Faction]int{}
 
@@ -12,8 +22,8 @@ func Ruler(c game.Clearing) (game.Faction, bool) {
 		scores[faction] += warriors
 	}
 
-	for faction, buildings := range c.Buildings {
-		scores[faction] += buildings
+	for _, building := range c.Buildings {
+		scores[building.Faction]++
 	}
 
 	var ruler game.Faction

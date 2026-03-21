@@ -27,8 +27,9 @@ func ValidBattles(faction game.Faction, m game.Map) []game.Action {
 			seenTargets[target] = true
 		}
 
-		for target, count := range c.Buildings {
-			if target == faction || count <= 0 || seenTargets[target] {
+		for _, building := range c.Buildings {
+			target := building.Faction
+			if target == faction || seenTargets[target] {
 				continue
 			}
 

@@ -25,7 +25,7 @@ func TestValidBattles(t *testing.T) {
 							game.Marquise: 2,
 							game.Eyrie:    1,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -52,7 +52,7 @@ func TestValidBattles(t *testing.T) {
 							game.Eyrie:            1,
 							game.WoodlandAlliance: 1,
 						},
-						Buildings: map[game.Faction]int{},
+						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -85,8 +85,8 @@ func TestValidBattles(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Eyrie: 1,
 						},
-						Buildings: map[game.Faction]int{
-							game.WoodlandAlliance: 1,
+						Buildings: []game.Building{
+							{Faction: game.WoodlandAlliance, Type: game.Sawmill},
 						},
 					},
 				},
@@ -120,8 +120,9 @@ func TestValidBattles(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 1,
 						},
-						Buildings: map[game.Faction]int{
-							game.Eyrie: 2,
+						Buildings: []game.Building{
+							{Faction: game.Eyrie, Type: game.Sawmill},
+							{Faction: game.Eyrie, Type: game.Workshop},
 						},
 					},
 				},
@@ -147,8 +148,8 @@ func TestValidBattles(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 2,
 						},
-						Buildings: map[game.Faction]int{
-							game.Marquise: 1,
+						Buildings: []game.Building{
+							{Faction: game.Marquise, Type: game.Sawmill},
 						},
 					},
 				},

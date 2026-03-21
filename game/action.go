@@ -5,6 +5,7 @@ type Action struct {
 	Movement *MovementAction
 	Battle   *BattleAction
 	Build    *BuildAction
+	Recruit  *RecruitAction
 }
 
 type ActionType int
@@ -13,6 +14,7 @@ const (
 	ActionMovement ActionType = iota
 	ActionBattle
 	ActionBuild
+	ActionRecruit
 )
 
 type MovementAction struct {
@@ -32,4 +34,9 @@ type BuildAction struct {
 	Faction      Faction
 	ClearingID   int
 	BuildingType BuildingType
+}
+
+type RecruitAction struct {
+	Faction     Faction
+	ClearingIDs []int
 }
