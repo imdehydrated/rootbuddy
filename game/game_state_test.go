@@ -14,7 +14,11 @@ func TestGameStateCreation(t *testing.T) {
 		Clearings: []Clearing{sampleClearing},
 	}
 	sampleCats := MarquiseState{
-		CardsInHand:      []int{1, 2, 3},
+		CardsInHand: []Card{
+			{ID: 1, Deck: BaseDeck, Name: "Fox Card", Suit: Fox, Kind: ItemCard},
+			{ID: 2, Deck: BaseDeck, Name: "Rabbit Card", Suit: Rabbit, Kind: PersistentEffectCard},
+			{ID: 3, Deck: BaseDeck, Name: "Bird Card", Suit: Bird, Kind: AmbushCard},
+		},
 		WarriorSupply:    25,
 		SawmillsPlaced:   1,
 		WorkshopsPlaced:  1,

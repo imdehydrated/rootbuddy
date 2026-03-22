@@ -1,5 +1,6 @@
 package game
 
 type TurnProgress struct {
-	RecruitUsed bool
+	RecruitUsed           bool
+	UsedWorkshopClearings []int
 }

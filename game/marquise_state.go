@@ -1,7 +1,7 @@
 package game
 
 type MarquiseState struct {
-	CardsInHand      []int
+	CardsInHand      []Card
 	WarriorSupply    int
 	SawmillsPlaced   int
 	WorkshopsPlaced  int

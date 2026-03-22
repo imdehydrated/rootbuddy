@@ -7,7 +7,11 @@ func ValidRecruitActions(state game.GameState) []game.Action {
 		return []game.Action{}
 	}
 
-	if state.CurrentPhase != game.Daylight {
+	if state.CurrentStep != game.StepUnspecified {
+		if state.CurrentStep != game.StepRecruit {
+			return []game.Action{}
+		}
+	} else if state.CurrentPhase != game.Daylight {
 		return []game.Action{}
 	}
 

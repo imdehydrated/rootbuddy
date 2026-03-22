@@ -1,7 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"log"
+	"net/http"
+
+	"github.com/imdehydrated/rootbuddy/server"
+)
 
 func main() {
-	fmt.Println("Hello world")
+	log.Fatal(http.ListenAndServe(":8080", server.NewServer()))
 }
