@@ -9,6 +9,24 @@ type Action struct {
 	Recruit          *RecruitAction
 	Overwork         *OverworkAction
 	Craft            *CraftAction
+	AddToDecree      *AddToDecreeAction
+	SpreadSympathy   *SpreadSympathyAction
+	Revolt           *RevoltAction
+	Mobilize         *MobilizeAction
+	Train            *TrainAction
+	Organize         *OrganizeAction
+	Explore          *ExploreAction
+	Quest            *QuestAction
+	Aid              *AidAction
+	Strike           *StrikeAction
+	Repair           *RepairAction
+	Turmoil          *TurmoilAction
+	Daybreak         *DaybreakAction
+	Slip             *SlipAction
+	BirdsongWood     *BirdsongWoodAction
+	EveningDraw      *EveningDrawAction
+	ScoreRoosts      *ScoreRoostsAction
+	PassPhase        *PassPhaseAction
 }
 
 type ActionType int
@@ -21,19 +39,40 @@ const (
 	ActionRecruit
 	ActionOverwork
 	ActionCraft
+	ActionAddToDecree
+	ActionSpreadSympathy
+	ActionRevolt
+	ActionMobilize
+	ActionTrain
+	ActionOrganize
+	ActionExplore
+	ActionQuest
+	ActionAid
+	ActionStrike
+	ActionRepair
+	ActionTurmoil
+	ActionDaybreak
+	ActionSlip
+	ActionBirdsongWood
+	ActionEveningDraw
+	ActionScoreRoosts
+	ActionPassPhase
 )
 
 type MovementAction struct {
 	Faction  Faction
+	Count    int
 	MaxCount int
 	From     int
 	To       int
+	DecreeCardID CardID
 }
 
 type BattleAction struct {
 	Faction       Faction
 	ClearingID    int
 	TargetFaction Faction
+	DecreeCardID  CardID
 }
 
 type BattleModifiers struct {
@@ -47,6 +86,7 @@ type BattleResolutionAction struct {
 	Faction              Faction
 	ClearingID           int
 	TargetFaction        Faction
+	DecreeCardID         CardID
 	AttackerRoll         int
 	DefenderRoll         int
 	AttackerHitModifier  int
@@ -61,11 +101,19 @@ type BuildAction struct {
 	Faction      Faction
 	ClearingID   int
 	BuildingType BuildingType
+	WoodSources  []WoodSource
+	DecreeCardID CardID
+}
+
+type WoodSource struct {
+	ClearingID int
+	Amount     int
 }
 
 type RecruitAction struct {
 	Faction     Faction
 	ClearingIDs []int
+	DecreeCardID CardID
 }
 
 type OverworkAction struct {
@@ -78,4 +126,120 @@ type CraftAction struct {
 	Faction               Faction
 	CardID                CardID
 	UsedWorkshopClearings []int
+}
+
+type DecreeColumn int
+
+const (
+	DecreeRecruit DecreeColumn = iota
+	DecreeMove
+	DecreeBattle
+	DecreeBuild
+)
+
+type AddToDecreeAction struct {
+	Faction Faction
+	CardIDs []CardID
+	Columns []DecreeColumn
+}
+
+type SpreadSympathyAction struct {
+	Faction          Faction
+	ClearingID       int
+	SupporterCardIDs []CardID
+}
+
+type RevoltAction struct {
+	Faction          Faction
+	ClearingID       int
+	BaseSuit         Suit
+	SupporterCardIDs []CardID
+}
+
+type MobilizeAction struct {
+	Faction Faction
+	CardID  CardID
+}
+
+type TrainAction struct {
+	Faction Faction
+	CardID  CardID
+}
+
+type OrganizeAction struct {
+	Faction    Faction
+	ClearingID int
+}
+
+type ExploreAction struct {
+	Faction    Faction
+	ClearingID int
+	ItemType   ItemType
+}
+
+type QuestReward int
+
+const (
+	QuestRewardVictoryPoints QuestReward = iota
+	QuestRewardDrawCards
+)
+
+type QuestAction struct {
+	Faction Faction
+	CardID  CardID
+	Reward  QuestReward
+}
+
+type AidAction struct {
+	Faction       Faction
+	TargetFaction Faction
+	ClearingID    int
+	CardID        CardID
+}
+
+type StrikeAction struct {
+	Faction       Faction
+	ClearingID    int
+	TargetFaction Faction
+}
+
+type RepairAction struct {
+	Faction   Faction
+	ItemIndex int
+}
+
+type TurmoilAction struct {
+	Faction   Faction
+	NewLeader EyrieLeader
+}
+
+type DaybreakAction struct {
+	Faction              Faction
+	RefreshedItemIndexes []int
+}
+
+type SlipAction struct {
+	Faction Faction
+	From    int
+	To      int
+}
+
+type BirdsongWoodAction struct {
+	Faction     Faction
+	ClearingIDs []int
+	Amount      int
+}
+
+type EveningDrawAction struct {
+	Faction Faction
+	Count   int
+}
+
+type ScoreRoostsAction struct {
+	Faction Faction
+	Points  int
+}
+
+type PassPhaseAction struct {
+	Faction Faction
 }

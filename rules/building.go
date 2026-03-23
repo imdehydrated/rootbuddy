@@ -39,8 +39,8 @@ func placedCount(marquise game.MarquiseState, buildingType game.BuildingType) in
 	}
 }
 
-func woodNetworkWood(startID int, m game.Map) int {
-	total := 0
+func ruledWoodNetwork(startID int, m game.Map) []game.Clearing {
+	network := []game.Clearing{}
 	queue := []int{startID}
 	visited := map[int]bool{}
 
@@ -63,7 +63,7 @@ func woodNetworkWood(startID int, m game.Map) int {
 			continue
 		}
 
-		total += c.Wood
+		network = append(network, c)
 
 		for _, adjID := range c.Adj {
 			if !visited[adjID] {
@@ -71,7 +71,40 @@ func woodNetworkWood(startID int, m game.Map) int {
 			}
 		}
 	}
-	return total
+
+	return network
+}
+
+func woodSourcesForBuild(startID int, cost int, m game.Map) ([]game.WoodSource, bool) {
+	if cost == 0 {
+		return []game.WoodSource{}, true
+	}
+
+	remaining := cost
+	sources := []game.WoodSource{}
+
+	for _, clearing := range ruledWoodNetwork(startID, m) {
+		if clearing.Wood <= 0 {
+			continue
+		}
+
+		used := clearing.Wood
+		if used > remaining {
+			used = remaining
+		}
+
+		sources = append(sources, game.WoodSource{
+			ClearingID: clearing.ID,
+			Amount:     used,
+		})
+		remaining -= used
+
+		if remaining == 0 {
+			return sources, true
+		}
+	}
+
+	return nil, false
 }
 
 func ValidBuilds(m game.Map, marquise game.MarquiseState) []game.Action {
@@ -92,15 +125,15 @@ func ValidBuilds(m game.Map, marquise game.MarquiseState) []game.Action {
 			continue
 		}
 
-		networkWood := woodNetworkWood(c.ID, m)
-
 		for _, buildingType := range availableBuildings(marquise) {
 			placed := placedCount(marquise, buildingType)
 			cost := buildCost(placed)
 			if cost < 0 {
 				continue
 			}
-			if networkWood < cost {
+
+			woodSources, ok := woodSourcesForBuild(c.ID, cost, m)
+			if !ok {
 				continue
 			}
 
@@ -110,6 +143,7 @@ func ValidBuilds(m game.Map, marquise game.MarquiseState) []game.Action {
 					Faction:      game.Marquise,
 					ClearingID:   c.ID,
 					BuildingType: buildingType,
+					WoodSources:  woodSources,
 				},
 			})
 		}

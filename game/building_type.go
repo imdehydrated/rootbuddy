@@ -6,4 +6,6 @@ const (
 	Sawmill BuildingType = iota
 	Workshop
 	Recruiter
+	Roost
+	Base
 )

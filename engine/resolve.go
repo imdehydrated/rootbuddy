@@ -25,6 +25,10 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 		return game.Action{}
 	}
 
+	if action.Battle.Faction == game.Eyrie && state.Eyrie.Leader == game.LeaderCommander {
+		modifiers.AttackerHitModifier++
+	}
+
 	attackerHits := min(attackerRoll, warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.Faction))
 	defenderHits := min(defenderRoll, warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.TargetFaction))
 
@@ -44,6 +48,7 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 			Faction:              action.Battle.Faction,
 			ClearingID:           action.Battle.ClearingID,
 			TargetFaction:        action.Battle.TargetFaction,
+			DecreeCardID:         action.Battle.DecreeCardID,
 			AttackerRoll:         attackerRoll,
 			DefenderRoll:         defenderRoll,
 			AttackerHitModifier:  modifiers.AttackerHitModifier,

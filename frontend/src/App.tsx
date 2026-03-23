@@ -218,6 +218,8 @@ export default function App() {
           boardLayout={boardLayout}
           selectedClearingID={selectedClearingID}
           keepClearingID={parsedState.marquise.keepClearingID}
+          vagabondClearingID={parsedState.vagabond.clearingID}
+          vagabondInForest={parsedState.vagabond.inForest}
           onSelectClearing={(clearingID) => {
             setSelectedClearingID(clearingID);
             setActiveModal("inspector");
@@ -277,10 +279,18 @@ export default function App() {
               <InspectorPanel
                 clearing={selectedClearing}
                 keepClearingID={parsedState.marquise.keepClearingID}
+                vagabondClearingID={parsedState.vagabond.clearingID}
+                vagabondInForest={parsedState.vagabond.inForest}
                 onUpdateClearing={updateClearing}
                 onSetKeepClearing={(clearingID) =>
                   updateState((draft) => {
                     draft.marquise.keepClearingID = clearingID;
+                  })
+                }
+                onSetVagabondClearing={(clearingID, inForest) =>
+                  updateState((draft) => {
+                    draft.vagabond.clearingID = clearingID;
+                    draft.vagabond.inForest = inForest;
                   })
                 }
                 onClose={() => setActiveModal(null)}
@@ -535,7 +545,7 @@ export default function App() {
                   </button>
                 </div>
                 <div className="compact-help">
-                  <p>1. Click a clearing to place warriors, buildings, wood, ruins, and the Keep.</p>
+                  <p>1. Click a clearing to place faction-specific warriors, buildings, sympathy, wood, ruins, the Keep, and the Vagabond.</p>
                   <p>2. Open Turn State and set the current Marquise step.</p>
                   <p>3. Use Generate Actions, then review or apply them from the Actions popup.</p>
                 </div>

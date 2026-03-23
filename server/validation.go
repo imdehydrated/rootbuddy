@@ -8,7 +8,11 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.Movement == nil {
 			return "movement payload is required"
 		}
-		if req.Action.Movement.MaxCount <= 0 || req.Action.Movement.From <= 0 || req.Action.Movement.To <= 0 {
+		count := req.Action.Movement.Count
+		if count <= 0 {
+			count = req.Action.Movement.MaxCount
+		}
+		if count <= 0 || req.Action.Movement.From <= 0 || req.Action.Movement.To <= 0 {
 			return "movement action must have positive count and valid clearing IDs"
 		}
 	case game.ActionBattleResolution:

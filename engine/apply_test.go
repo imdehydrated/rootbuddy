@@ -24,8 +24,8 @@ func TestApplyActionRecruit(t *testing.T) {
 				},
 			},
 		},
-		CurrentPhase: game.Birdsong,
-		CurrentStep:  game.StepRecruit,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 2,
 		},
@@ -50,8 +50,11 @@ func TestApplyActionRecruit(t *testing.T) {
 	if !next.TurnProgress.RecruitUsed {
 		t.Fatalf("expected recruit to be marked used after recruit action")
 	}
+	if next.TurnProgress.ActionsUsed != 1 {
+		t.Fatalf("expected recruit to consume 1 action, got %d", next.TurnProgress.ActionsUsed)
+	}
 	if next.CurrentPhase != game.Daylight {
-		t.Fatalf("expected recruit to advance phase to daylight, got %v", next.CurrentPhase)
+		t.Fatalf("expected recruit to remain in daylight, got %v", next.CurrentPhase)
 	}
 	if next.CurrentStep != game.StepDaylightActions {
 		t.Fatalf("expected recruit to advance step to daylight actions, got %v", next.CurrentStep)
@@ -66,11 +69,11 @@ func TestApplyActionRecruit(t *testing.T) {
 	if state.TurnProgress.RecruitUsed {
 		t.Fatalf("expected original recruit-used flag to remain false")
 	}
-	if state.CurrentPhase != game.Birdsong {
-		t.Fatalf("expected original phase to remain birdsong, got %v", state.CurrentPhase)
+	if state.CurrentPhase != game.Daylight {
+		t.Fatalf("expected original phase to remain daylight, got %v", state.CurrentPhase)
 	}
-	if state.CurrentStep != game.StepRecruit {
-		t.Fatalf("expected original step to remain recruit, got %v", state.CurrentStep)
+	if state.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected original step to remain daylight actions, got %v", state.CurrentStep)
 	}
 }
 
@@ -141,6 +144,7 @@ func TestApplyActionMovement(t *testing.T) {
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
 			Faction:  game.Marquise,
+			Count:    2,
 			MaxCount: 2,
 			From:     1,
 			To:       2,
@@ -170,6 +174,7 @@ func TestApplyActionBuild(t *testing.T) {
 			Clearings: []game.Clearing{
 				{
 					ID:        3,
+					Wood:      2,
 					Buildings: []game.Building{},
 				},
 			},
@@ -185,6 +190,9 @@ func TestApplyActionBuild(t *testing.T) {
 			Faction:      game.Marquise,
 			ClearingID:   3,
 			BuildingType: game.Sawmill,
+			WoodSources: []game.WoodSource{
+				{ClearingID: 3, Amount: 1},
+			},
 		},
 	}
 
@@ -200,12 +208,21 @@ func TestApplyActionBuild(t *testing.T) {
 	if next.Marquise.SawmillsPlaced != 2 {
 		t.Fatalf("expected sawmills placed to increase to 2, got %d", next.Marquise.SawmillsPlaced)
 	}
+	if next.Map.Clearings[0].Wood != 1 {
+		t.Fatalf("expected build to deduct 1 wood, got %d", next.Map.Clearings[0].Wood)
+	}
+	if next.VictoryPoints[game.Marquise] != 1 {
+		t.Fatalf("expected second sawmill to score 1 point, got %d", next.VictoryPoints[game.Marquise])
+	}
 
 	if len(state.Map.Clearings[0].Buildings) != 0 {
 		t.Fatalf("expected original clearing buildings to remain empty, got %+v", state.Map.Clearings[0].Buildings)
 	}
 	if state.Marquise.SawmillsPlaced != 1 {
 		t.Fatalf("expected original sawmills placed to remain 1, got %d", state.Marquise.SawmillsPlaced)
+	}
+	if state.Map.Clearings[0].Wood != 2 {
+		t.Fatalf("expected original clearing wood to remain 2, got %d", state.Map.Clearings[0].Wood)
 	}
 }
 
@@ -375,8 +392,8 @@ func TestApplyRecruitChangesSubsequentValidActions(t *testing.T) {
 			},
 		},
 		FactionTurn:  game.Marquise,
-		CurrentPhase: game.Birdsong,
-		CurrentStep:  game.StepRecruit,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 1,
 		},
@@ -396,6 +413,7 @@ func TestApplyRecruitChangesSubsequentValidActions(t *testing.T) {
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
 			Faction:  game.Marquise,
+			Count:    1,
 			MaxCount: 1,
 			From:     1,
 			To:       2,

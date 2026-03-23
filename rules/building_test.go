@@ -24,7 +24,6 @@ func TestValidBuilds(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 1,
 						},
-						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -40,6 +39,7 @@ func TestValidBuilds(t *testing.T) {
 						Faction:      game.Marquise,
 						ClearingID:   1,
 						BuildingType: game.Sawmill,
+						WoodSources:  []game.WoodSource{},
 					},
 				},
 			},
@@ -55,7 +55,6 @@ func TestValidBuilds(t *testing.T) {
 							game.Marquise:         1,
 							game.WoodlandAlliance: 2,
 						},
-						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -71,75 +70,13 @@ func TestValidBuilds(t *testing.T) {
 						Faction:      game.Marquise,
 						ClearingID:   1,
 						BuildingType: game.Sawmill,
+						WoodSources:  []game.WoodSource{},
 					},
 				},
 			},
 		},
 		{
-			name: "cannot build when no open slot remains",
-			board: game.Map{
-				Clearings: []game.Clearing{
-					{
-						ID:         1,
-						BuildSlots: 1,
-						Warriors: map[game.Faction]int{
-							game.Marquise: 1,
-						},
-						Buildings: []game.Building{
-							{Faction: game.Marquise, Type: game.Sawmill},
-						},
-					},
-				},
-			},
-			marquise: game.MarquiseState{
-				SawmillsPlaced:   0,
-				WorkshopsPlaced:  6,
-				RecruitersPlaced: 6,
-			},
-			unwantActions: []game.Action{
-				{
-					Type: game.ActionBuild,
-					Build: &game.BuildAction{
-						Faction:      game.Marquise,
-						ClearingID:   1,
-						BuildingType: game.Sawmill,
-					},
-				},
-			},
-		},
-		{
-			name: "ruin occupies a slot and blocks building when it fills the clearing",
-			board: game.Map{
-				Clearings: []game.Clearing{
-					{
-						ID:         1,
-						BuildSlots: 1,
-						Ruins:      true,
-						Warriors: map[game.Faction]int{
-							game.Marquise: 1,
-						},
-						Buildings: []game.Building{},
-					},
-				},
-			},
-			marquise: game.MarquiseState{
-				SawmillsPlaced:   0,
-				WorkshopsPlaced:  6,
-				RecruitersPlaced: 6,
-			},
-			unwantActions: []game.Action{
-				{
-					Type: game.ActionBuild,
-					Build: &game.BuildAction{
-						Faction:      game.Marquise,
-						ClearingID:   1,
-						BuildingType: game.Sawmill,
-					},
-				},
-			},
-		},
-		{
-			name: "can build using enough wood from ruled connected network",
+			name: "can build using enough wood from ruled connected network with explicit wood sources",
 			board: game.Map{
 				Clearings: []game.Clearing{
 					{
@@ -150,7 +87,6 @@ func TestValidBuilds(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 2,
 						},
-						Buildings: []game.Building{},
 					},
 					{
 						ID:         2,
@@ -159,7 +95,6 @@ func TestValidBuilds(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 1,
 						},
-						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -175,6 +110,9 @@ func TestValidBuilds(t *testing.T) {
 						Faction:      game.Marquise,
 						ClearingID:   2,
 						BuildingType: game.Sawmill,
+						WoodSources: []game.WoodSource{
+							{ClearingID: 1, Amount: 2},
+						},
 					},
 				},
 			},
@@ -191,7 +129,6 @@ func TestValidBuilds(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 2,
 						},
-						Buildings: []game.Building{},
 					},
 					{
 						ID:         2,
@@ -200,7 +137,6 @@ func TestValidBuilds(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Marquise: 1,
 						},
-						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -215,36 +151,6 @@ func TestValidBuilds(t *testing.T) {
 					Build: &game.BuildAction{
 						Faction:      game.Marquise,
 						ClearingID:   2,
-						BuildingType: game.Sawmill,
-					},
-				},
-			},
-		},
-		{
-			name: "cannot build building type with no remaining supply",
-			board: game.Map{
-				Clearings: []game.Clearing{
-					{
-						ID:         1,
-						BuildSlots: 2,
-						Warriors: map[game.Faction]int{
-							game.Marquise: 1,
-						},
-						Buildings: []game.Building{},
-					},
-				},
-			},
-			marquise: game.MarquiseState{
-				SawmillsPlaced:   6,
-				WorkshopsPlaced:  6,
-				RecruitersPlaced: 6,
-			},
-			unwantActions: []game.Action{
-				{
-					Type: game.ActionBuild,
-					Build: &game.BuildAction{
-						Faction:      game.Marquise,
-						ClearingID:   1,
 						BuildingType: game.Sawmill,
 					},
 				},

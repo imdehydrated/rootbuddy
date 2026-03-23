@@ -355,9 +355,19 @@ button.secondary {
   background: rgba(177, 80, 41, 0.92);
 }
 
+.token-chip.alliance,
+.token-chip.base,
+.token-chip.sympathy {
+  background: rgba(70, 118, 62, 0.92);
+}
+
 .token-chip.eyrie,
-.token-chip.enemy {
+.token-chip.roost {
   background: rgba(72, 97, 145, 0.92);
+}
+
+.token-chip.vagabond {
+  background: rgba(107, 90, 53, 0.92);
 }
 
 .token-chip.wood {
@@ -383,12 +393,26 @@ button.secondary {
   background: #fff4df;
 }
 
+.token-glyph.alliance {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #f1f8ea;
+}
+
 .token-glyph.eyrie {
   width: 0;
   height: 0;
   border-left: 0.32rem solid transparent;
   border-right: 0.32rem solid transparent;
   border-bottom: 0.6rem solid #f2f6ff;
+}
+
+.token-glyph.vagabond {
+  width: 0.48rem;
+  height: 0.62rem;
+  border-radius: 0.3rem 0.3rem 0.18rem 0.18rem;
+  background: #f8efd8;
 }
 
 .token-glyph.wood {
@@ -423,11 +447,25 @@ button.secondary {
   border-radius: 0.08rem;
 }
 
-.token-glyph.enemy {
+.token-glyph.roost {
   width: 0.58rem;
   height: 0.58rem;
   border-radius: 0.12rem;
   background: #edf3ff;
+}
+
+.token-glyph.base {
+  width: 0.6rem;
+  height: 0.48rem;
+  border-radius: 0.1rem;
+  background: #edf7ea;
+}
+
+.token-glyph.sympathy {
+  width: 0.62rem;
+  height: 0.52rem;
+  border-radius: 999px 999px 999px 999px / 78% 78% 44% 44%;
+  background: #edf7ea;
 }
 
 .token-glyph.keep {
@@ -456,9 +494,19 @@ button.secondary {
   background: rgba(177, 80, 41, 0.92);
 }
 
+.indicator-pill.alliance,
+.indicator-square.base,
+.indicator-square.sympathy {
+  background: rgba(70, 118, 62, 0.92);
+}
+
 .indicator-pill.eyrie,
-.indicator-square.enemy {
+.indicator-square.roost {
   background: rgba(72, 97, 145, 0.92);
+}
+
+.indicator-pill.vagabond {
+  background: rgba(107, 90, 53, 0.92);
 }
 
 .indicator-pill.wood {

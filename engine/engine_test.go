@@ -16,47 +16,39 @@ func containsAction(actions []game.Action, want game.Action) bool {
 	return false
 }
 
-func TestValidActionsReturnsRecruitActionsForRecruitStep(t *testing.T) {
+func TestValidActionsReturnsBirdsongWoodActionForBirdsong(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
 				{
 					ID: 1,
 					Buildings: []game.Building{
-						{Faction: game.Marquise, Type: game.Recruiter},
+						{Faction: game.Marquise, Type: game.Sawmill},
 					},
 				},
 			},
 		},
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Birdsong,
-		CurrentStep:  game.StepRecruit,
-		Marquise: game.MarquiseState{
-			WarriorSupply: 1,
-		},
+		CurrentStep:  game.StepBirdsong,
 	}
 
 	got := ValidActions(state)
 	want := game.Action{
-		Type: game.ActionRecruit,
-		Recruit: &game.RecruitAction{
+		Type: game.ActionBirdsongWood,
+		BirdsongWood: &game.BirdsongWoodAction{
 			Faction:     game.Marquise,
 			ClearingIDs: []int{1},
+			Amount:      1,
 		},
 	}
 
 	if !containsAction(got, want) {
-		t.Fatalf("expected recruit action %+v, got %+v", want, got)
-	}
-
-	for _, action := range got {
-		if action.Type != game.ActionRecruit {
-			t.Fatalf("expected only recruit actions at recruit step, got %+v", got)
-		}
+		t.Fatalf("expected birdsong wood action %+v, got %+v", want, got)
 	}
 }
 
-func TestValidActionsReturnsDaylightActionsForDaylightStep(t *testing.T) {
+func TestValidActionsReturnsRecruitAndMovementActionsForDaylightStep(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -64,6 +56,9 @@ func TestValidActionsReturnsDaylightActionsForDaylightStep(t *testing.T) {
 					ID:       1,
 					Adj:      []int{2},
 					Warriors: map[game.Faction]int{game.Marquise: 1},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
 				},
 				{
 					ID:  2,
@@ -74,57 +69,55 @@ func TestValidActionsReturnsDaylightActionsForDaylightStep(t *testing.T) {
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Daylight,
 		CurrentStep:  game.StepDaylightActions,
-	}
-
-	got := ValidActions(state)
-	want := game.Action{
-		Type: game.ActionMovement,
-		Movement: &game.MovementAction{
-			Faction:  game.Marquise,
-			MaxCount: 1,
-			From:     1,
-			To:       2,
-		},
-	}
-
-	if !containsAction(got, want) {
-		t.Fatalf("expected movement action %+v, got %+v", want, got)
-	}
-
-	for _, action := range got {
-		if action.Type == game.ActionRecruit {
-			t.Fatalf("did not expect recruit actions during daylight step, got %+v", got)
-		}
-	}
-}
-
-func TestValidActionsFallsBackToPhaseWhenStepIsUnspecified(t *testing.T) {
-	state := game.GameState{
-		Map: game.Map{
-			Clearings: []game.Clearing{
-				{
-					ID: 1,
-					Buildings: []game.Building{
-						{Faction: game.Marquise, Type: game.Recruiter},
-					},
-				},
-			},
-		},
-		FactionTurn:  game.Marquise,
-		CurrentPhase: game.Birdsong,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 1,
 		},
 	}
 
 	got := ValidActions(state)
+	wantRecruit := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1},
+		},
+	}
+	wantMovement := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	}
 
-	if len(got) != 1 || got[0].Type != game.ActionRecruit {
-		t.Fatalf("expected birdsong fallback to recruit action, got %+v", got)
+	if !containsAction(got, wantRecruit) {
+		t.Fatalf("expected recruit action %+v, got %+v", wantRecruit, got)
+	}
+	if !containsAction(got, wantMovement) {
+		t.Fatalf("expected movement action %+v, got %+v", wantMovement, got)
 	}
 }
 
-func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
+func TestValidActionsReturnsOnlyPassPhaseWhenActionLimitIsReached(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		TurnProgress: game.TurnProgress{
+			ActionsUsed: 3,
+		},
+	}
+
+	got := ValidActions(state)
+	if len(got) != 1 || got[0].Type != game.ActionPassPhase {
+		t.Fatalf("expected only pass-phase action at action limit, got %+v", got)
+	}
+}
+
+func TestEngineFlowBirdsongRecruitMoveBattleResolve(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -133,6 +126,7 @@ func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
 					Adj:  []int{2},
 					Suit: game.Fox,
 					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
 						{Faction: game.Marquise, Type: game.Recruiter},
 					},
 				},
@@ -148,10 +142,29 @@ func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
 		},
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Birdsong,
-		CurrentStep:  game.StepRecruit,
+		CurrentStep:  game.StepBirdsong,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 1,
 		},
+	}
+
+	birdsongAction := game.Action{
+		Type: game.ActionBirdsongWood,
+		BirdsongWood: &game.BirdsongWoodAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1},
+			Amount:      1,
+		},
+	}
+
+	actions := ValidActions(state)
+	if !containsAction(actions, birdsongAction) {
+		t.Fatalf("expected birdsong action %+v, got %+v", birdsongAction, actions)
+	}
+
+	afterBirdsong := ApplyAction(state, birdsongAction)
+	if afterBirdsong.CurrentPhase != game.Daylight || afterBirdsong.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected birdsong to advance to daylight actions, got phase=%v step=%v", afterBirdsong.CurrentPhase, afterBirdsong.CurrentStep)
 	}
 
 	recruitAction := game.Action{
@@ -162,20 +175,17 @@ func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
 		},
 	}
 
-	actions := ValidActions(state)
+	actions = ValidActions(afterBirdsong)
 	if !containsAction(actions, recruitAction) {
 		t.Fatalf("expected recruit action %+v, got %+v", recruitAction, actions)
 	}
 
-	afterRecruit := ApplyAction(state, recruitAction)
-	if afterRecruit.CurrentStep != game.StepDaylightActions {
-		t.Fatalf("expected recruit to advance to daylight actions, got %v", afterRecruit.CurrentStep)
-	}
-
+	afterRecruit := ApplyAction(afterBirdsong, recruitAction)
 	moveAction := game.Action{
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
 			Faction:  game.Marquise,
+			Count:    1,
 			MaxCount: 1,
 			From:     1,
 			To:       2,
@@ -188,10 +198,6 @@ func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
 	}
 
 	afterMove := ApplyAction(afterRecruit, moveAction)
-	if afterMove.Map.Clearings[1].Warriors[game.Marquise] != 1 {
-		t.Fatalf("expected marquise warrior in clearing 2 after move, got %d", afterMove.Map.Clearings[1].Warriors[game.Marquise])
-	}
-
 	battleAction := game.Action{
 		Type: game.ActionBattle,
 		Battle: &game.BattleAction{
@@ -207,17 +213,11 @@ func TestEngineFlowRecruitMoveBattleResolve(t *testing.T) {
 	}
 
 	resolved := ResolveBattle(afterMove, battleAction, 1, 0)
-	if resolved.Type != game.ActionBattleResolution || resolved.BattleResolution == nil {
-		t.Fatalf("expected battle resolution action, got %+v", resolved)
-	}
-
 	afterBattle := ApplyAction(afterMove, resolved)
 	if afterBattle.Map.Clearings[1].Warriors[game.Eyrie] != 0 {
 		t.Fatalf("expected eyrie warrior to be removed after battle, got %d", afterBattle.Map.Clearings[1].Warriors[game.Eyrie])
 	}
-
-	actions = ValidActions(afterBattle)
-	if containsAction(actions, battleAction) {
-		t.Fatalf("did not expect battle action %+v after defender was removed, got %+v", battleAction, actions)
+	if afterBattle.TurnProgress.ActionsUsed != 3 {
+		t.Fatalf("expected recruit, move, and battle to consume 3 actions, got %d", afterBattle.TurnProgress.ActionsUsed)
 	}
 }

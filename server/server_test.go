@@ -83,8 +83,8 @@ func TestHandleValidActions(t *testing.T) {
 				},
 			},
 			FactionTurn:  game.Marquise,
-			CurrentPhase: game.Birdsong,
-			CurrentStep:  game.StepRecruit,
+			CurrentPhase: game.Daylight,
+			CurrentStep:  game.StepDaylightActions,
 			Marquise: game.MarquiseState{
 				WarriorSupply: 1,
 			},
@@ -104,7 +104,14 @@ func TestHandleValidActions(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode valid actions response: %v", err)
 	}
-	if len(resp.Actions) != 1 || resp.Actions[0].Type != game.ActionRecruit {
+	foundRecruit := false
+	for _, action := range resp.Actions {
+		if action.Type == game.ActionRecruit {
+			foundRecruit = true
+			break
+		}
+	}
+	if !foundRecruit {
 		t.Fatalf("expected recruit action response, got %+v", resp.Actions)
 	}
 }
@@ -193,8 +200,8 @@ func TestHandleApplyAction(t *testing.T) {
 					{ID: 1},
 				},
 			},
-			CurrentPhase: game.Birdsong,
-			CurrentStep:  game.StepRecruit,
+			CurrentPhase: game.Daylight,
+			CurrentStep:  game.StepDaylightActions,
 			Marquise: game.MarquiseState{
 				WarriorSupply: 1,
 			},

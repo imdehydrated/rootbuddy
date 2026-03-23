@@ -8,3 +8,5 @@ const (
 	Eyrie
 	Vagabond
 )
+
+const Alliance Faction = WoodlandAlliance

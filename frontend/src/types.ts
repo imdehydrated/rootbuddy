@@ -3,6 +3,23 @@ export interface Building {
   type: number;
 }
 
+export interface Token {
+  faction: number;
+  type: number;
+}
+
+export interface Decree {
+  recruit: number[];
+  move: number[];
+  battle: number[];
+  build: number[];
+}
+
+export interface Item {
+  type: number;
+  status: number;
+}
+
 export type HighlightedClearing = {
   clearingID: number;
   role: "source" | "target" | "affected";
@@ -32,6 +49,7 @@ export interface Clearing {
   wood: number;
   warriors: Record<string, number>;
   buildings: Building[];
+  tokens: Token[];
 }
 
 export interface GameState {
@@ -42,6 +60,8 @@ export interface GameState {
   factionTurn: number;
   currentPhase: number;
   currentStep: number;
+  turnOrder: number[];
+  victoryPoints: Record<string, number>;
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
@@ -50,9 +70,49 @@ export interface GameState {
     recruitersPlaced: number;
     keepClearingID: number;
   };
+  eyrie: {
+    cardsInHand: Card[];
+    warriorSupply: number;
+    roostsPlaced: number;
+    leader: number;
+    availableLeaders: number[];
+    decree: Decree;
+    craftedThisTurn: boolean;
+  };
+  alliance: {
+    cardsInHand: Card[];
+    warriorSupply: number;
+    supporters: Card[];
+    officers: number;
+    foxBasePlaced: boolean;
+    rabbitBasePlaced: boolean;
+    mouseBasePlaced: boolean;
+    sympathyPlaced: number;
+  };
+  vagabond: {
+    cardsInHand: Card[];
+    character: number;
+    clearingID: number;
+    inForest: boolean;
+    items: Item[];
+    relationships: Record<string, number>;
+    questsCompleted: Card[];
+    questsAvailable: Card[];
+  };
   turnProgress: {
+    actionsUsed: number;
+    bonusActions: number;
+    marchesUsed: number;
     recruitUsed: boolean;
     usedWorkshopClearings: number[];
+    hasCrafted: boolean;
+    decreeColumnsResolved: number;
+    decreeCardsResolved: number;
+    resolvedDecreeCardIDs: number[];
+    cardsAddedToDecree: number;
+    officerActionsUsed: number;
+    hasOrganized: boolean;
+    hasSlipped: boolean;
   };
 }
 
@@ -60,19 +120,23 @@ export interface Action {
   type: number;
   movement?: {
     faction: number;
+    count: number;
     maxCount: number;
     from: number;
     to: number;
+    decreeCardID: number;
   } | null;
   battle?: {
     faction: number;
     clearingID: number;
     targetFaction: number;
+    decreeCardID: number;
   } | null;
   battleResolution?: {
     faction: number;
     clearingID: number;
     targetFaction: number;
+    decreeCardID: number;
     attackerRoll: number;
     defenderRoll: number;
     attackerHitModifier: number;
@@ -86,10 +150,16 @@ export interface Action {
     faction: number;
     clearingID: number;
     buildingType: number;
+    woodSources: Array<{
+      clearingID: number;
+      amount: number;
+    }>;
+    decreeCardID: number;
   } | null;
   recruit?: {
     faction: number;
     clearingIDs: number[];
+    decreeCardID: number;
   } | null;
   overwork?: {
     faction: number;
@@ -100,5 +170,87 @@ export interface Action {
     faction: number;
     cardID: number;
     usedWorkshopClearings: number[];
+  } | null;
+  addToDecree?: {
+    faction: number;
+    cardIDs: number[];
+    columns: number[];
+  } | null;
+  spreadSympathy?: {
+    faction: number;
+    clearingID: number;
+    supporterCardIDs: number[];
+  } | null;
+  revolt?: {
+    faction: number;
+    clearingID: number;
+    baseSuit: number;
+    supporterCardIDs: number[];
+  } | null;
+  mobilize?: {
+    faction: number;
+    cardID: number;
+  } | null;
+  train?: {
+    faction: number;
+    cardID: number;
+  } | null;
+  organize?: {
+    faction: number;
+    clearingID: number;
+  } | null;
+  explore?: {
+    faction: number;
+    clearingID: number;
+    itemType: number;
+  } | null;
+  quest?: {
+    faction: number;
+    cardID: number;
+    reward: number;
+  } | null;
+  aid?: {
+    faction: number;
+    targetFaction: number;
+    clearingID: number;
+    cardID: number;
+  } | null;
+  strike?: {
+    faction: number;
+    clearingID: number;
+    targetFaction: number;
+  } | null;
+  repair?: {
+    faction: number;
+    itemIndex: number;
+  } | null;
+  turmoil?: {
+    faction: number;
+    newLeader: number;
+  } | null;
+  daybreak?: {
+    faction: number;
+    refreshedItemIndexes: number[];
+  } | null;
+  slip?: {
+    faction: number;
+    from: number;
+    to: number;
+  } | null;
+  birdsongWood?: {
+    faction: number;
+    clearingIDs: number[];
+    amount: number;
+  } | null;
+  eveningDraw?: {
+    faction: number;
+    count: number;
+  } | null;
+  scoreRoosts?: {
+    faction: number;
+    points: number;
+  } | null;
+  passPhase?: {
+    faction: number;
   } | null;
 }

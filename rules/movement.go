@@ -34,15 +34,18 @@ func ValidMovementActions(faction game.Faction, m game.Map) []game.Action {
 				continue
 			}
 
-			moves = append(moves, game.Action{
-				Type: game.ActionMovement,
-				Movement: &game.MovementAction{
-					Faction:  faction,
-					MaxCount: available,
-					From:     origin.ID,
-					To:       destination.ID,
-				},
-			})
+			for count := 1; count <= available; count++ {
+				moves = append(moves, game.Action{
+					Type: game.ActionMovement,
+					Movement: &game.MovementAction{
+						Faction:  faction,
+						Count:    count,
+						MaxCount: available,
+						From:     origin.ID,
+						To:       destination.ID,
+					},
+				})
+			}
 		}
 	}
 	return moves

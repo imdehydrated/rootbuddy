@@ -4,7 +4,10 @@ type TurnStep int
 
 const (
 	StepUnspecified TurnStep = iota
-	StepRecruit
+	StepBirdsong
+	StepDaylightCraft
 	StepDaylightActions
 	StepEvening
 )
+
+const StepRecruit TurnStep = StepBirdsong

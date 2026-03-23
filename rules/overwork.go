@@ -17,7 +17,15 @@ func ValidOverworkActions(state game.GameState) []game.Action {
 		return actions
 	}
 
+	if state.CurrentStep != game.StepUnspecified && state.CurrentStep != game.StepDaylightActions {
+		return actions
+	}
+
 	if state.CurrentPhase != game.Daylight {
+		return actions
+	}
+
+	if state.TurnProgress.ActionsUsed >= 3+state.TurnProgress.BonusActions {
 		return actions
 	}
 

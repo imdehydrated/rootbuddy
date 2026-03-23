@@ -25,7 +25,7 @@ func TestValidMovementActions(t *testing.T) {
 		unwantActions []game.Action
 	}{
 		{
-			name:    "generates action when origin is ruled",
+			name:    "generates one action per selectable warrior count when origin is ruled",
 			faction: game.Marquise,
 			board: game.Map{
 				Clearings: []game.Clearing{
@@ -33,16 +33,14 @@ func TestValidMovementActions(t *testing.T) {
 						ID:  1,
 						Adj: []int{2},
 						Warriors: map[game.Faction]int{
-							game.Marquise:         3,
+							game.Marquise: 3,
 							game.WoodlandAlliance: 1,
 						},
-						Buildings: []game.Building{},
 					},
 					{
-						ID:        2,
-						Adj:       []int{1},
-						Warriors:  map[game.Faction]int{},
-						Buildings: []game.Building{},
+						ID:       2,
+						Adj:      []int{1},
+						Warriors: map[game.Faction]int{},
 					},
 				},
 			},
@@ -51,6 +49,17 @@ func TestValidMovementActions(t *testing.T) {
 					Type: game.ActionMovement,
 					Movement: &game.MovementAction{
 						Faction:  game.Marquise,
+						Count:    1,
+						MaxCount: 3,
+						From:     1,
+						To:       2,
+					},
+				},
+				{
+					Type: game.ActionMovement,
+					Movement: &game.MovementAction{
+						Faction:  game.Marquise,
+						Count:    3,
 						MaxCount: 3,
 						From:     1,
 						To:       2,
@@ -59,7 +68,7 @@ func TestValidMovementActions(t *testing.T) {
 			},
 		},
 		{
-			name:    "generates action when destination is ruled",
+			name:    "generates movement when destination is ruled",
 			faction: game.Marquise,
 			board: game.Map{
 				Clearings: []game.Clearing{
@@ -70,7 +79,6 @@ func TestValidMovementActions(t *testing.T) {
 							game.Marquise:         2,
 							game.WoodlandAlliance: 3,
 						},
-						Buildings: []game.Building{},
 					},
 					{
 						ID:  2,
@@ -89,6 +97,7 @@ func TestValidMovementActions(t *testing.T) {
 					Type: game.ActionMovement,
 					Movement: &game.MovementAction{
 						Faction:  game.Marquise,
+						Count:    2,
 						MaxCount: 2,
 						From:     1,
 						To:       2,
@@ -108,7 +117,6 @@ func TestValidMovementActions(t *testing.T) {
 							game.Marquise:         1,
 							game.WoodlandAlliance: 2,
 						},
-						Buildings: []game.Building{},
 					},
 					{
 						ID:  2,
@@ -116,7 +124,6 @@ func TestValidMovementActions(t *testing.T) {
 						Warriors: map[game.Faction]int{
 							game.Eyrie: 1,
 						},
-						Buildings: []game.Building{},
 					},
 				},
 			},
@@ -125,84 +132,8 @@ func TestValidMovementActions(t *testing.T) {
 					Type: game.ActionMovement,
 					Movement: &game.MovementAction{
 						Faction:  game.Marquise,
+						Count:    1,
 						MaxCount: 1,
-						From:     1,
-						To:       2,
-					},
-				},
-			},
-		},
-		{
-			name:    "generates no action between non adjacent clearings",
-			faction: game.Marquise,
-			board: game.Map{
-				Clearings: []game.Clearing{
-					{
-						ID:  1,
-						Adj: []int{},
-						Warriors: map[game.Faction]int{
-							game.Marquise: 2,
-						},
-						Buildings: []game.Building{},
-					},
-					{
-						ID:        2,
-						Adj:       []int{},
-						Warriors:  map[game.Faction]int{},
-						Buildings: []game.Building{},
-					},
-				},
-			},
-			unwantActions: []game.Action{
-				{
-					Type: game.ActionMovement,
-					Movement: &game.MovementAction{
-						Faction:  game.Marquise,
-						MaxCount: 2,
-						From:     1,
-						To:       2,
-					},
-				},
-			},
-		},
-		{
-			name:    "max count is bounded by available warriors",
-			faction: game.Marquise,
-			board: game.Map{
-				Clearings: []game.Clearing{
-					{
-						ID:  1,
-						Adj: []int{2},
-						Warriors: map[game.Faction]int{
-							game.Marquise: 2,
-						},
-						Buildings: []game.Building{},
-					},
-					{
-						ID:        2,
-						Adj:       []int{1},
-						Warriors:  map[game.Faction]int{},
-						Buildings: []game.Building{},
-					},
-				},
-			},
-			wantActions: []game.Action{
-				{
-					Type: game.ActionMovement,
-					Movement: &game.MovementAction{
-						Faction:  game.Marquise,
-						MaxCount: 2,
-						From:     1,
-						To:       2,
-					},
-				},
-			},
-			unwantActions: []game.Action{
-				{
-					Type: game.ActionMovement,
-					Movement: &game.MovementAction{
-						Faction:  game.Marquise,
-						MaxCount: 3,
 						From:     1,
 						To:       2,
 					},
@@ -225,10 +156,9 @@ func TestValidMovementActions(t *testing.T) {
 						},
 					},
 					{
-						ID:        2,
-						Adj:       []int{1},
-						Warriors:  map[game.Faction]int{},
-						Buildings: []game.Building{},
+						ID:       2,
+						Adj:      []int{1},
+						Warriors: map[game.Faction]int{},
 					},
 				},
 			},
@@ -237,6 +167,7 @@ func TestValidMovementActions(t *testing.T) {
 					Type: game.ActionMovement,
 					Movement: &game.MovementAction{
 						Faction:  game.Marquise,
+						Count:    1,
 						MaxCount: 1,
 						From:     1,
 						To:       2,

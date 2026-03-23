@@ -14,7 +14,7 @@ func TestValidRecruitActions(t *testing.T) {
 		unwantActions []game.Action
 	}{
 		{
-			name: "generates one recruit action when marquise has recruiters and enough supply",
+			name: "generates one recruit action during daylight actions when marquise has recruiters and enough supply",
 			state: game.GameState{
 				Map: game.Map{
 					Clearings: []game.Clearing{
@@ -34,10 +34,10 @@ func TestValidRecruitActions(t *testing.T) {
 				},
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
 				Marquise: game.MarquiseState{
 					WarriorSupply: 2,
 				},
-				TurnProgress: game.TurnProgress{},
 			},
 			wantActions: []game.Action{
 				{
@@ -64,10 +64,10 @@ func TestValidRecruitActions(t *testing.T) {
 				},
 				FactionTurn:  game.Eyrie,
 				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
 				Marquise: game.MarquiseState{
 					WarriorSupply: 1,
 				},
-				TurnProgress: game.TurnProgress{},
 			},
 			unwantActions: []game.Action{
 				{
@@ -80,7 +80,7 @@ func TestValidRecruitActions(t *testing.T) {
 			},
 		},
 		{
-			name: "no recruit action outside daylight",
+			name: "no recruit action outside daylight actions",
 			state: game.GameState{
 				Map: game.Map{
 					Clearings: []game.Clearing{
@@ -94,10 +94,10 @@ func TestValidRecruitActions(t *testing.T) {
 				},
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Birdsong,
+				CurrentStep:  game.StepBirdsong,
 				Marquise: game.MarquiseState{
 					WarriorSupply: 1,
 				},
-				TurnProgress: game.TurnProgress{},
 			},
 			unwantActions: []game.Action{
 				{
@@ -124,6 +124,7 @@ func TestValidRecruitActions(t *testing.T) {
 				},
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
 				Marquise: game.MarquiseState{
 					WarriorSupply: 1,
 				},
@@ -142,22 +143,27 @@ func TestValidRecruitActions(t *testing.T) {
 			},
 		},
 		{
-			name: "no recruit action when no recruiters are on the board",
+			name: "no recruit action when action limit is exhausted",
 			state: game.GameState{
 				Map: game.Map{
 					Clearings: []game.Clearing{
 						{
-							ID:        1,
-							Buildings: []game.Building{},
+							ID: 1,
+							Buildings: []game.Building{
+								{Faction: game.Marquise, Type: game.Recruiter},
+							},
 						},
 					},
 				},
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
 				Marquise: game.MarquiseState{
 					WarriorSupply: 1,
 				},
-				TurnProgress: game.TurnProgress{},
+				TurnProgress: game.TurnProgress{
+					ActionsUsed: 3,
+				},
 			},
 			unwantActions: []game.Action{
 				{
@@ -170,7 +176,7 @@ func TestValidRecruitActions(t *testing.T) {
 			},
 		},
 		{
-			name: "no recruit action when supply is less than recruiter count",
+			name: "limited supply generates one recruit action per valid recruiter subset",
 			state: game.GameState{
 				Map: game.Map{
 					Clearings: []game.Clearing{
@@ -186,21 +192,80 @@ func TestValidRecruitActions(t *testing.T) {
 								{Faction: game.Marquise, Type: game.Recruiter},
 							},
 						},
+						{
+							ID: 3,
+							Buildings: []game.Building{
+								{Faction: game.Marquise, Type: game.Recruiter},
+							},
+						},
 					},
 				},
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
 				Marquise: game.MarquiseState{
-					WarriorSupply: 1,
+					WarriorSupply: 2,
 				},
-				TurnProgress: game.TurnProgress{},
+			},
+			wantActions: []game.Action{
+				{
+					Type: game.ActionRecruit,
+					Recruit: &game.RecruitAction{
+						Faction:     game.Marquise,
+						ClearingIDs: []int{1, 2},
+					},
+				},
+				{
+					Type: game.ActionRecruit,
+					Recruit: &game.RecruitAction{
+						Faction:     game.Marquise,
+						ClearingIDs: []int{1, 3},
+					},
+				},
+				{
+					Type: game.ActionRecruit,
+					Recruit: &game.RecruitAction{
+						Faction:     game.Marquise,
+						ClearingIDs: []int{2, 3},
+					},
+				},
 			},
 			unwantActions: []game.Action{
 				{
 					Type: game.ActionRecruit,
 					Recruit: &game.RecruitAction{
 						Faction:     game.Marquise,
-						ClearingIDs: []int{1, 2},
+						ClearingIDs: []int{1, 2, 3},
+					},
+				},
+			},
+		},
+		{
+			name: "zero supply produces no recruit actions even with recruiters on the map",
+			state: game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID: 1,
+							Buildings: []game.Building{
+								{Faction: game.Marquise, Type: game.Recruiter},
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Marquise,
+				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightActions,
+				Marquise: game.MarquiseState{
+					WarriorSupply: 0,
+				},
+			},
+			unwantActions: []game.Action{
+				{
+					Type: game.ActionRecruit,
+					Recruit: &game.RecruitAction{
+						Faction:     game.Marquise,
+						ClearingIDs: []int{1},
 					},
 				},
 			},

@@ -9,4 +9,5 @@ type Clearing struct {
 	Wood       int
 	Warriors   map[Faction]int
 	Buildings  []Building
+	Tokens     []Token
 }

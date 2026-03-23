@@ -8,6 +8,8 @@ type BoardPanelProps = {
   boardLayout: BoardLayout;
   selectedClearingID: number;
   keepClearingID: number;
+  vagabondClearingID: number;
+  vagabondInForest: boolean;
   highlightedClearings?: HighlightedClearing[];
   onSelectClearing: (clearingID: number) => void;
 };
@@ -17,6 +19,8 @@ export function BoardPanel({
   boardLayout,
   selectedClearingID,
   keepClearingID,
+  vagabondClearingID,
+  vagabondInForest,
   highlightedClearings = [],
   onSelectClearing
 }: BoardPanelProps) {
@@ -67,6 +71,7 @@ export function BoardPanel({
               position={clearingPosition(clearing.id, index, boardLayout.clearingPositions)}
               isSelected={clearing.id === selectedClearingID}
               hasKeep={clearing.id === keepClearingID}
+              hasVagabond={!vagabondInForest && clearing.id === vagabondClearingID}
               highlightRole={highlightByClearing.get(clearing.id)}
               onClick={() => onSelectClearing(clearing.id)}
             />
