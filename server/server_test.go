@@ -44,6 +44,29 @@ func TestHandleAPIHealthCheck(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 for API health check, got %d", rec.Code)
 	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected CORS allow-origin header, got %q", got)
+	}
+}
+
+func TestHandleCORSPreflight(t *testing.T) {
+	req := httptest.NewRequest(http.MethodOptions, "/api/actions/valid", nil)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for CORS preflight, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected CORS allow-origin header, got %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, OPTIONS" {
+		t.Fatalf("expected CORS allow-methods header, got %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+		t.Fatalf("expected CORS allow-headers header, got %q", got)
+	}
 }
 
 func TestHandleValidActions(t *testing.T) {

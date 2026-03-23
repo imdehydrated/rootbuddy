@@ -47,6 +47,7 @@ The rules layer is intentionally pure: given a state, it returns legal actions w
 Requirements:
 
 - Go 1.26+
+- Node.js 20+
 
 Start the server:
 
@@ -55,6 +56,16 @@ go run .
 ```
 
 The server listens on `http://localhost:8080`.
+
+Start the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on `http://localhost:5173`.
 
 ## API
 
@@ -84,6 +95,8 @@ The codebase includes unit and integration-style tests for:
 - rules logic
 - engine state transitions
 - HTTP handlers
+
+The frontend is scaffolded as a separate React + TypeScript app under `frontend/`.
 
 Run the test suite with:
 

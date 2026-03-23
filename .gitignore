@@ -3,3 +3,5 @@
 coverage.out
 EXECUTION-PLAN.md
 AGENTS.md
+frontend/node_modules/
+frontend/dist/

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/boardlayouts.ts","./src/gamehelpers.ts","./src/labels.ts","./src/main.tsx","./src/samplestate.ts","./src/types.ts","./src/components/boardpanel.tsx","./src/components/clearingmarker.tsx","./src/components/inspectorpanel.tsx"],"version":"5.9.3"}

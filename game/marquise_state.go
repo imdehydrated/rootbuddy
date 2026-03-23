@@ -6,4 +6,5 @@ type MarquiseState struct {
 	SawmillsPlaced   int
 	WorkshopsPlaced  int
 	RecruitersPlaced int
+	KeepClearingID   int
 }

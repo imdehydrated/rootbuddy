@@ -4,6 +4,7 @@ import "github.com/imdehydrated/rootbuddy/game"
 
 func AutumnMap() game.Map {
 	return game.Map{
+		ID: game.AutumnMapID,
 		Clearings: []game.Clearing{
 			{
 				ID:         1,
