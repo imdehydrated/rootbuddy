@@ -60,11 +60,13 @@ const (
 )
 
 type MovementAction struct {
-	Faction  Faction
-	Count    int
-	MaxCount int
-	From     int
-	To       int
+	Faction      Faction
+	Count        int
+	MaxCount     int
+	From         int
+	To           int
+	FromForestID int
+	ToForestID   int
 	DecreeCardID CardID
 }
 
@@ -76,8 +78,8 @@ type BattleAction struct {
 }
 
 type BattleModifiers struct {
-	AttackerHitModifier int
-	DefenderHitModifier int
+	AttackerHitModifier  int
+	DefenderHitModifier  int
 	IgnoreHitsToAttacker bool
 	IgnoreHitsToDefender bool
 }
@@ -111,8 +113,8 @@ type WoodSource struct {
 }
 
 type RecruitAction struct {
-	Faction     Faction
-	ClearingIDs []int
+	Faction      Faction
+	ClearingIDs  []int
 	DecreeCardID CardID
 }
 
@@ -185,9 +187,10 @@ const (
 )
 
 type QuestAction struct {
-	Faction Faction
-	CardID  CardID
-	Reward  QuestReward
+	Faction     Faction
+	QuestID     QuestID
+	ItemIndexes []int
+	Reward      QuestReward
 }
 
 type AidAction struct {
@@ -219,9 +222,11 @@ type DaybreakAction struct {
 }
 
 type SlipAction struct {
-	Faction Faction
-	From    int
-	To      int
+	Faction      Faction
+	From         int
+	To           int
+	FromForestID int
+	ToForestID   int
 }
 
 type BirdsongWoodAction struct {

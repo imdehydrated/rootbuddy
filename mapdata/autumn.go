@@ -47,6 +47,7 @@ func AutumnMap() game.Map {
 				BuildSlots: 2,
 				Adj:        []int{2, 11, 3},
 				Ruins:      true,
+				RuinItems:  []game.ItemType{game.ItemSword},
 			},
 			{
 				ID:         7,
@@ -75,6 +76,7 @@ func AutumnMap() game.Map {
 				BuildSlots: 2,
 				Adj:        []int{1, 2, 12},
 				Ruins:      true,
+				RuinItems:  []game.ItemType{game.ItemHammer},
 			},
 			{
 				ID:         11,
@@ -82,6 +84,7 @@ func AutumnMap() game.Map {
 				BuildSlots: 3,
 				Adj:        []int{6, 3, 12},
 				Ruins:      true,
+				RuinItems:  []game.ItemType{game.ItemBag},
 			},
 			{
 				ID:         12,
@@ -89,7 +92,17 @@ func AutumnMap() game.Map {
 				BuildSlots: 2,
 				Adj:        []int{4, 9, 10, 11, 7},
 				Ruins:      true,
+				RuinItems:  []game.ItemType{game.ItemCoin},
 			},
+		},
+		Forests: []game.Forest{
+			{ID: 1, AdjacentClearings: []int{1, 5}},
+			{ID: 2, AdjacentClearings: []int{5, 2, 10}},
+			{ID: 3, AdjacentClearings: []int{2, 6, 11, 3}},
+			{ID: 4, AdjacentClearings: []int{3, 7, 8}},
+			{ID: 5, AdjacentClearings: []int{8, 4, 12, 7}},
+			{ID: 6, AdjacentClearings: []int{4, 9, 1}},
+			{ID: 7, AdjacentClearings: []int{1, 10, 12, 11, 6, 2}},
 		},
 	}
 }

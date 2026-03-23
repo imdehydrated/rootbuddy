@@ -43,13 +43,23 @@ const (
 	RelAllied
 )
 
+type QuestID int
+
+type Quest struct {
+	ID            QuestID
+	Name          string
+	Suit          Suit
+	RequiredItems []ItemType
+}
+
 type VagabondState struct {
 	CardsInHand     []Card
 	Character       VagabondCharacter
 	ClearingID      int
+	ForestID        int
 	InForest        bool
 	Items           []Item
 	Relationships   map[Faction]RelationshipLevel
-	QuestsCompleted []Card
-	QuestsAvailable []Card
+	QuestsCompleted []Quest
+	QuestsAvailable []Quest
 }

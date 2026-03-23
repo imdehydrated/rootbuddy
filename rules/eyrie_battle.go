@@ -5,7 +5,7 @@ import "github.com/imdehydrated/rootbuddy/game"
 func ValidEyrieBattleActions(state game.GameState, cardID game.CardID) []game.Action {
 	actions := []game.Action{}
 
-	for _, action := range ValidBattles(game.Eyrie, state.Map) {
+	for _, action := range ValidBattlesInState(game.Eyrie, state) {
 		if action.Battle == nil {
 			continue
 		}

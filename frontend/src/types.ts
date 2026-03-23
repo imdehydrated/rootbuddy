@@ -15,9 +15,21 @@ export interface Decree {
   build: number[];
 }
 
+export interface Forest {
+  id: number;
+  adjacentClearings: number[];
+}
+
 export interface Item {
   type: number;
   status: number;
+}
+
+export interface Quest {
+  id: number;
+  name: string;
+  suit: number;
+  requiredItems: number[];
 }
 
 export type HighlightedClearing = {
@@ -46,6 +58,7 @@ export interface Clearing {
   buildSlots: number;
   adj: number[];
   ruins: boolean;
+  ruinItems: number[];
   wood: number;
   warriors: Record<string, number>;
   buildings: Building[];
@@ -56,6 +69,7 @@ export interface GameState {
   map: {
     id: string;
     clearings: Clearing[];
+    forests: Forest[];
   };
   factionTurn: number;
   currentPhase: number;
@@ -93,11 +107,12 @@ export interface GameState {
     cardsInHand: Card[];
     character: number;
     clearingID: number;
+    forestID: number;
     inForest: boolean;
     items: Item[];
     relationships: Record<string, number>;
-    questsCompleted: Card[];
-    questsAvailable: Card[];
+    questsCompleted: Quest[];
+    questsAvailable: Quest[];
   };
   turnProgress: {
     actionsUsed: number;
@@ -124,6 +139,8 @@ export interface Action {
     maxCount: number;
     from: number;
     to: number;
+    fromForestID: number;
+    toForestID: number;
     decreeCardID: number;
   } | null;
   battle?: {
@@ -206,7 +223,8 @@ export interface Action {
   } | null;
   quest?: {
     faction: number;
-    cardID: number;
+    questID: number;
+    itemIndexes: number[];
     reward: number;
   } | null;
   aid?: {
@@ -236,6 +254,8 @@ export interface Action {
     faction: number;
     from: number;
     to: number;
+    fromForestID: number;
+    toForestID: number;
   } | null;
   birdsongWood?: {
     faction: number;

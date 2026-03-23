@@ -21,6 +21,30 @@ func ApplyAction(state game.GameState, action game.Action) game.GameState {
 		applyOverwork(&next, action)
 	case game.ActionCraft:
 		applyCraft(&next, action)
+	case game.ActionDaybreak:
+		applyDaybreak(&next, action)
+	case game.ActionSlip:
+		applySlip(&next, action)
+	case game.ActionExplore:
+		applyExplore(&next, action)
+	case game.ActionAid:
+		applyAid(&next, action)
+	case game.ActionQuest:
+		applyQuest(&next, action)
+	case game.ActionStrike:
+		applyStrike(&next, action)
+	case game.ActionRepair:
+		applyRepair(&next, action)
+	case game.ActionSpreadSympathy:
+		applySpreadSympathy(&next, action)
+	case game.ActionRevolt:
+		applyRevolt(&next, action)
+	case game.ActionMobilize:
+		applyMobilize(&next, action)
+	case game.ActionTrain:
+		applyTrain(&next, action)
+	case game.ActionOrganize:
+		applyOrganize(&next, action)
 	case game.ActionAddToDecree:
 		applyAddToDecree(&next, action)
 	case game.ActionTurmoil:
@@ -52,6 +76,11 @@ func cloneState(state game.GameState) game.GameState {
 			copy(cloned.Adj, clearing.Adj)
 		}
 
+		if clearing.RuinItems != nil {
+			cloned.RuinItems = make([]game.ItemType, len(clearing.RuinItems))
+			copy(cloned.RuinItems, clearing.RuinItems)
+		}
+
 		if clearing.Warriors != nil {
 			cloned.Warriors = make(map[game.Faction]int, len(clearing.Warriors))
 			for faction, count := range clearing.Warriors {
@@ -70,6 +99,18 @@ func cloneState(state game.GameState) game.GameState {
 		}
 
 		next.Map.Clearings[i] = cloned
+	}
+
+	if state.Map.Forests != nil {
+		next.Map.Forests = make([]game.Forest, len(state.Map.Forests))
+		for i, forest := range state.Map.Forests {
+			cloned := forest
+			if forest.AdjacentClearings != nil {
+				cloned.AdjacentClearings = make([]int, len(forest.AdjacentClearings))
+				copy(cloned.AdjacentClearings, forest.AdjacentClearings)
+			}
+			next.Map.Forests[i] = cloned
+		}
 	}
 
 	if state.TurnOrder != nil {
@@ -132,12 +173,12 @@ func cloneState(state game.GameState) game.GameState {
 	}
 
 	if state.Vagabond.QuestsCompleted != nil {
-		next.Vagabond.QuestsCompleted = make([]game.Card, len(state.Vagabond.QuestsCompleted))
+		next.Vagabond.QuestsCompleted = make([]game.Quest, len(state.Vagabond.QuestsCompleted))
 		copy(next.Vagabond.QuestsCompleted, state.Vagabond.QuestsCompleted)
 	}
 
 	if state.Vagabond.QuestsAvailable != nil {
-		next.Vagabond.QuestsAvailable = make([]game.Card, len(state.Vagabond.QuestsAvailable))
+		next.Vagabond.QuestsAvailable = make([]game.Quest, len(state.Vagabond.QuestsAvailable))
 		copy(next.Vagabond.QuestsAvailable, state.Vagabond.QuestsAvailable)
 	}
 
@@ -182,6 +223,80 @@ func removeCardByID(cards []game.Card, id game.CardID) []game.Card {
 	return cards
 }
 
+func removeCardsByID(cards []game.Card, ids []game.CardID) []game.Card {
+	remaining := cards
+	for _, id := range ids {
+		remaining = removeCardByID(remaining, id)
+	}
+
+	return remaining
+}
+
+func setAllianceBasePlaced(state *game.GameState, suit game.Suit, placed bool) {
+	switch suit {
+	case game.Fox:
+		state.Alliance.FoxBasePlaced = placed
+	case game.Rabbit:
+		state.Alliance.RabbitBasePlaced = placed
+	case game.Mouse:
+		state.Alliance.MouseBasePlaced = placed
+	}
+}
+
+func allianceHasAnyBase(state game.GameState) bool {
+	return state.Alliance.FoxBasePlaced || state.Alliance.RabbitBasePlaced || state.Alliance.MouseBasePlaced
+}
+
+func addAllianceSupporter(state *game.GameState, card game.Card) {
+	if !allianceHasAnyBase(*state) && len(state.Alliance.Supporters) >= 5 {
+		return
+	}
+
+	state.Alliance.Supporters = append(state.Alliance.Supporters, card)
+}
+
+func cardMatchesSuitOrBird(card game.Card, suit game.Suit) bool {
+	return card.Suit == suit || card.Suit == game.Bird
+}
+
+func transferOutrageCard(state *game.GameState, faction game.Faction, suit game.Suit) {
+	if faction == game.Alliance {
+		return
+	}
+
+	var hand *[]game.Card
+	switch faction {
+	case game.Marquise:
+		hand = &state.Marquise.CardsInHand
+	case game.Eyrie:
+		hand = &state.Eyrie.CardsInHand
+	case game.Vagabond:
+		hand = &state.Vagabond.CardsInHand
+	default:
+		return
+	}
+
+	for i, card := range *hand {
+		if !cardMatchesSuitOrBird(card, suit) {
+			continue
+		}
+
+		addAllianceSupporter(state, card)
+		*hand = append((*hand)[:i], (*hand)[i+1:]...)
+		return
+	}
+}
+
+func hasAllianceSympathy(clearing game.Clearing) bool {
+	for _, token := range clearing.Tokens {
+		if token.Faction == game.Alliance && token.Type == game.TokenSympathy {
+			return true
+		}
+	}
+
+	return false
+}
+
 func applyRecruit(state *game.GameState, action game.Action) {
 	if action.Recruit == nil {
 		return
@@ -203,6 +318,8 @@ func applyRecruit(state *game.GameState, action game.Action) {
 			state.Marquise.WarriorSupply--
 		case game.Eyrie:
 			state.Eyrie.WarriorSupply--
+		case game.Alliance:
+			state.Alliance.WarriorSupply--
 		}
 	}
 
@@ -213,6 +330,25 @@ func applyRecruit(state *game.GameState, action game.Action) {
 
 func applyMovement(state *game.GameState, action game.Action) {
 	if action.Movement == nil {
+		return
+	}
+
+	if action.Movement.Faction == game.Vagabond {
+		if action.Movement.ToForestID != 0 {
+			state.Vagabond.ClearingID = 0
+			state.Vagabond.ForestID = action.Movement.ToForestID
+			state.Vagabond.InForest = true
+		} else {
+			state.Vagabond.ClearingID = action.Movement.To
+			state.Vagabond.ForestID = 0
+			state.Vagabond.InForest = false
+		}
+		exhaustReadyItemsByType(state, game.ItemBoots, max(1, action.Movement.Count))
+
+		toIndex := findClearingIndex(state.Map, action.Movement.To)
+		if !state.Vagabond.InForest && toIndex != -1 && hasAllianceSympathy(state.Map.Clearings[toIndex]) {
+			transferOutrageCard(state, action.Movement.Faction, state.Map.Clearings[toIndex].Suit)
+		}
 		return
 	}
 
@@ -236,6 +372,10 @@ func applyMovement(state *game.GameState, action game.Action) {
 		state.Map.Clearings[toIndex].Warriors = map[game.Faction]int{}
 	}
 	state.Map.Clearings[toIndex].Warriors[action.Movement.Faction] += moved
+
+	if action.Movement.Faction != game.Alliance && hasAllianceSympathy(state.Map.Clearings[toIndex]) {
+		transferOutrageCard(state, action.Movement.Faction, state.Map.Clearings[toIndex].Suit)
+	}
 }
 
 func removeWarriorLosses(clearing *game.Clearing, faction game.Faction, losses int) int {
@@ -288,12 +428,55 @@ func removeBuildingLosses(state *game.GameState, clearing *game.Clearing, factio
 			if faction == game.Eyrie && building.Type == game.Roost && state.Eyrie.RoostsPlaced > 0 {
 				state.Eyrie.RoostsPlaced--
 			}
+			if faction == game.Alliance && building.Type == game.Base {
+				setAllianceBasePlaced(state, clearing.Suit, false)
+			}
 			losses--
 			continue
 		}
 		remaining = append(remaining, building)
 	}
 	clearing.Buildings = remaining
+}
+
+func removeTokenLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) (int, int, int) {
+	if losses <= 0 {
+		return losses, 0, 0
+	}
+
+	removedTokens := 0
+	removedSympathy := 0
+	if len(clearing.Tokens) > 0 {
+		remaining := make([]game.Token, 0, len(clearing.Tokens))
+		for _, token := range clearing.Tokens {
+			if losses > 0 && token.Faction == faction {
+				if token.Faction == game.Alliance && token.Type == game.TokenSympathy && state.Alliance.SympathyPlaced > 0 {
+					state.Alliance.SympathyPlaced--
+					removedSympathy++
+				}
+				if token.Faction == game.Marquise && token.Type == game.TokenKeep {
+					state.Marquise.KeepClearingID = 0
+				}
+				losses--
+				removedTokens++
+				continue
+			}
+			remaining = append(remaining, token)
+		}
+		clearing.Tokens = remaining
+	}
+
+	if losses > 0 && faction == game.Marquise && clearing.Wood > 0 {
+		removedWood := losses
+		if removedWood > clearing.Wood {
+			removedWood = clearing.Wood
+		}
+		clearing.Wood -= removedWood
+		losses -= removedWood
+		removedTokens += removedWood
+	}
+
+	return losses, removedTokens, removedSympathy
 }
 
 func applyBattleResolution(state *game.GameState, action game.Action) {
@@ -307,12 +490,41 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	}
 
 	clearing := &state.Map.Clearings[index]
-	removeWarriorLosses(clearing, action.BattleResolution.Faction, action.BattleResolution.AttackerLosses)
+	if action.BattleResolution.Faction == game.Vagabond {
+		exhaustReadyItemsByType(state, game.ItemSword, 1)
+		damageVagabondItems(state, action.BattleResolution.AttackerLosses)
+	} else {
+		removeWarriorLosses(clearing, action.BattleResolution.Faction, action.BattleResolution.AttackerLosses)
+	}
+
+	if action.BattleResolution.TargetFaction == game.Vagabond {
+		exhaustReadyItemsByType(state, game.ItemSword, 1)
+		damageVagabondItems(state, action.BattleResolution.DefenderLosses)
+		return
+	}
+
+	targetWarriorsBefore := 0
+	if clearing.Warriors != nil {
+		targetWarriorsBefore = clearing.Warriors[action.BattleResolution.TargetFaction]
+	}
 	remainingDefenderLosses := removeWarriorLosses(clearing, action.BattleResolution.TargetFaction, action.BattleResolution.DefenderLosses)
 	beforeBuildings := len(clearing.Buildings)
 	removeBuildingLosses(state, clearing, action.BattleResolution.TargetFaction, remainingDefenderLosses)
 	removedBuildings := beforeBuildings - len(clearing.Buildings)
-	scoreBattleRemovals(state, action.BattleResolution.Faction, removedBuildings, 0)
+	remainingDefenderLosses -= removedBuildings
+	_, removedTokens, removedSympathy := removeTokenLosses(state, clearing, action.BattleResolution.TargetFaction, remainingDefenderLosses)
+	removedWarriors := targetWarriorsBefore
+	if clearing.Warriors != nil {
+		removedWarriors -= clearing.Warriors[action.BattleResolution.TargetFaction]
+	}
+	scoreBattleRemovals(state, action.BattleResolution.Faction, removedBuildings, removedTokens)
+
+	if removedSympathy > 0 && action.BattleResolution.Faction != game.Alliance {
+		transferOutrageCard(state, action.BattleResolution.Faction, clearing.Suit)
+	}
+	if action.BattleResolution.Faction == game.Vagabond && removedWarriors+removedBuildings+removedTokens > 0 {
+		setVagabondRelationship(state, action.BattleResolution.TargetFaction, game.RelHostile)
+	}
 }
 
 func applyBuild(state *game.GameState, action game.Action) {
@@ -328,8 +540,8 @@ func applyBuild(state *game.GameState, action game.Action) {
 	state.Map.Clearings[index].Buildings = append(
 		state.Map.Clearings[index].Buildings,
 		game.Building{
-			Faction:      action.Build.Faction,
-			Type:         action.Build.BuildingType,
+			Faction: action.Build.Faction,
+			Type:    action.Build.BuildingType,
 		},
 	)
 
@@ -345,6 +557,8 @@ func applyBuild(state *game.GameState, action game.Action) {
 		state.Marquise.RecruitersPlaced++
 	case game.Roost:
 		state.Eyrie.RoostsPlaced++
+	case game.Base:
+		setAllianceBasePlaced(state, state.Map.Clearings[index].Suit, true)
 	}
 
 	for _, source := range action.Build.WoodSources {
@@ -387,11 +601,186 @@ func applyCraft(state *game.GameState, action game.Action) {
 		state.Marquise.CardsInHand = removeCardByID(state.Marquise.CardsInHand, action.Craft.CardID)
 	case game.Eyrie:
 		state.Eyrie.CardsInHand = removeCardByID(state.Eyrie.CardsInHand, action.Craft.CardID)
+	case game.Alliance:
+		state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, action.Craft.CardID)
+	case game.Vagabond:
+		state.Vagabond.CardsInHand = removeCardByID(state.Vagabond.CardsInHand, action.Craft.CardID)
+		exhaustReadyItemsByType(state, game.ItemHammer, len(action.Craft.UsedWorkshopClearings))
 	}
 	state.TurnProgress.UsedWorkshopClearings = append(
 		state.TurnProgress.UsedWorkshopClearings,
 		action.Craft.UsedWorkshopClearings...,
 	)
+}
+
+func applySpreadSympathy(state *game.GameState, action game.Action) {
+	if action.SpreadSympathy == nil {
+		return
+	}
+
+	index := findClearingIndex(state.Map, action.SpreadSympathy.ClearingID)
+	if index == -1 {
+		return
+	}
+
+	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.SpreadSympathy.SupporterCardIDs)
+	state.Map.Clearings[index].Tokens = append(state.Map.Clearings[index].Tokens, game.Token{
+		Faction: game.Alliance,
+		Type:    game.TokenSympathy,
+	})
+	scoreAllianceSympathy(state, state.Alliance.SympathyPlaced)
+	state.Alliance.SympathyPlaced++
+}
+
+func removeEnemyPiecesForRevolt(state *game.GameState, clearing *game.Clearing) int {
+	removedPieces := 0
+
+	for faction, warriors := range clearing.Warriors {
+		if faction == game.Alliance || warriors <= 0 {
+			continue
+		}
+		removedPieces += warriors
+		clearing.Warriors[faction] = 0
+	}
+
+	if len(clearing.Buildings) > 0 {
+		remaining := make([]game.Building, 0, len(clearing.Buildings))
+		for _, building := range clearing.Buildings {
+			if building.Faction == game.Alliance {
+				remaining = append(remaining, building)
+				continue
+			}
+
+			if building.Faction == game.Marquise {
+				decrementPlacedBuildingCounter(state, building.Type)
+			}
+			if building.Faction == game.Eyrie && building.Type == game.Roost && state.Eyrie.RoostsPlaced > 0 {
+				state.Eyrie.RoostsPlaced--
+			}
+			if building.Faction == game.Alliance && building.Type == game.Base {
+				setAllianceBasePlaced(state, clearing.Suit, false)
+			}
+			removedPieces++
+		}
+		clearing.Buildings = remaining
+	}
+
+	if len(clearing.Tokens) > 0 {
+		remaining := make([]game.Token, 0, len(clearing.Tokens))
+		for _, token := range clearing.Tokens {
+			if token.Faction == game.Alliance {
+				remaining = append(remaining, token)
+				continue
+			}
+
+			if token.Faction == game.Marquise && token.Type == game.TokenKeep {
+				state.Marquise.KeepClearingID = 0
+			}
+			removedPieces++
+		}
+		clearing.Tokens = remaining
+	}
+
+	if clearing.Wood > 0 {
+		removedPieces += clearing.Wood
+		clearing.Wood = 0
+	}
+
+	return removedPieces
+}
+
+func sympathyCountBySuit(board game.Map, suit game.Suit) int {
+	count := 0
+	for _, clearing := range board.Clearings {
+		if clearing.Suit != suit || !hasAllianceSympathy(clearing) {
+			continue
+		}
+		count++
+	}
+
+	return count
+}
+
+func applyRevolt(state *game.GameState, action game.Action) {
+	if action.Revolt == nil {
+		return
+	}
+
+	index := findClearingIndex(state.Map, action.Revolt.ClearingID)
+	if index == -1 {
+		return
+	}
+
+	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.Revolt.SupporterCardIDs)
+	clearing := &state.Map.Clearings[index]
+	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
+	clearing.Buildings = append(clearing.Buildings, game.Building{
+		Faction: game.Alliance,
+		Type:    game.Base,
+	})
+	setAllianceBasePlaced(state, action.Revolt.BaseSuit, true)
+
+	if clearing.Warriors == nil {
+		clearing.Warriors = map[game.Faction]int{}
+	}
+
+	recruitCount := sympathyCountBySuit(state.Map, action.Revolt.BaseSuit)
+	if recruitCount > state.Alliance.WarriorSupply {
+		recruitCount = state.Alliance.WarriorSupply
+	}
+	clearing.Warriors[game.Alliance] += recruitCount
+	state.Alliance.WarriorSupply -= recruitCount
+	state.Alliance.Officers++
+	addVictoryPoints(state, game.Alliance, removedPieces)
+}
+
+func applyMobilize(state *game.GameState, action game.Action) {
+	if action.Mobilize == nil {
+		return
+	}
+
+	for _, card := range state.Alliance.CardsInHand {
+		if card.ID != action.Mobilize.CardID {
+			continue
+		}
+
+		state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, card.ID)
+		addAllianceSupporter(state, card)
+		return
+	}
+}
+
+func applyTrain(state *game.GameState, action game.Action) {
+	if action.Train == nil {
+		return
+	}
+
+	state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, action.Train.CardID)
+	state.Alliance.Officers++
+}
+
+func applyOrganize(state *game.GameState, action game.Action) {
+	if action.Organize == nil {
+		return
+	}
+
+	index := findClearingIndex(state.Map, action.Organize.ClearingID)
+	if index == -1 {
+		return
+	}
+
+	clearing := &state.Map.Clearings[index]
+	if clearing.Warriors == nil || clearing.Warriors[game.Alliance] <= 0 {
+		return
+	}
+
+	clearing.Warriors[game.Alliance]--
+	clearing.Tokens = append(clearing.Tokens, game.Token{
+		Faction: game.Alliance,
+		Type:    game.TokenSympathy,
+	})
+	scoreAllianceSympathy(state, state.Alliance.SympathyPlaced)
+	state.Alliance.SympathyPlaced++
 }
 
 func appendCardToDecree(decree *game.Decree, column game.DecreeColumn, cardID game.CardID) {
@@ -515,6 +904,10 @@ func applyEveningDraw(state *game.GameState, action game.Action) {
 	if action.EveningDraw == nil {
 		return
 	}
+
+	if action.EveningDraw.Faction == game.Vagabond && state.Vagabond.InForest {
+		repairAllDamagedItems(state)
+	}
 }
 
 func applyScoreRoosts(state *game.GameState, action game.Action) {
@@ -539,8 +932,21 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 	case game.ActionBirdsongWood:
 		state.CurrentPhase = game.Daylight
 		state.CurrentStep = game.StepDaylightActions
+	case game.ActionDaybreak:
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+	case game.ActionSlip:
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+		state.TurnProgress.HasSlipped = true
 	case game.ActionRecruit:
-		state.CurrentStep = game.StepDaylightActions
+		if action.Recruit != nil && action.Recruit.Faction == game.Alliance {
+			state.CurrentPhase = game.Evening
+			state.CurrentStep = game.StepEvening
+			state.TurnProgress.OfficerActionsUsed++
+		} else {
+			state.CurrentStep = game.StepDaylightActions
+		}
 		if action.Recruit != nil && action.Recruit.Faction == game.Marquise {
 			state.TurnProgress.ActionsUsed++
 		}
@@ -548,7 +954,13 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			markResolvedDecreeCard(state, action.Recruit.DecreeCardID)
 		}
 	case game.ActionMovement:
-		state.CurrentStep = game.StepDaylightActions
+		if action.Movement != nil && action.Movement.Faction == game.Alliance {
+			state.CurrentPhase = game.Evening
+			state.CurrentStep = game.StepEvening
+			state.TurnProgress.OfficerActionsUsed++
+		} else {
+			state.CurrentStep = game.StepDaylightActions
+		}
 		if action.Movement != nil && action.Movement.Faction == game.Marquise {
 			state.TurnProgress.ActionsUsed++
 			state.TurnProgress.MarchesUsed++
@@ -558,6 +970,11 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		}
 	case game.ActionBattleResolution, game.ActionBuild, game.ActionOverwork:
 		state.CurrentStep = game.StepDaylightActions
+		if action.Type == game.ActionBattleResolution && action.BattleResolution != nil && action.BattleResolution.Faction == game.Alliance {
+			state.CurrentPhase = game.Evening
+			state.CurrentStep = game.StepEvening
+			state.TurnProgress.OfficerActionsUsed++
+		}
 		switch {
 		case action.Type == game.ActionBattleResolution && action.BattleResolution != nil && action.BattleResolution.Faction == game.Marquise:
 			state.TurnProgress.ActionsUsed++
@@ -573,11 +990,26 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 	case game.ActionCraft:
 		state.CurrentStep = game.StepDaylightActions
 		state.TurnProgress.HasCrafted = true
+	case game.ActionExplore, game.ActionAid, game.ActionQuest, game.ActionStrike, game.ActionRepair:
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+	case game.ActionSpreadSympathy, game.ActionRevolt:
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+	case game.ActionMobilize, game.ActionTrain:
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+	case game.ActionOrganize:
+		state.CurrentPhase = game.Evening
+		state.CurrentStep = game.StepEvening
+		state.TurnProgress.OfficerActionsUsed++
 	case game.ActionTurmoil:
 		state.CurrentPhase = game.Evening
 		state.CurrentStep = game.StepEvening
 		state.TurnProgress.DecreeColumnsResolved = 0
 		state.TurnProgress.DecreeCardsResolved = 0
+	case game.ActionScoreRoosts:
+		beginNextFactionTurn(state)
 	case game.ActionPassPhase:
 		switch state.CurrentPhase {
 		case game.Birdsong:
@@ -590,7 +1022,11 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 				state.CurrentPhase = game.Evening
 				state.CurrentStep = game.StepEvening
 			}
+		case game.Evening:
+			beginNextFactionTurn(state)
 		}
+	case game.ActionEveningDraw:
+		beginNextFactionTurn(state)
 	}
 }
 

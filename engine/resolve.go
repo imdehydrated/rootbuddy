@@ -25,12 +25,26 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 		return game.Action{}
 	}
 
+	if action.Battle.TargetFaction == game.Alliance && attackerRoll > defenderRoll {
+		attackerRoll, defenderRoll = defenderRoll, attackerRoll
+	}
+
 	if action.Battle.Faction == game.Eyrie && state.Eyrie.Leader == game.LeaderCommander {
 		modifiers.AttackerHitModifier++
 	}
 
-	attackerHits := min(attackerRoll, warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.Faction))
-	defenderHits := min(defenderRoll, warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.TargetFaction))
+	attackerCap := warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.Faction)
+	if action.Battle.Faction == game.Vagabond {
+		attackerCap = vagabondBattleHitCap(state)
+	}
+
+	defenderCap := warriorCountInClearing(state, action.Battle.ClearingID, action.Battle.TargetFaction)
+	if action.Battle.TargetFaction == game.Vagabond {
+		defenderCap = vagabondBattleHitCap(state)
+	}
+
+	attackerHits := min(attackerRoll, attackerCap)
+	defenderHits := min(defenderRoll, defenderCap)
 
 	attackerHits = max(0, attackerHits+modifiers.AttackerHitModifier)
 	defenderHits = max(0, defenderHits+modifiers.DefenderHitModifier)

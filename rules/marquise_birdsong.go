@@ -17,7 +17,7 @@ func ValidMarquiseBirdsongWoodActions(state game.GameState) []game.Action {
 
 	clearingIDs := []int{}
 	for _, clearing := range state.Map.Clearings {
-		if hasMarquiseSawmill(clearing) {
+		if marquiseHasSawmill(clearing) {
 			clearingIDs = append(clearingIDs, clearing.ID)
 		}
 	}

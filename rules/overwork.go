@@ -2,35 +2,18 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
-func hasMarquiseSawmill(c game.Clearing) bool {
-	for _, building := range c.Buildings {
-		if building.Faction == game.Marquise && building.Type == game.Sawmill {
-			return true
-		}
-	}
-	return false
+func ValidOverworkActions(state game.GameState) []game.Action {
+	return ValidMarquiseOverworkActions(state)
 }
 
-func ValidOverworkActions(state game.GameState) []game.Action {
+func ValidMarquiseOverworkActions(state game.GameState) []game.Action {
 	actions := []game.Action{}
-	if state.FactionTurn != game.Marquise {
-		return actions
-	}
-
-	if state.CurrentStep != game.StepUnspecified && state.CurrentStep != game.StepDaylightActions {
-		return actions
-	}
-
-	if state.CurrentPhase != game.Daylight {
-		return actions
-	}
-
-	if state.TurnProgress.ActionsUsed >= 3+state.TurnProgress.BonusActions {
+	if !marquiseIsDaylightActionStep(state) || marquiseActionLimitReached(state) {
 		return actions
 	}
 
 	for _, clearing := range state.Map.Clearings {
-		if !hasMarquiseSawmill(clearing) {
+		if !marquiseHasSawmill(clearing) {
 			continue
 		}
 

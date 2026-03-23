@@ -28,6 +28,13 @@ function isBoardEmpty(state: GameState): boolean {
 
 function normalizeState(nextState: GameState): GameState {
   const normalized = structuredClone(nextState);
+  normalized.map.forests ??= [];
+  normalized.vagabond.forestID ??= 0;
+  normalized.vagabond.questsAvailable ??= [];
+  normalized.vagabond.questsCompleted ??= [];
+  for (const clearing of normalized.map.clearings) {
+    clearing.ruinItems ??= [];
+  }
   syncMarquiseStateFromBoard(normalized);
   return normalized;
 }

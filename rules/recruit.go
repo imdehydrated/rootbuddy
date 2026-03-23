@@ -33,42 +33,17 @@ func recruitClearingSubsets(clearingIDs []int, choose int) [][]int {
 }
 
 func ValidRecruitActions(state game.GameState) []game.Action {
-	if state.FactionTurn != game.Marquise {
-		return []game.Action{}
+	return ValidMarquiseRecruitActions(state)
+}
+
+func ValidMarquiseRecruitActions(state game.GameState) []game.Action {
+	if !marquiseIsDaylightActionStep(state) || marquiseActionLimitReached(state) || state.TurnProgress.RecruitUsed {
+		return nil
 	}
 
-	if state.CurrentStep != game.StepUnspecified {
-		if state.CurrentStep != game.StepDaylightActions {
-			return []game.Action{}
-		}
-	} else if state.CurrentPhase != game.Daylight {
-		return []game.Action{}
-	}
-
-	if state.TurnProgress.ActionsUsed >= 3+state.TurnProgress.BonusActions {
-		return []game.Action{}
-	}
-
-	if state.TurnProgress.RecruitUsed {
-		return []game.Action{}
-	}
-
-	recruiterClearings := []int{}
-	for _, clearing := range state.Map.Clearings {
-		for _, building := range clearing.Buildings {
-			if building.Faction == game.Marquise && building.Type == game.Recruiter {
-				recruiterClearings = append(recruiterClearings, clearing.ID)
-				break
-			}
-		}
-	}
-
-	if len(recruiterClearings) == 0 {
-		return []game.Action{}
-	}
-
-	if state.Marquise.WarriorSupply <= 0 {
-		return []game.Action{}
+	recruiterClearings := marquiseRecruiterClearings(state.Map)
+	if len(recruiterClearings) == 0 || state.Marquise.WarriorSupply <= 0 {
+		return nil
 	}
 
 	recruitCount := state.Marquise.WarriorSupply
@@ -76,7 +51,7 @@ func ValidRecruitActions(state game.GameState) []game.Action {
 		recruitCount = len(recruiterClearings)
 	}
 
-	actions := make([]game.Action, 0)
+	actions := make([]game.Action, 0, len(recruiterClearings))
 	for _, chosenClearings := range recruitClearingSubsets(recruiterClearings, recruitCount) {
 		actions = append(actions, game.Action{
 			Type: game.ActionRecruit,

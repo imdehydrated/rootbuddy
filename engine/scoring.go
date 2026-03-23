@@ -3,6 +3,7 @@ package engine
 import "github.com/imdehydrated/rootbuddy/game"
 
 var marquiseBuildingTrack = []int{0, 1, 2, 3, 3, 4}
+var allianceSympathyTrack = []int{0, 1, 1, 1, 2, 2, 2, 3, 3, 4}
 
 func addVictoryPoints(state *game.GameState, faction game.Faction, points int) {
 	if points <= 0 {
@@ -30,4 +31,12 @@ func scoreBattleRemovals(state *game.GameState, faction game.Faction, removedBui
 		points += removedBuildings + removedTokens
 	}
 	addVictoryPoints(state, faction, points)
+}
+
+func scoreAllianceSympathy(state *game.GameState, alreadyPlaced int) {
+	if alreadyPlaced < 0 || alreadyPlaced >= len(allianceSympathyTrack) {
+		return
+	}
+
+	addVictoryPoints(state, game.Alliance, allianceSympathyTrack[alreadyPlaced])
 }
