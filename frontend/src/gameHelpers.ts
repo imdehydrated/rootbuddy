@@ -73,7 +73,7 @@ export function countWarriors(warriors: Record<string, number>, faction: number)
   return warriors[String(faction)] ?? 0;
 }
 
-export function syncMarquiseStateFromBoard(state: GameState): void {
+export function syncDerivedFactionStateFromBoard(state: GameState): void {
   const totalMarquiseWarriors = state.map.clearings.reduce(
     (sum, clearing) => sum + countWarriors(clearing.warriors, MARQUISE_FACTION),
     0

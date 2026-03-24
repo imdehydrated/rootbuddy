@@ -9,5 +9,3 @@ const (
 	StepDaylightActions
 	StepEvening
 )
-
-const StepRecruit TurnStep = StepBirdsong

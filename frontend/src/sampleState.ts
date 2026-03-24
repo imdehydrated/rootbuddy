@@ -4,18 +4,18 @@ export const sampleState: GameState = {
   map: {
     id: "autumn",
     clearings: [
-      { id: 1, suit: 0, buildSlots: 1, adj: [5, 10, 9], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 2, suit: 2, buildSlots: 2, adj: [5, 10, 6], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 3, suit: 1, buildSlots: 1, adj: [7, 11, 6], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 4, suit: 1, buildSlots: 1, adj: [9, 12, 8], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
+      { id: 1, suit: 0, buildSlots: 1, adj: [5, 10, 9], ruins: false, ruinItems: [], wood: 1, warriors: { "0": 3 }, buildings: [{ faction: 0, type: 0 }], tokens: [{ faction: 0, type: 0 }] },
+      { id: 2, suit: 2, buildSlots: 2, adj: [5, 10, 6], ruins: false, ruinItems: [], wood: 0, warriors: { "0": 2 }, buildings: [{ faction: 0, type: 2 }], tokens: [] },
+      { id: 3, suit: 1, buildSlots: 1, adj: [7, 11, 6], ruins: false, ruinItems: [], wood: 0, warriors: { "2": 3 }, buildings: [{ faction: 2, type: 3 }], tokens: [] },
+      { id: 4, suit: 1, buildSlots: 1, adj: [9, 12, 8], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [{ faction: 1, type: 1 }] },
       { id: 5, suit: 1, buildSlots: 2, adj: [1, 2], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 6, suit: 0, buildSlots: 2, adj: [2, 11, 3], ruins: true, ruinItems: [4], wood: 0, warriors: {}, buildings: [], tokens: [] },
+      { id: 6, suit: 0, buildSlots: 2, adj: [2, 11, 3], ruins: true, ruinItems: [1], wood: 0, warriors: { "0": 1 }, buildings: [], tokens: [] },
       { id: 7, suit: 2, buildSlots: 2, adj: [3, 12, 8], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
       { id: 8, suit: 0, buildSlots: 2, adj: [7, 4], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 9, suit: 2, buildSlots: 2, adj: [1, 12, 4], ruins: false, ruinItems: [], wood: 0, warriors: {}, buildings: [], tokens: [] },
+      { id: 9, suit: 2, buildSlots: 2, adj: [1, 12, 4], ruins: false, ruinItems: [], wood: 1, warriors: { "0": 1 }, buildings: [{ faction: 0, type: 1 }], tokens: [] },
       { id: 10, suit: 1, buildSlots: 2, adj: [1, 2, 12], ruins: true, ruinItems: [3], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 11, suit: 2, buildSlots: 3, adj: [6, 3, 12], ruins: true, ruinItems: [7], wood: 0, warriors: {}, buildings: [], tokens: [] },
-      { id: 12, suit: 0, buildSlots: 2, adj: [4, 9, 10, 11, 7], ruins: true, ruinItems: [1], wood: 0, warriors: {}, buildings: [], tokens: [] }
+      { id: 11, suit: 2, buildSlots: 3, adj: [6, 3, 12], ruins: true, ruinItems: [7], wood: 0, warriors: { "1": 2 }, buildings: [{ faction: 1, type: 4 }], tokens: [] },
+      { id: 12, suit: 0, buildSlots: 2, adj: [4, 9, 10, 11, 7], ruins: true, ruinItems: [3], wood: 0, warriors: {}, buildings: [], tokens: [] }
     ],
     forests: [
       { id: 1, adjacentClearings: [1, 5] },
@@ -27,33 +27,33 @@ export const sampleState: GameState = {
       { id: 7, adjacentClearings: [1, 10, 12, 11, 6, 2] }
     ]
   },
-  factionTurn: 0,
-  currentPhase: 0,
-  currentStep: 0,
+  factionTurn: 3,
+  currentPhase: 1,
+  currentStep: 3,
   turnOrder: [0, 2, 1, 3],
   victoryPoints: {
-    "0": 0,
-    "1": 0,
-    "2": 0,
-    "3": 0
+    "0": 7,
+    "1": 4,
+    "2": 5,
+    "3": 3
   },
   marquise: {
     cardsInHand: [],
-    warriorSupply: 25,
-    sawmillsPlaced: 0,
-    workshopsPlaced: 0,
-    recruitersPlaced: 0,
-    keepClearingID: 0
+    warriorSupply: 18,
+    sawmillsPlaced: 1,
+    workshopsPlaced: 1,
+    recruitersPlaced: 1,
+    keepClearingID: 1
   },
   eyrie: {
     cardsInHand: [],
-    warriorSupply: 20,
-    roostsPlaced: 0,
-    leader: 0,
+    warriorSupply: 17,
+    roostsPlaced: 1,
+    leader: 2,
     availableLeaders: [0, 1, 2, 3],
     decree: {
-      recruit: [],
-      move: [],
+      recruit: [-1],
+      move: [-2],
       battle: [],
       build: []
     },
@@ -63,22 +63,30 @@ export const sampleState: GameState = {
     cardsInHand: [],
     warriorSupply: 10,
     supporters: [],
-    officers: 0,
+    officers: 1,
     foxBasePlaced: false,
     rabbitBasePlaced: false,
-    mouseBasePlaced: false,
-    sympathyPlaced: 0
+    mouseBasePlaced: true,
+    sympathyPlaced: 1
   },
   vagabond: {
     cardsInHand: [],
-    character: 0,
-    clearingID: 0,
+    character: 2,
+    clearingID: 6,
     forestID: 0,
     inForest: false,
-    items: [],
-    relationships: {},
+    items: [
+      { type: 6, status: 0 },
+      { type: 5, status: 0 },
+      { type: 4, status: 0 },
+      { type: 3, status: 0 },
+      { type: 0, status: 1 }
+    ],
+    relationships: { "0": 1, "1": 2, "2": 1 },
     questsCompleted: [],
-    questsAvailable: []
+    questsAvailable: [
+      { id: 1, name: "Expel Bandits", suit: 0, requiredItems: [5, 6] }
+    ]
   },
   turnProgress: {
     actionsUsed: 0,

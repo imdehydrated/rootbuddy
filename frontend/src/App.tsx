@@ -3,12 +3,12 @@ import { applyAction, fetchValidActions, resolveBattle } from "./api";
 import { boardLayoutForState } from "./boardLayouts";
 import { BoardPanel } from "./components/BoardPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
-import { syncMarquiseStateFromBoard } from "./gameHelpers";
-import { describeAction, factionLabels, phaseLabels, stepLabels } from "./labels";
+import { TurnStatePanel } from "./components/TurnStatePanel";
+import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
+import { affectedClearings, syncDerivedFactionStateFromBoard } from "./gameHelpers";
+import { ACTION_TYPE, describeAction, factionLabels, phaseLabels, stepLabels } from "./labels";
 import { sampleState } from "./sampleState";
 import type { Action, Clearing, GameState } from "./types";
-
-const initialJSON = JSON.stringify(sampleState, null, 2);
 
 type ActiveModal = "inspector" | "turn" | "actions" | "battle" | "json" | "help" | null;
 
@@ -35,54 +35,39 @@ function normalizeState(nextState: GameState): GameState {
   for (const clearing of normalized.map.clearings) {
     clearing.ruinItems ??= [];
   }
-  syncMarquiseStateFromBoard(normalized);
+  syncDerivedFactionStateFromBoard(normalized);
   return normalized;
 }
 
+const initialState = normalizeState(sampleState);
+const initialJSON = JSON.stringify(initialState, null, 2);
+
 function zeroActionHint(state: GameState): string {
-  if (state.factionTurn !== 0) {
-    return "No actions: the current turn is not set to Marquise.";
+  if (state.currentPhase === 0) {
+    return "No legal birdsong actions found for the current faction state.";
   }
 
-  const recruitStep =
-    state.currentStep === 1 || (state.currentStep === 0 && state.currentPhase === 0);
-  const daylightStep =
-    state.currentStep === 2 || (state.currentStep === 0 && state.currentPhase === 1);
-  const eveningStep =
-    state.currentStep === 3 || (state.currentStep === 0 && state.currentPhase === 2);
-
-  if (recruitStep) {
-    if (state.turnProgress.recruitUsed) {
-      return "No actions: recruit is already marked used this turn.";
-    }
-    if (state.marquise.recruitersPlaced === 0) {
-      return "No actions: the recruit step needs at least one recruiter on the board.";
-    }
-    if (state.marquise.warriorSupply <= 0) {
-      return "No actions: the Marquise has no warriors left in supply to recruit.";
-    }
+  if (state.currentPhase === 1) {
+    return "No legal daylight actions found. Check faction-specific requirements like ruling, decree state, supporters, items, wood, and cards in hand.";
   }
 
-  if (daylightStep) {
-    return "No legal daylight actions found. Check ruling, adjacency, wood, and cards in hand.";
+  if (state.currentPhase === 2) {
+    return "No legal evening actions found for the current faction state.";
   }
 
-  if (eveningStep) {
-    return "No actions: evening actions are not implemented yet.";
-  }
-
-  return "No legal actions found for this state. Check the selected faction, phase, and step.";
+  return "No legal actions found for this state. Check the selected faction, phase, step, and faction-specific resources.";
 }
 
 export default function App() {
   const [stateText, setStateText] = useState(initialJSON);
   const deferredStateText = useDeferredValue(stateText);
-  const [parsedState, setParsedState] = useState<GameState>(sampleState);
+  const [parsedState, setParsedState] = useState<GameState>(initialState);
   const [selectedClearingID, setSelectedClearingID] = useState<number>(
-    sampleState.map.clearings[0]?.id ?? 0
+    initialState.map.clearings[0]?.id ?? 0
   );
   const [actions, setActions] = useState<Action[]>([]);
   const [selectedBattleIndex, setSelectedBattleIndex] = useState<number | null>(null);
+  const [hoveredActionIndex, setHoveredActionIndex] = useState<number | null>(null);
   const [attackerRoll, setAttackerRoll] = useState("1");
   const [defenderRoll, setDefenderRoll] = useState("0");
   const [error, setError] = useState<string>("");
@@ -114,6 +99,7 @@ export default function App() {
       setStateText(stringifyState(normalizedState));
       setActions([]);
       setSelectedBattleIndex(null);
+      setHoveredActionIndex(null);
       setError("");
     });
   }
@@ -188,7 +174,7 @@ export default function App() {
     }
 
     const action = actions[selectedBattleIndex];
-    if (action.type !== 1) {
+    if (action.type !== ACTION_TYPE.BATTLE) {
       setStatus("Selected action is not a battle.");
       return;
     }
@@ -216,9 +202,12 @@ export default function App() {
     parsedState.map.clearings[0];
   const boardLayout = boardLayoutForState(parsedState);
   const boardIsEmpty = isBoardEmpty(parsedState);
+  const previewedAction =
+    actions[hoveredActionIndex ?? selectedBattleIndex ?? -1] ?? null;
+  const highlightedClearings = previewedAction ? affectedClearings(previewedAction) : [];
 
   return (
-    <main className="app-shell board-only-shell">
+    <main className="app-shell workspace-shell">
       <div className="board-stage">
         <BoardPanel
           clearings={parsedState.map.clearings}
@@ -227,57 +216,67 @@ export default function App() {
           keepClearingID={parsedState.marquise.keepClearingID}
           vagabondClearingID={parsedState.vagabond.clearingID}
           vagabondInForest={parsedState.vagabond.inForest}
+          highlightedClearings={highlightedClearings}
           onSelectClearing={(clearingID) => {
             setSelectedClearingID(clearingID);
             setActiveModal("inspector");
           }}
         />
 
-        <div className="floating-status">
-          <p className="eyebrow">RootBuddy</p>
-          <span className={error ? "message error" : "message"}>{error || status}</span>
-        </div>
-
-        <div className="floating-actions top-left">
-          <button type="button" className="secondary" onClick={() => setActiveModal("help")}>
-            Help
-          </button>
-          <button type="button" className="secondary" onClick={() => setActiveModal("turn")}>
-            Turn State
-          </button>
-        </div>
-
-        <div className="floating-actions top-right">
-          <button type="button" className="secondary" onClick={() => setActiveModal("actions")}>
-            Actions
-          </button>
-          <button type="button" className="secondary" onClick={() => setActiveModal("battle")}>
-            Resolve
-          </button>
-          <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
-            JSON
-          </button>
-        </div>
-
-        <div className="floating-actions bottom-bar">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => {
-              syncState(sampleState);
-              setStatus("Board reset. Click a clearing to start setting the board.");
-              setActiveModal("help");
-            }}
-          >
-            Reset
-          </button>
-          <button type="button" onClick={refreshActions} disabled={!!error || boardIsEmpty}>
-            Generate Actions
-          </button>
-        </div>
-
         {boardIsEmpty ? <div className="board-hint">Click a clearing to edit the board.</div> : null}
       </div>
+
+      <aside className="app-sidebar">
+        <section className="panel sidebar-panel">
+          <p className="eyebrow">RootBuddy</p>
+          <div className="status-block">
+            <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
+            <span>
+              {phaseLabels[parsedState.currentPhase] ?? "Unknown"} / {stepLabels[parsedState.currentStep] ?? "Unknown"}
+            </span>
+          </div>
+          <span className={error ? "message error" : "message"}>{error || status}</span>
+        </section>
+
+        <TurnSummaryPanel state={parsedState} />
+
+        <section className="panel sidebar-panel sidebar-actions-panel">
+          <p className="eyebrow">Controls</p>
+          <div className="sidebar-actions">
+            <button type="button" className="secondary" onClick={() => setActiveModal("help")}>
+              Help
+            </button>
+            <button type="button" className="secondary" onClick={() => setActiveModal("turn")}>
+              Turn State
+            </button>
+            <button type="button" className="secondary" onClick={() => setActiveModal("actions")}>
+              Actions
+            </button>
+            <button type="button" className="secondary" onClick={() => setActiveModal("battle")}>
+              Resolve
+            </button>
+            <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
+              JSON
+            </button>
+          </div>
+          <div className="sidebar-actions footer">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                syncState(initialState);
+                setStatus("Board reset. Click a clearing to start setting the board.");
+                setActiveModal("help");
+              }}
+            >
+              Reset
+            </button>
+            <button type="button" onClick={refreshActions} disabled={!!error || boardIsEmpty}>
+              Generate Actions
+            </button>
+          </div>
+        </section>
+      </aside>
 
       {activeModal ? (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
@@ -305,131 +304,7 @@ export default function App() {
             ) : null}
 
             {activeModal === "turn" ? (
-              <section className="panel modal-panel">
-                <div className="panel-header">
-                  <h2>Turn State</h2>
-                  <button type="button" className="secondary" onClick={() => setActiveModal(null)}>
-                    Close
-                  </button>
-                </div>
-                <div className="turn-state-actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() =>
-                      updateState((draft) => {
-                        draft.factionTurn = 0;
-                        draft.currentPhase = 1;
-                        draft.currentStep = 2;
-                      })
-                    }
-                  >
-                    Set Marquise Daylight
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() =>
-                      updateState((draft) => {
-                        draft.factionTurn = 0;
-                        draft.currentPhase = 0;
-                        draft.currentStep = 1;
-                      })
-                    }
-                  >
-                    Set Recruit Step
-                  </button>
-                </div>
-                <div className="control-grid">
-                  <label>
-                    <span>Faction Turn</span>
-                    <select
-                      value={parsedState.factionTurn}
-                      onChange={(event) =>
-                        updateState((draft) => {
-                          draft.factionTurn = Number(event.target.value);
-                        })
-                      }
-                    >
-                      {factionLabels.map((label, index) => (
-                        <option key={label} value={index}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Phase</span>
-                    <select
-                      value={parsedState.currentPhase}
-                      onChange={(event) =>
-                        updateState((draft) => {
-                          draft.currentPhase = Number(event.target.value);
-                        })
-                      }
-                    >
-                      {phaseLabels.map((label, index) => (
-                        <option key={label} value={index}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Step</span>
-                    <select
-                      value={parsedState.currentStep}
-                      onChange={(event) =>
-                        updateState((draft) => {
-                          draft.currentStep = Number(event.target.value);
-                        })
-                      }
-                    >
-                      {stepLabels.map((label, index) => (
-                        <option key={label} value={index}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Warrior Supply</span>
-                    <input type="number" min="0" value={parsedState.marquise.warriorSupply} readOnly />
-                  </label>
-                  <label>
-                    <span>Sawmills Placed</span>
-                    <input type="number" min="0" value={parsedState.marquise.sawmillsPlaced} readOnly />
-                  </label>
-                  <label>
-                    <span>Workshops Placed</span>
-                    <input type="number" min="0" value={parsedState.marquise.workshopsPlaced} readOnly />
-                  </label>
-                  <label>
-                    <span>Recruiters Placed</span>
-                    <input type="number" min="0" value={parsedState.marquise.recruitersPlaced} readOnly />
-                  </label>
-                  <label>
-                    <span>Keep Clearing</span>
-                    <input
-                      type="text"
-                      value={parsedState.marquise.keepClearingID || "Unset"}
-                      readOnly
-                    />
-                  </label>
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={parsedState.turnProgress.recruitUsed}
-                      onChange={(event) =>
-                        updateState((draft) => {
-                          draft.turnProgress.recruitUsed = event.target.checked;
-                        })
-                      }
-                    />
-                    Recruit Used
-                  </label>
-                </div>
-              </section>
+              <TurnStatePanel state={parsedState} onUpdateState={updateState} onClose={() => setActiveModal(null)} />
             ) : null}
 
             {activeModal === "actions" ? (
@@ -452,9 +327,14 @@ export default function App() {
                 ) : (
                   <ul className="action-list">
                     {actions.map((action, index) => {
-                      const isBattle = action.type === 1;
+                      const isBattle = action.type === ACTION_TYPE.BATTLE;
                       return (
-                        <li key={`${action.type}-${index}`} className="action-card">
+                        <li
+                          key={`${action.type}-${index}`}
+                          className={`action-card ${index === (hoveredActionIndex ?? selectedBattleIndex) ? "previewed" : ""}`}
+                          onMouseEnter={() => setHoveredActionIndex(index)}
+                          onMouseLeave={() => setHoveredActionIndex(null)}
+                        >
                           <strong>{describeAction(action)}</strong>
                           <div className="action-controls">
                             <button
@@ -470,6 +350,7 @@ export default function App() {
                                 className="secondary"
                                 onClick={() => {
                                   setSelectedBattleIndex(index);
+                                  setHoveredActionIndex(index);
                                   setActiveModal("battle");
                                 }}
                               >
@@ -553,7 +434,7 @@ export default function App() {
                 </div>
                 <div className="compact-help">
                   <p>1. Click a clearing to place faction-specific warriors, buildings, sympathy, wood, ruins, the Keep, and the Vagabond.</p>
-                  <p>2. Open Turn State and set the current Marquise step.</p>
+                  <p>2. Open Turn State and set the current faction, phase, and step.</p>
                   <p>3. Use Generate Actions, then review or apply them from the Actions popup.</p>
                 </div>
               </section>
