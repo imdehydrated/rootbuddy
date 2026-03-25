@@ -2,6 +2,25 @@ import type { Action, GameState } from "./types";
 
 const API_BASE = "http://localhost:8080/api";
 
+function normalizeJSONKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeJSONKeys);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey =
+      key.toUpperCase() === key ? key.toLowerCase() : `${key[0].toLowerCase()}${key.slice(1)}`;
+    normalized[normalizedKey] = normalizeJSONKeys(entry);
+  }
+
+  return normalized;
+}
+
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -17,7 +36,7 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
     throw new Error(message);
   }
 
-  return json as T;
+  return normalizeJSONKeys(json) as T;
 }
 
 export async function fetchValidActions(state: GameState): Promise<Action[]> {

@@ -36,7 +36,11 @@ export const ACTION_TYPE = {
   BIRDSONG_WOOD: 21,
   EVENING_DRAW: 22,
   SCORE_ROOSTS: 23,
-  PASS_PHASE: 24
+  PASS_PHASE: 24,
+  ADD_CARD_TO_HAND: 25,
+  REMOVE_CARD_FROM_HAND: 26,
+  OTHER_PLAYER_DRAW: 27,
+  OTHER_PLAYER_PLAY: 28
 } as const;
 
 export function describeAction(action: Action): string {
@@ -91,6 +95,14 @@ export function describeAction(action: Action): string {
       return `Score ${action.scoreRoosts?.points ?? 0} roost point(s)`;
     case ACTION_TYPE.PASS_PHASE:
       return "Pass phase";
+    case ACTION_TYPE.ADD_CARD_TO_HAND:
+      return `Add card ${action.addCardToHand?.cardID ?? "?"} to hand`;
+    case ACTION_TYPE.REMOVE_CARD_FROM_HAND:
+      return `Remove card ${action.removeCardFromHand?.cardID ?? "?"} from hand`;
+    case ACTION_TYPE.OTHER_PLAYER_DRAW:
+      return `Record ${factionLabels[action.otherPlayerDraw?.faction ?? 0] ?? "Unknown"} drawing ${action.otherPlayerDraw?.count ?? 0} card(s)`;
+    case ACTION_TYPE.OTHER_PLAYER_PLAY:
+      return `Record ${factionLabels[action.otherPlayerPlay?.faction ?? 0] ?? "Unknown"} playing card ${action.otherPlayerPlay?.cardID ?? "?"}`;
     default:
       return "Unknown action";
   }

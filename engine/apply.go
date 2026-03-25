@@ -57,6 +57,14 @@ func ApplyAction(state game.GameState, action game.Action) game.GameState {
 		applyScoreRoosts(&next, action)
 	case game.ActionPassPhase:
 		applyPassPhase(&next, action)
+	case game.ActionAddCardToHand:
+		applyAddCardToHand(&next, action)
+	case game.ActionRemoveCardFromHand:
+		applyRemoveCardFromHand(&next, action)
+	case game.ActionOtherPlayerDraw:
+		applyOtherPlayerDraw(&next, action)
+	case game.ActionOtherPlayerPlay:
+		applyOtherPlayerPlay(&next, action)
 	}
 
 	advanceTurnState(&next, action)
@@ -118,10 +126,51 @@ func cloneState(state game.GameState) game.GameState {
 		copy(next.TurnOrder, state.TurnOrder)
 	}
 
+	if state.Deck != nil {
+		next.Deck = make([]game.CardID, len(state.Deck))
+		copy(next.Deck, state.Deck)
+	}
+
+	if state.DiscardPile != nil {
+		next.DiscardPile = make([]game.CardID, len(state.DiscardPile))
+		copy(next.DiscardPile, state.DiscardPile)
+	}
+
 	if state.VictoryPoints != nil {
 		next.VictoryPoints = make(map[game.Faction]int, len(state.VictoryPoints))
 		for faction, points := range state.VictoryPoints {
 			next.VictoryPoints[faction] = points
+		}
+	}
+
+	if state.ItemSupply != nil {
+		next.ItemSupply = make(map[game.ItemType]int, len(state.ItemSupply))
+		for itemType, count := range state.ItemSupply {
+			next.ItemSupply[itemType] = count
+		}
+	}
+
+	if state.PersistentEffects != nil {
+		next.PersistentEffects = make(map[game.Faction][]game.CardID, len(state.PersistentEffects))
+		for faction, cardIDs := range state.PersistentEffects {
+			next.PersistentEffects[faction] = cloneCardIDs(cardIDs)
+		}
+	}
+
+	if state.QuestDeck != nil {
+		next.QuestDeck = make([]game.QuestID, len(state.QuestDeck))
+		copy(next.QuestDeck, state.QuestDeck)
+	}
+
+	if state.QuestDiscard != nil {
+		next.QuestDiscard = make([]game.QuestID, len(state.QuestDiscard))
+		copy(next.QuestDiscard, state.QuestDiscard)
+	}
+
+	if state.OtherHandCounts != nil {
+		next.OtherHandCounts = make(map[game.Faction]int, len(state.OtherHandCounts))
+		for faction, count := range state.OtherHandCounts {
+			next.OtherHandCounts[faction] = count
 		}
 	}
 
@@ -230,6 +279,39 @@ func removeCardsByID(cards []game.Card, ids []game.CardID) []game.Card {
 	}
 
 	return remaining
+}
+
+func removeCardFromFactionHand(state *game.GameState, faction game.Faction, cardID game.CardID) (game.Card, bool) {
+	var (
+		remaining []game.Card
+		card      game.Card
+		ok        bool
+	)
+
+	switch faction {
+	case game.Marquise:
+		remaining, card, ok = removeCardFromCards(state.Marquise.CardsInHand, cardID)
+		if ok {
+			state.Marquise.CardsInHand = remaining
+		}
+	case game.Eyrie:
+		remaining, card, ok = removeCardFromCards(state.Eyrie.CardsInHand, cardID)
+		if ok {
+			state.Eyrie.CardsInHand = remaining
+		}
+	case game.Alliance:
+		remaining, card, ok = removeCardFromCards(state.Alliance.CardsInHand, cardID)
+		if ok {
+			state.Alliance.CardsInHand = remaining
+		}
+	case game.Vagabond:
+		remaining, card, ok = removeCardFromCards(state.Vagabond.CardsInHand, cardID)
+		if ok {
+			state.Vagabond.CardsInHand = remaining
+		}
+	}
+
+	return card, ok
 }
 
 func setAllianceBasePlaced(state *game.GameState, suit game.Suit, placed bool) {
@@ -587,8 +669,11 @@ func applyOverwork(state *game.GameState, action game.Action) {
 		return
 	}
 
+	if _, ok := removeCardFromFactionHand(state, game.Marquise, action.Overwork.CardID); !ok {
+		return
+	}
 	state.Map.Clearings[index].Wood++
-	state.Marquise.CardsInHand = removeCardByID(state.Marquise.CardsInHand, action.Overwork.CardID)
+	DiscardCard(state, action.Overwork.CardID)
 }
 
 func applyCraft(state *game.GameState, action game.Action) {
@@ -596,17 +681,14 @@ func applyCraft(state *game.GameState, action game.Action) {
 		return
 	}
 
-	switch action.Craft.Faction {
-	case game.Marquise:
-		state.Marquise.CardsInHand = removeCardByID(state.Marquise.CardsInHand, action.Craft.CardID)
-	case game.Eyrie:
-		state.Eyrie.CardsInHand = removeCardByID(state.Eyrie.CardsInHand, action.Craft.CardID)
-	case game.Alliance:
-		state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, action.Craft.CardID)
-	case game.Vagabond:
-		state.Vagabond.CardsInHand = removeCardByID(state.Vagabond.CardsInHand, action.Craft.CardID)
+	if _, ok := removeCardFromFactionHand(state, action.Craft.Faction, action.Craft.CardID); !ok {
+		return
+	}
+
+	if action.Craft.Faction == game.Vagabond {
 		exhaustReadyItemsByType(state, game.ItemHammer, len(action.Craft.UsedWorkshopClearings))
 	}
+	DiscardCard(state, action.Craft.CardID)
 	state.TurnProgress.UsedWorkshopClearings = append(
 		state.TurnProgress.UsedWorkshopClearings,
 		action.Craft.UsedWorkshopClearings...,
@@ -624,6 +706,7 @@ func applySpreadSympathy(state *game.GameState, action game.Action) {
 	}
 
 	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.SpreadSympathy.SupporterCardIDs)
+	DiscardCards(state, action.SpreadSympathy.SupporterCardIDs)
 	state.Map.Clearings[index].Tokens = append(state.Map.Clearings[index].Tokens, game.Token{
 		Faction: game.Alliance,
 		Type:    game.TokenSympathy,
@@ -712,6 +795,7 @@ func applyRevolt(state *game.GameState, action game.Action) {
 	}
 
 	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.Revolt.SupporterCardIDs)
+	DiscardCards(state, action.Revolt.SupporterCardIDs)
 	clearing := &state.Map.Clearings[index]
 	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
 	clearing.Buildings = append(clearing.Buildings, game.Building{
@@ -744,7 +828,9 @@ func applyMobilize(state *game.GameState, action game.Action) {
 			continue
 		}
 
-		state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, card.ID)
+		if _, ok := removeCardFromFactionHand(state, game.Alliance, card.ID); !ok {
+			return
+		}
 		addAllianceSupporter(state, card)
 		return
 	}
@@ -755,7 +841,10 @@ func applyTrain(state *game.GameState, action game.Action) {
 		return
 	}
 
-	state.Alliance.CardsInHand = removeCardByID(state.Alliance.CardsInHand, action.Train.CardID)
+	if _, ok := removeCardFromFactionHand(state, game.Alliance, action.Train.CardID); !ok {
+		return
+	}
+	DiscardCard(state, action.Train.CardID)
 	state.Alliance.Officers++
 }
 
@@ -874,6 +963,10 @@ func applyTurmoil(state *game.GameState, action game.Action) {
 	}
 	state.VictoryPoints[game.Eyrie] -= birdCardsInDecree(state.Eyrie.Decree)
 
+	DiscardCards(state, state.Eyrie.Decree.Recruit)
+	DiscardCards(state, state.Eyrie.Decree.Move)
+	DiscardCards(state, state.Eyrie.Decree.Battle)
+	DiscardCards(state, state.Eyrie.Decree.Build)
 	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, state.Eyrie.Leader)
 	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, action.Turmoil.NewLeader)
 	state.Eyrie.Leader = action.Turmoil.NewLeader
@@ -908,6 +1001,8 @@ func applyEveningDraw(state *game.GameState, action game.Action) {
 	if action.EveningDraw.Faction == game.Vagabond && state.Vagabond.InForest {
 		repairAllDamagedItems(state)
 	}
+
+	DrawCards(state, action.EveningDraw.Faction, action.EveningDraw.Count)
 }
 
 func applyScoreRoosts(state *game.GameState, action game.Action) {
@@ -922,6 +1017,53 @@ func applyPassPhase(state *game.GameState, action game.Action) {
 	if action.PassPhase == nil {
 		return
 	}
+}
+
+func applyAddCardToHand(state *game.GameState, action game.Action) {
+	if action.AddCardToHand == nil {
+		return
+	}
+
+	card, ok := CardByID(action.AddCardToHand.CardID)
+	if !ok {
+		return
+	}
+
+	appendCardToFactionHand(state, action.AddCardToHand.Faction, card)
+}
+
+func applyRemoveCardFromHand(state *game.GameState, action game.Action) {
+	if action.RemoveCardFromHand == nil {
+		return
+	}
+
+	if _, ok := removeCardFromFactionHand(state, action.RemoveCardFromHand.Faction, action.RemoveCardFromHand.CardID); !ok {
+		return
+	}
+
+	DiscardCard(state, action.RemoveCardFromHand.CardID)
+}
+
+func applyOtherPlayerDraw(state *game.GameState, action game.Action) {
+	if action.OtherPlayerDraw == nil {
+		return
+	}
+
+	if state.GameMode == game.GameModeOnline {
+		DrawCards(state, action.OtherPlayerDraw.Faction, action.OtherPlayerDraw.Count)
+		return
+	}
+
+	incrementOtherHandCount(state, action.OtherPlayerDraw.Faction, action.OtherPlayerDraw.Count)
+}
+
+func applyOtherPlayerPlay(state *game.GameState, action game.Action) {
+	if action.OtherPlayerPlay == nil {
+		return
+	}
+
+	decrementOtherHandCount(state, action.OtherPlayerPlay.Faction, 1)
+	DiscardCard(state, action.OtherPlayerPlay.CardID)
 }
 
 func advanceTurnState(state *game.GameState, action game.Action) {

@@ -171,6 +171,11 @@ func vagabondBattleHitCap(state game.GameState) int {
 }
 
 func appendCardToFactionHand(state *game.GameState, faction game.Faction, card game.Card) {
+	if !tracksHandForFaction(*state, faction) {
+		incrementOtherHandCount(state, faction, 1)
+		return
+	}
+
 	switch faction {
 	case game.Marquise:
 		state.Marquise.CardsInHand = append(state.Marquise.CardsInHand, card)
@@ -417,7 +422,10 @@ func applyQuest(state *game.GameState, action game.Action) {
 	state.Vagabond.QuestsCompleted = append(state.Vagabond.QuestsCompleted, quest)
 	if action.Quest.Reward == game.QuestRewardVictoryPoints {
 		addVictoryPoints(state, game.Vagabond, questCountBySuit(state.Vagabond.QuestsCompleted, quest.Suit))
+		return
 	}
+
+	DrawCards(state, game.Vagabond, 2)
 }
 
 func applyStrike(state *game.GameState, action game.Action) {

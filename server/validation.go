@@ -55,6 +55,106 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		}
 	case game.ActionBattle:
 		return "battle initiation cannot be applied directly; resolve it first"
+	case game.ActionAddToDecree:
+		if req.Action.AddToDecree == nil {
+			return "add-to-decree payload is required"
+		}
+	case game.ActionSpreadSympathy:
+		if req.Action.SpreadSympathy == nil {
+			return "spread sympathy payload is required"
+		}
+	case game.ActionRevolt:
+		if req.Action.Revolt == nil {
+			return "revolt payload is required"
+		}
+	case game.ActionMobilize:
+		if req.Action.Mobilize == nil {
+			return "mobilize payload is required"
+		}
+	case game.ActionTrain:
+		if req.Action.Train == nil {
+			return "train payload is required"
+		}
+	case game.ActionOrganize:
+		if req.Action.Organize == nil {
+			return "organize payload is required"
+		}
+	case game.ActionExplore:
+		if req.Action.Explore == nil {
+			return "explore payload is required"
+		}
+	case game.ActionQuest:
+		if req.Action.Quest == nil {
+			return "quest payload is required"
+		}
+	case game.ActionAid:
+		if req.Action.Aid == nil {
+			return "aid payload is required"
+		}
+	case game.ActionStrike:
+		if req.Action.Strike == nil {
+			return "strike payload is required"
+		}
+	case game.ActionRepair:
+		if req.Action.Repair == nil {
+			return "repair payload is required"
+		}
+	case game.ActionTurmoil:
+		if req.Action.Turmoil == nil {
+			return "turmoil payload is required"
+		}
+	case game.ActionDaybreak:
+		if req.Action.Daybreak == nil {
+			return "daybreak payload is required"
+		}
+	case game.ActionSlip:
+		if req.Action.Slip == nil {
+			return "slip payload is required"
+		}
+	case game.ActionBirdsongWood:
+		if req.Action.BirdsongWood == nil {
+			return "birdsong wood payload is required"
+		}
+	case game.ActionEveningDraw:
+		if req.Action.EveningDraw == nil {
+			return "evening draw payload is required"
+		}
+	case game.ActionScoreRoosts:
+		if req.Action.ScoreRoosts == nil {
+			return "score roosts payload is required"
+		}
+	case game.ActionPassPhase:
+		if req.Action.PassPhase == nil {
+			return "pass phase payload is required"
+		}
+	case game.ActionAddCardToHand:
+		if req.Action.AddCardToHand == nil {
+			return "add card to hand payload is required"
+		}
+		if req.Action.AddCardToHand.CardID <= 0 {
+			return "add card to hand action must have a valid card ID"
+		}
+	case game.ActionRemoveCardFromHand:
+		if req.Action.RemoveCardFromHand == nil {
+			return "remove card from hand payload is required"
+		}
+		if req.Action.RemoveCardFromHand.CardID <= 0 {
+			return "remove card from hand action must have a valid card ID"
+		}
+	case game.ActionOtherPlayerDraw:
+		if req.Action.OtherPlayerDraw == nil {
+			return "other player draw payload is required"
+		}
+		if req.Action.OtherPlayerDraw.Count <= 0 {
+			return "other player draw action must have a positive count"
+		}
+	case game.ActionOtherPlayerPlay:
+		if req.Action.OtherPlayerPlay == nil {
+			return "other player play payload is required"
+		}
+		if req.Action.OtherPlayerPlay.CardID <= 0 {
+			return "other player play action must have a valid card ID"
+		}
 	default:
 		return "unsupported action type"
 	}

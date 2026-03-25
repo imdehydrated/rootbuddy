@@ -1,32 +1,36 @@
 package game
 
 type Action struct {
-	Type             ActionType
-	Movement         *MovementAction
-	Battle           *BattleAction
-	BattleResolution *BattleResolutionAction
-	Build            *BuildAction
-	Recruit          *RecruitAction
-	Overwork         *OverworkAction
-	Craft            *CraftAction
-	AddToDecree      *AddToDecreeAction
-	SpreadSympathy   *SpreadSympathyAction
-	Revolt           *RevoltAction
-	Mobilize         *MobilizeAction
-	Train            *TrainAction
-	Organize         *OrganizeAction
-	Explore          *ExploreAction
-	Quest            *QuestAction
-	Aid              *AidAction
-	Strike           *StrikeAction
-	Repair           *RepairAction
-	Turmoil          *TurmoilAction
-	Daybreak         *DaybreakAction
-	Slip             *SlipAction
-	BirdsongWood     *BirdsongWoodAction
-	EveningDraw      *EveningDrawAction
-	ScoreRoosts      *ScoreRoostsAction
-	PassPhase        *PassPhaseAction
+	Type               ActionType
+	Movement           *MovementAction
+	Battle             *BattleAction
+	BattleResolution   *BattleResolutionAction
+	Build              *BuildAction
+	Recruit            *RecruitAction
+	Overwork           *OverworkAction
+	Craft              *CraftAction
+	AddToDecree        *AddToDecreeAction
+	SpreadSympathy     *SpreadSympathyAction
+	Revolt             *RevoltAction
+	Mobilize           *MobilizeAction
+	Train              *TrainAction
+	Organize           *OrganizeAction
+	Explore            *ExploreAction
+	Quest              *QuestAction
+	Aid                *AidAction
+	Strike             *StrikeAction
+	Repair             *RepairAction
+	Turmoil            *TurmoilAction
+	Daybreak           *DaybreakAction
+	Slip               *SlipAction
+	BirdsongWood       *BirdsongWoodAction
+	EveningDraw        *EveningDrawAction
+	ScoreRoosts        *ScoreRoostsAction
+	PassPhase          *PassPhaseAction
+	AddCardToHand      *AddCardToHandAction
+	RemoveCardFromHand *RemoveCardFromHandAction
+	OtherPlayerDraw    *OtherPlayerDrawAction
+	OtherPlayerPlay    *OtherPlayerPlayAction
 }
 
 type ActionType int
@@ -57,6 +61,10 @@ const (
 	ActionEveningDraw
 	ActionScoreRoosts
 	ActionPassPhase
+	ActionAddCardToHand
+	ActionRemoveCardFromHand
+	ActionOtherPlayerDraw
+	ActionOtherPlayerPlay
 )
 
 type MovementAction struct {
@@ -247,4 +255,24 @@ type ScoreRoostsAction struct {
 
 type PassPhaseAction struct {
 	Faction Faction
+}
+
+type AddCardToHandAction struct {
+	Faction Faction
+	CardID  CardID
+}
+
+type RemoveCardFromHandAction struct {
+	Faction Faction
+	CardID  CardID
+}
+
+type OtherPlayerDrawAction struct {
+	Faction Faction
+	Count   int
+}
+
+type OtherPlayerPlayAction struct {
+	Faction Faction
+	CardID  CardID
 }

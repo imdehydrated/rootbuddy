@@ -49,6 +49,8 @@ export interface Card {
     mouse: number;
     any: number;
   };
+  craftedItem: number | null;
+  effectID: string;
   vp: number;
 }
 
@@ -71,11 +73,23 @@ export interface GameState {
     clearings: Clearing[];
     forests: Forest[];
   };
+  gameMode: number;
+  gamePhase: number;
+  playerFaction: number;
+  winner: number;
+  roundNumber: number;
   factionTurn: number;
   currentPhase: number;
   currentStep: number;
   turnOrder: number[];
   victoryPoints: Record<string, number>;
+  deck: number[];
+  discardPile: number[];
+  itemSupply: Record<string, number>;
+  persistentEffects: Record<string, number[]>;
+  questDeck: number[];
+  questDiscard: number[];
+  otherHandCounts: Record<string, number>;
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
@@ -272,5 +286,21 @@ export interface Action {
   } | null;
   passPhase?: {
     faction: number;
+  } | null;
+  addCardToHand?: {
+    faction: number;
+    cardID: number;
+  } | null;
+  removeCardFromHand?: {
+    faction: number;
+    cardID: number;
+  } | null;
+  otherPlayerDraw?: {
+    faction: number;
+    count: number;
+  } | null;
+  otherPlayerPlay?: {
+    faction: number;
+    cardID: number;
   } | null;
 }

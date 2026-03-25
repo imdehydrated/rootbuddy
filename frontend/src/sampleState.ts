@@ -27,10 +27,38 @@ export const sampleState: GameState = {
       { id: 7, adjacentClearings: [1, 10, 12, 11, 6, 2] }
     ]
   },
+  gameMode: 0,
+  gamePhase: 1,
+  playerFaction: 3,
+  winner: 0,
+  roundNumber: 3,
   factionTurn: 3,
   currentPhase: 1,
   currentStep: 3,
   turnOrder: [0, 2, 1, 3],
+  deck: [12, 13, 14, 26, 27],
+  discardPile: [7, 25, 36],
+  itemSupply: {
+    "0": 1,
+    "1": 2,
+    "2": 0,
+    "3": 0,
+    "4": 1,
+    "5": 0,
+    "6": 0,
+    "7": 1
+  },
+  persistentEffects: {
+    "0": [15],
+    "2": [28]
+  },
+  questDeck: [2, 3, 4, 5],
+  questDiscard: [6],
+  otherHandCounts: {
+    "0": 2,
+    "1": 4,
+    "2": 3
+  },
   victoryPoints: {
     "0": 7,
     "1": 4,

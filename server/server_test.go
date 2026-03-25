@@ -320,6 +320,38 @@ func TestHandleApplyActionRejectsMissingMovementPayload(t *testing.T) {
 	}
 }
 
+func TestHandleApplyActionAcceptsPassPhase(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			CurrentPhase: game.Birdsong,
+			CurrentStep:  game.StepBirdsong,
+		},
+		Action: game.Action{
+			Type: game.ActionPassPhase,
+			PassPhase: &game.PassPhaseAction{
+				Faction: game.Marquise,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for pass phase apply action, got %d", rec.Code)
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode pass phase apply response: %v", err)
+	}
+	if resp.State.CurrentPhase != game.Daylight || resp.State.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected pass phase to advance to daylight actions, got phase=%v step=%v", resp.State.CurrentPhase, resp.State.CurrentStep)
+	}
+}
+
 func TestHandleResolveBattle(t *testing.T) {
 	body, _ := json.Marshal(ResolveBattleRequest{
 		State: game.GameState{

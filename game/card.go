@@ -32,5 +32,7 @@ type Card struct {
 	Suit         Suit
 	Kind         CardKind
 	CraftingCost CraftingCost
+	CraftedItem  *ItemType
+	EffectID     string
 	VP           int
 }
