@@ -111,6 +111,18 @@ func workshopIDsForCost(cost game.CraftingCost, workshops map[game.Suit][]int) (
 	return chosen, true
 }
 
+func itemCraftAvailable(state game.GameState, card game.Card) bool {
+	if card.CraftedItem == nil {
+		return true
+	}
+
+	if state.ItemSupply == nil {
+		return true
+	}
+
+	return state.ItemSupply[*card.CraftedItem] > 0
+}
+
 func ValidCraftActions(state game.GameState) []game.Action {
 	actions := []game.Action{}
 
@@ -126,6 +138,9 @@ func ValidCraftActions(state game.GameState) []game.Action {
 
 	for _, card := range state.Marquise.CardsInHand {
 		if !isCraftable(card.Kind) {
+			continue
+		}
+		if !itemCraftAvailable(state, card) {
 			continue
 		}
 		if card.CraftingCost.Fox == 0 &&

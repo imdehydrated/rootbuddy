@@ -1,4 +1,4 @@
-import type { Action, GameState } from "./types";
+import type { Action, GameState, SetupRequest } from "./types";
 
 const API_BASE = "http://localhost:8080/api";
 
@@ -62,4 +62,9 @@ export async function resolveBattle(
     defenderRoll
   });
   return response.action;
+}
+
+export async function setupGame(request: SetupRequest): Promise<GameState> {
+  const response = await postJSON<{ state: GameState }>("/game/setup", request);
+  return response.state;
 }

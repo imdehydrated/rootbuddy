@@ -542,3 +542,34 @@ func TestHandleResolveBattleRejectsOutOfRangeRolls(t *testing.T) {
 		t.Fatalf("unexpected error response: %+v", resp)
 	}
 }
+
+func TestHandleSetup(t *testing.T) {
+	body, _ := json.Marshal(SetupRequest{
+		GameMode:          game.GameModeOnline,
+		PlayerFaction:     game.Marquise,
+		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:             game.AutumnMapID,
+		VagabondCharacter: game.CharThief,
+		EyrieLeader:       game.LeaderBuilder,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/game/setup", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for setup, got %d", rec.Code)
+	}
+
+	var resp SetupResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode setup response: %v", err)
+	}
+	if resp.State.GamePhase != game.LifecyclePlaying {
+		t.Fatalf("expected playing setup state, got %+v", resp.State)
+	}
+	if len(resp.State.Map.Clearings) != 12 {
+		t.Fatalf("expected autumn map clearings, got %+v", resp.State.Map.Clearings)
+	}
+}

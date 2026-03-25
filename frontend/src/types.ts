@@ -145,6 +145,15 @@ export interface GameState {
   };
 }
 
+export interface SetupRequest {
+  gameMode: number;
+  playerFaction: number;
+  factions: number[];
+  mapID: string;
+  vagabondCharacter: number;
+  eyrieLeader: number;
+}
+
 export interface Action {
   type: number;
   movement?: {

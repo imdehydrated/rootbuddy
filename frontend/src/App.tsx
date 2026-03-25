@@ -3,6 +3,7 @@ import { applyAction, fetchValidActions, resolveBattle } from "./api";
 import { boardLayoutForState } from "./boardLayouts";
 import { BoardPanel } from "./components/BoardPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
+import { SetupWizard } from "./components/SetupWizard";
 import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
 import { affectedClearings, syncDerivedFactionStateFromBoard } from "./gameHelpers";
@@ -59,6 +60,7 @@ function zeroActionHint(state: GameState): string {
 }
 
 export default function App() {
+  const [showSetup, setShowSetup] = useState(true);
   const [stateText, setStateText] = useState(initialJSON);
   const deferredStateText = useDeferredValue(stateText);
   const [parsedState, setParsedState] = useState<GameState>(initialState);
@@ -206,6 +208,25 @@ export default function App() {
     actions[hoveredActionIndex ?? selectedBattleIndex ?? -1] ?? null;
   const highlightedClearings = previewedAction ? affectedClearings(previewedAction) : [];
 
+  if (showSetup) {
+    return (
+      <SetupWizard
+        onStart={(state) => {
+          syncState(state);
+          setShowSetup(false);
+          setStatus("Game created.");
+          setActiveModal(null);
+        }}
+        onUseSample={() => {
+          syncState(initialState);
+          setShowSetup(false);
+          setStatus("Loaded sample state.");
+          setActiveModal("help");
+        }}
+      />
+    );
+  }
+
   return (
     <main className="app-shell workspace-shell">
       <div className="board-stage">
@@ -245,6 +266,9 @@ export default function App() {
           <div className="sidebar-actions">
             <button type="button" className="secondary" onClick={() => setActiveModal("help")}>
               Help
+            </button>
+            <button type="button" className="secondary" onClick={() => setShowSetup(true)}>
+              Setup
             </button>
             <button type="button" className="secondary" onClick={() => setActiveModal("turn")}>
               Turn State

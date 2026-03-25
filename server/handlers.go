@@ -95,3 +95,26 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		Action: action,
 	})
 }
+
+func HandleSetup(w http.ResponseWriter, r *http.Request) {
+	var req SetupRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	state, err := engine.SetupGame(engine.SetupRequest{
+		GameMode:          req.GameMode,
+		PlayerFaction:     req.PlayerFaction,
+		Factions:          req.Factions,
+		MapID:             req.MapID,
+		VagabondCharacter: req.VagabondCharacter,
+		EyrieLeader:       req.EyrieLeader,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SetupResponse{State: state})
+}

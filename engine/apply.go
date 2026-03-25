@@ -681,12 +681,23 @@ func applyCraft(state *game.GameState, action game.Action) {
 		return
 	}
 
+	card, found := CardByID(action.Craft.CardID)
+	if found && card.CraftedItem != nil && !DeductItem(state, *card.CraftedItem) {
+		return
+	}
+
 	if _, ok := removeCardFromFactionHand(state, action.Craft.Faction, action.Craft.CardID); !ok {
 		return
 	}
 
 	if action.Craft.Faction == game.Vagabond {
 		exhaustReadyItemsByType(state, game.ItemHammer, len(action.Craft.UsedWorkshopClearings))
+		if found && card.CraftedItem != nil {
+			state.Vagabond.Items = append(state.Vagabond.Items, game.Item{
+				Type:   *card.CraftedItem,
+				Status: game.ItemReady,
+			})
+		}
 	}
 	DiscardCard(state, action.Craft.CardID)
 	state.TurnProgress.UsedWorkshopClearings = append(

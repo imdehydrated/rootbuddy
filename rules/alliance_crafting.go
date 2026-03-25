@@ -23,6 +23,9 @@ func ValidAllianceCraftActions(state game.GameState) []game.Action {
 		if !isCraftable(card.Kind) {
 			continue
 		}
+		if !itemCraftAvailable(state, card) {
+			continue
+		}
 		if card.CraftingCost.Fox == 0 &&
 			card.CraftingCost.Rabbit == 0 &&
 			card.CraftingCost.Mouse == 0 &&

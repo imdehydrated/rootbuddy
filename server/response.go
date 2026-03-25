@@ -14,6 +14,10 @@ type ResolveBattleResponse struct {
 	Action game.Action `json:"action"`
 }
 
+type SetupResponse struct {
+	State game.GameState `json:"state"`
+}
+
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
