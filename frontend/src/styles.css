@@ -238,6 +238,20 @@ button.secondary {
     inset 0 2px 0 rgba(255, 255, 255, 0.62);
 }
 
+.clearing-marker.setup-legal {
+  box-shadow:
+    0 0 0 4px rgba(51, 118, 90, 0.44),
+    0 10px 20px rgba(0, 0, 0, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+}
+
+.clearing-marker.setup-chosen {
+  box-shadow:
+    0 0 0 4px rgba(244, 190, 77, 0.76),
+    0 10px 20px rgba(0, 0, 0, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+}
+
 .marker-token-cluster {
   min-height: 1.15rem;
   width: 100%;
@@ -809,6 +823,33 @@ textarea {
   color: #fbf6ed;
   font-size: 0.92rem;
   box-shadow: 0 10px 24px rgba(29, 52, 44, 0.2);
+}
+
+.forest-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 4.5rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(68, 87, 63, 0.68);
+  background: rgba(238, 242, 229, 0.84);
+  color: #2a3926;
+  z-index: 3;
+}
+
+.forest-marker.legal {
+  box-shadow: 0 0 0 3px rgba(51, 118, 90, 0.24);
+}
+
+.forest-marker.selected {
+  box-shadow: 0 0 0 4px rgba(244, 190, 77, 0.68);
+}
+
+.forest-marker-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .modal-backdrop {

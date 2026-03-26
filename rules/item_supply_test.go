@@ -16,6 +16,15 @@ func testItemCard(id game.CardID, craftedItem game.ItemType, cost game.CraftingC
 	}
 }
 
+func testPersistentCard(id game.CardID, effectID string, cost game.CraftingCost) game.Card {
+	return game.Card{
+		ID:           id,
+		Kind:         game.PersistentEffectCard,
+		CraftingCost: cost,
+		EffectID:     effectID,
+	}
+}
+
 func TestValidCraftActionsSkipsUnavailableItemSupply(t *testing.T) {
 	actions := ValidCraftActions(game.GameState{
 		Map: game.Map{
@@ -133,5 +142,36 @@ func TestValidVagabondCraftActionsSkipsUnavailableItemSupply(t *testing.T) {
 
 	if len(actions) != 0 {
 		t.Fatalf("expected no Vagabond craft actions when item supply is exhausted, got %+v", actions)
+	}
+}
+
+func TestValidCraftActionsSkipsDuplicatePersistentEffectForSameFaction(t *testing.T) {
+	actions := ValidCraftActions(game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Marquise: {15},
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				testPersistentCard(16, "better_burrow_bank", game.CraftingCost{Rabbit: 2}),
+			},
+		},
+	})
+
+	if len(actions) != 0 {
+		t.Fatalf("expected no craft action for duplicate persistent effect, got %+v", actions)
 	}
 }

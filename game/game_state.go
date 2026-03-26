@@ -18,7 +18,11 @@ const (
 type GameState struct {
 	Map               Map
 	GameMode          GameMode
+	TrackAllHands     bool `json:"-"`
+	RandomSeed        int64
+	ShuffleCount      int64
 	GamePhase         GameLifecycle
+	SetupStage        SetupStage
 	PlayerFaction     Faction
 	Winner            Faction
 	RoundNumber       int

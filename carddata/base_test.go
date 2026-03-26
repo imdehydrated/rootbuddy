@@ -34,4 +34,9 @@ func TestBaseDeckIncludesCraftedItemsAndEffectIDs(t *testing.T) {
 	if favor.EffectID != "favor_foxes" {
 		t.Fatalf("expected Favor of the Foxes effect id to be favor_foxes, got %q", favor.EffectID)
 	}
+
+	royalClaim := byID[7]
+	if royalClaim.Kind != game.PersistentEffectCard {
+		t.Fatalf("expected Royal Claim to be a persistent crafted effect, got %v", royalClaim.Kind)
+	}
 }

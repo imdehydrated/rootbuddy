@@ -11,7 +11,16 @@ type BoardPanelProps = {
   vagabondClearingID: number;
   vagabondInForest: boolean;
   highlightedClearings?: HighlightedClearing[];
+  setupLegalClearingIDs?: number[];
+  setupSelectedClearingIDs?: number[];
+  forestTargets?: Array<{
+    forestID: number;
+    label: string;
+    legal: boolean;
+    selected: boolean;
+  }>;
   onSelectClearing: (clearingID: number) => void;
+  onSelectForest?: (forestID: number) => void;
 };
 
 export function BoardPanel({
@@ -22,11 +31,18 @@ export function BoardPanel({
   vagabondClearingID,
   vagabondInForest,
   highlightedClearings = [],
+  setupLegalClearingIDs = [],
+  setupSelectedClearingIDs = [],
+  forestTargets = [],
   onSelectClearing
+  ,
+  onSelectForest
 }: BoardPanelProps) {
   const highlightByClearing = new Map(
     highlightedClearings.map((highlight) => [highlight.clearingID, highlight.role])
   );
+  const legalSetupClearings = new Set(setupLegalClearingIDs);
+  const selectedSetupClearings = new Set(setupSelectedClearingIDs);
 
   const adjacencySegments = clearings.flatMap((clearing) =>
     clearing.adj
@@ -73,9 +89,29 @@ export function BoardPanel({
               hasKeep={clearing.id === keepClearingID}
               hasVagabond={!vagabondInForest && clearing.id === vagabondClearingID}
               highlightRole={highlightByClearing.get(clearing.id)}
+              isSetupLegal={legalSetupClearings.has(clearing.id)}
+              isSetupChosen={selectedSetupClearings.has(clearing.id)}
               onClick={() => onSelectClearing(clearing.id)}
             />
           ))}
+          {forestTargets.map((forest) => {
+            const position = boardLayout.forestPositions[forest.forestID];
+            if (!position) {
+              return null;
+            }
+
+            return (
+              <button
+                key={forest.forestID}
+                type="button"
+                className={`forest-marker ${forest.legal ? "legal" : ""} ${forest.selected ? "selected" : ""}`}
+                style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                onClick={() => onSelectForest?.(forest.forestID)}
+              >
+                <span className="forest-marker-label">{forest.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>

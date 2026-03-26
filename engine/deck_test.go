@@ -50,7 +50,7 @@ func TestDrawCardsTracksOtherFactionCountOnlyInOnlineMode(t *testing.T) {
 	}
 }
 
-func TestApplyActionCraftDiscardsCraftedCard(t *testing.T) {
+func TestApplyActionCraftPersistentEffectMovesCardIntoPlay(t *testing.T) {
 	state := game.GameState{
 		Marquise: game.MarquiseState{
 			CardsInHand: []game.Card{
@@ -67,8 +67,11 @@ func TestApplyActionCraftDiscardsCraftedCard(t *testing.T) {
 		},
 	})
 
-	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 20 {
-		t.Fatalf("expected crafted card to move to discard, got %+v", next.DiscardPile)
+	if len(next.DiscardPile) != 0 {
+		t.Fatalf("expected persistent effect craft to stay out of discard, got %+v", next.DiscardPile)
+	}
+	if len(next.PersistentEffects[game.Marquise]) != 1 || next.PersistentEffects[game.Marquise][0] != 20 {
+		t.Fatalf("expected crafted persistent effect to move into play, got %+v", next.PersistentEffects)
 	}
 }
 

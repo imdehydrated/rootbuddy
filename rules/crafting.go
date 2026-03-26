@@ -1,6 +1,9 @@
 package rules
 
-import "github.com/imdehydrated/rootbuddy/game"
+import (
+	"github.com/imdehydrated/rootbuddy/carddata"
+	"github.com/imdehydrated/rootbuddy/game"
+)
 
 func isCraftable(kind game.CardKind) bool {
 	return kind == game.ItemCard ||
@@ -113,14 +116,38 @@ func workshopIDsForCost(cost game.CraftingCost, workshops map[game.Suit][]int) (
 
 func itemCraftAvailable(state game.GameState, card game.Card) bool {
 	if card.CraftedItem == nil {
-		return true
+		return !persistentEffectAlreadyCrafted(state, card)
 	}
 
 	if state.ItemSupply == nil {
-		return true
+		return !persistentEffectAlreadyCrafted(state, card)
 	}
 
-	return state.ItemSupply[*card.CraftedItem] > 0
+	return state.ItemSupply[*card.CraftedItem] > 0 && !persistentEffectAlreadyCrafted(state, card)
+}
+
+func persistentEffectAlreadyCrafted(state game.GameState, card game.Card) bool {
+	if card.Kind != game.PersistentEffectCard || card.EffectID == "" {
+		return false
+	}
+
+	for _, cardID := range state.PersistentEffects[state.FactionTurn] {
+		if craftedCard, ok := persistentCardByID(cardID); ok && craftedCard.EffectID == card.EffectID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func persistentCardByID(cardID game.CardID) (game.Card, bool) {
+	for _, card := range carddata.BaseDeck() {
+		if card.ID == cardID {
+			return card, true
+		}
+	}
+
+	return game.Card{}, false
 }
 
 func ValidCraftActions(state game.GameState) []game.Action {

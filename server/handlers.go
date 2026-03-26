@@ -43,6 +43,7 @@ func HandleValidActions(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, ValidActionsResponse{
 		Actions: engine.ValidActions(req.State),
+		GameID:  req.GameID,
 	})
 }
 
@@ -57,8 +58,27 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	state := req.State
+	if req.GameID != "" {
+		authoritative, ok := store.load(req.GameID)
+		if !ok {
+			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
+			return
+		}
+		state = mergeAuthoritativeState(req.State, authoritative)
+	}
+
+	next, effectResult := engine.ApplyActionDetailed(state, req.Action)
+	if req.GameID != "" {
+		store.save(req.GameID, next)
+		effectResult = redactEffectResultForPlayer(state, next, req.Action, effectResult)
+		next = redactStateForPlayer(next)
+	}
+
 	writeJSON(w, http.StatusOK, ApplyActionResponse{
-		State: engine.ApplyAction(req.State, req.Action),
+		State:        next,
+		EffectResult: effectResult,
+		GameID:       req.GameID,
 	})
 }
 
@@ -73,10 +93,20 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	state := req.State
+	if req.GameID != "" {
+		authoritative, ok := store.load(req.GameID)
+		if !ok {
+			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
+			return
+		}
+		state = mergeAuthoritativeState(req.State, authoritative)
+	}
+
 	var action game.Action
 	if req.UseModifiers {
 		action = engine.ResolveBattleWithModifiers(
-			req.State,
+			state,
 			req.Action,
 			req.AttackerRoll,
 			req.DefenderRoll,
@@ -84,7 +114,7 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		)
 	} else {
 		action = engine.ResolveBattle(
-			req.State,
+			state,
 			req.Action,
 			req.AttackerRoll,
 			req.DefenderRoll,
@@ -93,6 +123,34 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, ResolveBattleResponse{
 		Action: action,
+		GameID: req.GameID,
+	})
+}
+
+func HandleBattleContext(w http.ResponseWriter, r *http.Request) {
+	var req BattleContextRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+	if validationError := validateBattleContextRequest(req); validationError != "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
+		return
+	}
+
+	state := req.State
+	if req.GameID != "" {
+		authoritative, ok := store.load(req.GameID)
+		if !ok {
+			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
+			return
+		}
+		state = mergeAuthoritativeState(req.State, authoritative)
+	}
+
+	writeJSON(w, http.StatusOK, BattleContextResponse{
+		BattleContext: engine.BattleContext(state, req.Action),
+		GameID:        req.GameID,
 	})
 }
 
@@ -110,11 +168,24 @@ func HandleSetup(w http.ResponseWriter, r *http.Request) {
 		MapID:             req.MapID,
 		VagabondCharacter: req.VagabondCharacter,
 		EyrieLeader:       req.EyrieLeader,
+		RandomSeed:        req.RandomSeed,
 	})
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SetupResponse{State: state})
+	gameID := ""
+	if state.GameMode == game.GameModeOnline {
+		gameID = newGameID()
+		authoritative := engine.CloneState(state)
+		authoritative.TrackAllHands = true
+		store.save(gameID, authoritative)
+		state = redactStateForPlayer(authoritative)
+	}
+
+	writeJSON(w, http.StatusOK, SetupResponse{
+		State:  state,
+		GameID: gameID,
+	})
 }

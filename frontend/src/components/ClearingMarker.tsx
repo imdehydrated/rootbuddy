@@ -9,6 +9,8 @@ type ClearingMarkerProps = {
   hasKeep: boolean;
   hasVagabond: boolean;
   highlightRole?: HighlightedClearing["role"];
+  isSetupLegal?: boolean;
+  isSetupChosen?: boolean;
   onClick: () => void;
 };
 
@@ -47,6 +49,8 @@ export function ClearingMarker({
   hasKeep,
   hasVagabond,
   highlightRole,
+  isSetupLegal = false,
+  isSetupChosen = false,
   onClick
 }: ClearingMarkerProps) {
   const marquiseWarriors = clearing.warriors["0"] ?? 0;
@@ -65,6 +69,12 @@ export function ClearingMarker({
   }
   if (highlightRole) {
     classNames.push(`highlight-${highlightRole}`);
+  }
+  if (isSetupLegal) {
+    classNames.push("setup-legal");
+  }
+  if (isSetupChosen) {
+    classNames.push("setup-chosen");
   }
 
   return (

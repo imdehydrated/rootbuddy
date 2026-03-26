@@ -4,6 +4,7 @@ import {
   itemStatusLabels,
   phaseLabels,
   relationshipLabels,
+  setupStageLabels,
   stepLabels,
   suitLabels,
   vagabondCharacterLabels
@@ -67,7 +68,11 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
         <div className="summary-card">
           <span className="summary-label">Active Turn</span>
           <strong>{factionLabels[state.factionTurn] ?? "Unknown"}</strong>
-          <span>{phaseLabels[state.currentPhase] ?? "Unknown"} / {stepLabels[state.currentStep] ?? "Unknown"}</span>
+          <span>
+            {state.gamePhase === 0
+              ? setupStageLabels[state.setupStage] ?? "Setup"
+              : `${phaseLabels[state.currentPhase] ?? "Unknown"} / ${stepLabels[state.currentStep] ?? "Unknown"}`}
+          </span>
         </div>
         <div className="summary-card">
           <span className="summary-label">Turn Order</span>

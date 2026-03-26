@@ -12,6 +12,8 @@ func NewServer() http.Handler {
 	mux.HandleFunc("POST /api/actions/apply", HandleApplyAction)
 	mux.HandleFunc("POST /battles/resolve", HandleResolveBattle)
 	mux.HandleFunc("POST /api/battles/resolve", HandleResolveBattle)
+	mux.HandleFunc("POST /battles/context", HandleBattleContext)
+	mux.HandleFunc("POST /api/battles/context", HandleBattleContext)
 	mux.HandleFunc("POST /game/setup", HandleSetup)
 	mux.HandleFunc("POST /api/game/setup", HandleSetup)
 	return withCORS(mux)

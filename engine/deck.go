@@ -1,9 +1,7 @@
 package engine
 
 import (
-	"math/rand"
 	"sort"
-	"time"
 
 	"github.com/imdehydrated/rootbuddy/carddata"
 	"github.com/imdehydrated/rootbuddy/game"
@@ -20,9 +18,9 @@ func BuildDeck(cards []game.Card) []game.CardID {
 	return deck
 }
 
-func ShuffleDeck(deck []game.CardID) []game.CardID {
+func ShuffleDeck(state *game.GameState, deck []game.CardID) []game.CardID {
 	shuffled := cloneCardIDs(deck)
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := nextShuffleRNG(state)
 	rng.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
@@ -34,12 +32,12 @@ func ReshuffleDeck(state *game.GameState) {
 		return
 	}
 
-	state.Deck = ShuffleDeck(state.DiscardPile)
+	state.Deck = ShuffleDeck(state, state.DiscardPile)
 	state.DiscardPile = nil
 }
 
 func tracksHandForFaction(state game.GameState, faction game.Faction) bool {
-	return faction == state.PlayerFaction
+	return state.TrackAllHands || faction == state.PlayerFaction
 }
 
 func drawOneCardID(state *game.GameState) (game.CardID, bool) {

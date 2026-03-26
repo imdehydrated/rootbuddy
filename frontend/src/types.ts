@@ -54,6 +54,12 @@ export interface Card {
   vp: number;
 }
 
+export interface EffectResult {
+  effectID: string;
+  message: string;
+  cards: Card[];
+}
+
 export interface Clearing {
   id: number;
   suit: number;
@@ -74,7 +80,10 @@ export interface GameState {
     forests: Forest[];
   };
   gameMode: number;
+  randomSeed: number;
+  shuffleCount: number;
   gamePhase: number;
+  setupStage: number;
   playerFaction: number;
   winner: number;
   roundNumber: number;
@@ -142,6 +151,10 @@ export interface GameState {
     officerActionsUsed: number;
     hasOrganized: boolean;
     hasSlipped: boolean;
+    usedPersistentEffectIDs: string[];
+    birdsongMainActionTaken: boolean;
+    daylightMainActionTaken: boolean;
+    eveningMainActionTaken: boolean;
   };
 }
 
@@ -152,6 +165,7 @@ export interface SetupRequest {
   mapID: string;
   vagabondCharacter: number;
   eyrieLeader: number;
+  randomSeed?: number;
 }
 
 export interface Action {
@@ -165,12 +179,14 @@ export interface Action {
     fromForestID: number;
     toForestID: number;
     decreeCardID: number;
+    sourceEffectID: string;
   } | null;
   battle?: {
     faction: number;
     clearingID: number;
     targetFaction: number;
     decreeCardID: number;
+    sourceEffectID: string;
   } | null;
   battleResolution?: {
     faction: number;
@@ -183,8 +199,16 @@ export interface Action {
     defenderHitModifier: number;
     ignoreHitsToAttacker: boolean;
     ignoreHitsToDefender: boolean;
+    defenderAmbushed: boolean;
+    attackerCounterAmbush: boolean;
+    attackerUsedArmorers: boolean;
+    defenderUsedArmorers: boolean;
+    attackerUsedBrutalTactics: boolean;
+    defenderUsedSappers: boolean;
+    ambushHitsToAttacker: number;
     attackerLosses: number;
     defenderLosses: number;
+    sourceEffectID: string;
   } | null;
   build?: {
     faction: number;
@@ -312,4 +336,57 @@ export interface Action {
     faction: number;
     cardID: number;
   } | null;
+  discardEffect?: {
+    faction: number;
+    cardID: number;
+  } | null;
+  marquiseSetup?: {
+    faction: number;
+    keepClearingID: number;
+    sawmillClearingID: number;
+    workshopClearingID: number;
+    recruiterClearingID: number;
+  } | null;
+  eyrieSetup?: {
+    faction: number;
+    clearingID: number;
+  } | null;
+  vagabondSetup?: {
+    faction: number;
+    forestID: number;
+  } | null;
+  usePersistentEffect?: {
+    faction: number;
+    effectID: string;
+    targetFaction: number;
+    clearingID: number;
+    observedCardID: number;
+  } | null;
+}
+
+export interface BattleModifiers {
+  attackerHitModifier: number;
+  defenderHitModifier: number;
+  ignoreHitsToAttacker: boolean;
+  ignoreHitsToDefender: boolean;
+  defenderAmbush: boolean;
+  attackerCounterAmbush: boolean;
+  attackerUsesArmorers: boolean;
+  defenderUsesArmorers: boolean;
+  attackerUsesBrutalTactics: boolean;
+  defenderUsesSappers: boolean;
+}
+
+export interface BattleContext {
+  action: Action;
+  clearingSuit: number;
+  timing: string[];
+  attackerHasScoutingParty: boolean;
+  canDefenderAmbush: boolean;
+  canAttackerCounterAmbush: boolean;
+  canAttackerArmorers: boolean;
+  canDefenderArmorers: boolean;
+  canAttackerBrutalTactics: boolean;
+  canDefenderSappers: boolean;
+  assistDefenderAmbushPromptRequired: boolean;
 }

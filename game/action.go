@@ -1,36 +1,41 @@
 package game
 
 type Action struct {
-	Type               ActionType
-	Movement           *MovementAction
-	Battle             *BattleAction
-	BattleResolution   *BattleResolutionAction
-	Build              *BuildAction
-	Recruit            *RecruitAction
-	Overwork           *OverworkAction
-	Craft              *CraftAction
-	AddToDecree        *AddToDecreeAction
-	SpreadSympathy     *SpreadSympathyAction
-	Revolt             *RevoltAction
-	Mobilize           *MobilizeAction
-	Train              *TrainAction
-	Organize           *OrganizeAction
-	Explore            *ExploreAction
-	Quest              *QuestAction
-	Aid                *AidAction
-	Strike             *StrikeAction
-	Repair             *RepairAction
-	Turmoil            *TurmoilAction
-	Daybreak           *DaybreakAction
-	Slip               *SlipAction
-	BirdsongWood       *BirdsongWoodAction
-	EveningDraw        *EveningDrawAction
-	ScoreRoosts        *ScoreRoostsAction
-	PassPhase          *PassPhaseAction
-	AddCardToHand      *AddCardToHandAction
-	RemoveCardFromHand *RemoveCardFromHandAction
-	OtherPlayerDraw    *OtherPlayerDrawAction
-	OtherPlayerPlay    *OtherPlayerPlayAction
+	Type                ActionType
+	Movement            *MovementAction
+	Battle              *BattleAction
+	BattleResolution    *BattleResolutionAction
+	Build               *BuildAction
+	Recruit             *RecruitAction
+	Overwork            *OverworkAction
+	Craft               *CraftAction
+	AddToDecree         *AddToDecreeAction
+	SpreadSympathy      *SpreadSympathyAction
+	Revolt              *RevoltAction
+	Mobilize            *MobilizeAction
+	Train               *TrainAction
+	Organize            *OrganizeAction
+	Explore             *ExploreAction
+	Quest               *QuestAction
+	Aid                 *AidAction
+	Strike              *StrikeAction
+	Repair              *RepairAction
+	Turmoil             *TurmoilAction
+	Daybreak            *DaybreakAction
+	Slip                *SlipAction
+	BirdsongWood        *BirdsongWoodAction
+	EveningDraw         *EveningDrawAction
+	ScoreRoosts         *ScoreRoostsAction
+	PassPhase           *PassPhaseAction
+	AddCardToHand       *AddCardToHandAction
+	RemoveCardFromHand  *RemoveCardFromHandAction
+	OtherPlayerDraw     *OtherPlayerDrawAction
+	OtherPlayerPlay     *OtherPlayerPlayAction
+	DiscardEffect       *DiscardEffectAction
+	MarquiseSetup       *MarquiseSetupAction
+	EyrieSetup          *EyrieSetupAction
+	VagabondSetup       *VagabondSetupAction
+	UsePersistentEffect *UsePersistentEffectAction
 }
 
 type ActionType int
@@ -65,46 +70,67 @@ const (
 	ActionRemoveCardFromHand
 	ActionOtherPlayerDraw
 	ActionOtherPlayerPlay
+	ActionDiscardEffect
+	ActionMarquiseSetup
+	ActionEyrieSetup
+	ActionVagabondSetup
+	ActionUsePersistentEffect
 )
 
 type MovementAction struct {
-	Faction      Faction
-	Count        int
-	MaxCount     int
-	From         int
-	To           int
-	FromForestID int
-	ToForestID   int
-	DecreeCardID CardID
+	Faction        Faction
+	Count          int
+	MaxCount       int
+	From           int
+	To             int
+	FromForestID   int
+	ToForestID     int
+	DecreeCardID   CardID
+	SourceEffectID string
 }
 
 type BattleAction struct {
-	Faction       Faction
-	ClearingID    int
-	TargetFaction Faction
-	DecreeCardID  CardID
+	Faction        Faction
+	ClearingID     int
+	TargetFaction  Faction
+	DecreeCardID   CardID
+	SourceEffectID string
 }
 
 type BattleModifiers struct {
-	AttackerHitModifier  int
-	DefenderHitModifier  int
-	IgnoreHitsToAttacker bool
-	IgnoreHitsToDefender bool
+	AttackerHitModifier       int
+	DefenderHitModifier       int
+	IgnoreHitsToAttacker      bool
+	IgnoreHitsToDefender      bool
+	DefenderAmbush            bool
+	AttackerCounterAmbush     bool
+	AttackerUsesArmorers      bool
+	DefenderUsesArmorers      bool
+	AttackerUsesBrutalTactics bool
+	DefenderUsesSappers       bool
 }
 
 type BattleResolutionAction struct {
-	Faction              Faction
-	ClearingID           int
-	TargetFaction        Faction
-	DecreeCardID         CardID
-	AttackerRoll         int
-	DefenderRoll         int
-	AttackerHitModifier  int
-	DefenderHitModifier  int
-	IgnoreHitsToAttacker bool
-	IgnoreHitsToDefender bool
-	AttackerLosses       int
-	DefenderLosses       int
+	Faction                   Faction
+	ClearingID                int
+	TargetFaction             Faction
+	DecreeCardID              CardID
+	AttackerRoll              int
+	DefenderRoll              int
+	AttackerHitModifier       int
+	DefenderHitModifier       int
+	IgnoreHitsToAttacker      bool
+	IgnoreHitsToDefender      bool
+	DefenderAmbushed          bool
+	AttackerCounterAmbush     bool
+	AttackerUsedArmorers      bool
+	DefenderUsedArmorers      bool
+	AttackerUsedBrutalTactics bool
+	DefenderUsedSappers       bool
+	AmbushHitsToAttacker      int
+	AttackerLosses            int
+	DefenderLosses            int
+	SourceEffectID            string
 }
 
 type BuildAction struct {
@@ -275,4 +301,35 @@ type OtherPlayerDrawAction struct {
 type OtherPlayerPlayAction struct {
 	Faction Faction
 	CardID  CardID
+}
+
+type DiscardEffectAction struct {
+	Faction Faction
+	CardID  CardID
+}
+
+type MarquiseSetupAction struct {
+	Faction             Faction
+	KeepClearingID      int
+	SawmillClearingID   int
+	WorkshopClearingID  int
+	RecruiterClearingID int
+}
+
+type EyrieSetupAction struct {
+	Faction    Faction
+	ClearingID int
+}
+
+type VagabondSetupAction struct {
+	Faction  Faction
+	ForestID int
+}
+
+type UsePersistentEffectAction struct {
+	Faction        Faction
+	EffectID       string
+	TargetFaction  Faction
+	ClearingID     int
+	ObservedCardID CardID
 }

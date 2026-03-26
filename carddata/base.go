@@ -86,7 +86,7 @@ func BaseDeck() []game.Card {
 		persistent(4, "Sappers", game.Bird, game.CraftingCost{Mouse: 1}, "sappers"),
 		persistent(5, "Brutal Tactics", game.Bird, game.CraftingCost{Fox: 2}, "brutal_tactics"),
 		persistent(6, "Brutal Tactics", game.Bird, game.CraftingCost{Fox: 2}, "brutal_tactics"),
-		oneTime(7, "Royal Claim", game.Bird, game.CraftingCost{Any: 4}, "royal_claim"),
+		persistent(7, "Royal Claim", game.Bird, game.CraftingCost{Any: 4}, "royal_claim"),
 		itemWithCraftedItem(8, "Birdy Bindle", game.Bird, game.CraftingCost{Mouse: 1}, game.ItemBag, 1),
 		itemWithCraftedItem(9, "Woodland Runners", game.Bird, game.CraftingCost{Rabbit: 1}, game.ItemBoots, 1),
 		itemWithCraftedItem(10, "Arms Trader", game.Bird, game.CraftingCost{Fox: 2}, game.ItemSword, 2),

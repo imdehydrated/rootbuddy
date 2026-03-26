@@ -10,6 +10,7 @@ export interface BoardLayout {
   label: string;
   imagePath: string;
   clearingPositions: Record<number, BoardPosition>;
+  forestPositions: Record<number, BoardPosition>;
 }
 
 const autumnBoardLayout: BoardLayout = {
@@ -29,6 +30,15 @@ const autumnBoardLayout: BoardLayout = {
     7: { left: 60, top: 72 },
     8: { left: 39, top: 84 },
     3: { left: 84, top: 78 }
+  },
+  forestPositions: {
+    1: { left: 35, top: 11 },
+    2: { left: 71, top: 19 },
+    3: { left: 75, top: 39 },
+    4: { left: 72, top: 66 },
+    5: { left: 34, top: 78 },
+    6: { left: 11, top: 54 },
+    7: { left: 48, top: 43 }
   }
 };
 

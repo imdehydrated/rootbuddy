@@ -12,8 +12,10 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if count <= 0 {
 			count = req.Action.Movement.MaxCount
 		}
-		if count <= 0 || req.Action.Movement.From <= 0 || req.Action.Movement.To <= 0 {
-			return "movement action must have positive count and valid clearing IDs"
+		hasSource := req.Action.Movement.From > 0 || req.Action.Movement.FromForestID > 0
+		hasDestination := req.Action.Movement.To > 0 || req.Action.Movement.ToForestID > 0
+		if count <= 0 || !hasSource || !hasDestination {
+			return "movement action must have positive count and valid source and destination"
 		}
 	case game.ActionBattleResolution:
 		if req.Action.BattleResolution == nil {
@@ -155,6 +157,41 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.OtherPlayerPlay.CardID <= 0 {
 			return "other player play action must have a valid card ID"
 		}
+	case game.ActionDiscardEffect:
+		if req.Action.DiscardEffect == nil {
+			return "discard effect payload is required"
+		}
+		if req.Action.DiscardEffect.CardID <= 0 {
+			return "discard effect action must have a valid card ID"
+		}
+	case game.ActionMarquiseSetup:
+		if req.Action.MarquiseSetup == nil {
+			return "marquise setup payload is required"
+		}
+		if req.Action.MarquiseSetup.KeepClearingID <= 0 {
+			return "marquise setup action must have a valid keep clearing ID"
+		}
+	case game.ActionEyrieSetup:
+		if req.Action.EyrieSetup == nil {
+			return "eyrie setup payload is required"
+		}
+		if req.Action.EyrieSetup.ClearingID <= 0 {
+			return "eyrie setup action must have a valid clearing ID"
+		}
+	case game.ActionVagabondSetup:
+		if req.Action.VagabondSetup == nil {
+			return "vagabond setup payload is required"
+		}
+		if req.Action.VagabondSetup.ForestID <= 0 {
+			return "vagabond setup action must have a valid forest ID"
+		}
+	case game.ActionUsePersistentEffect:
+		if req.Action.UsePersistentEffect == nil {
+			return "use persistent effect payload is required"
+		}
+		if req.Action.UsePersistentEffect.EffectID == "" {
+			return "use persistent effect action must have an effect ID"
+		}
 	default:
 		return "unsupported action type"
 	}
@@ -177,6 +214,23 @@ func validateResolveBattleRequest(req ResolveBattleRequest) string {
 	}
 	if req.AttackerRoll < 0 || req.AttackerRoll > 3 || req.DefenderRoll < 0 || req.DefenderRoll > 3 {
 		return "battle rolls must be between 0 and 3"
+	}
+
+	return ""
+}
+
+func validateBattleContextRequest(req BattleContextRequest) string {
+	if req.Action.Type != game.ActionBattle {
+		return "battle context requires a battle action"
+	}
+	if req.Action.Battle == nil {
+		return "battle payload is required"
+	}
+	if req.Action.Battle.ClearingID <= 0 {
+		return "battle action must have a valid clearing ID"
+	}
+	if req.Action.Battle.Faction == req.Action.Battle.TargetFaction {
+		return "battle action must target a different faction"
 	}
 
 	return ""

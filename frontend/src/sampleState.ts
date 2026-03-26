@@ -28,7 +28,10 @@ export const sampleState: GameState = {
     ]
   },
   gameMode: 0,
+  randomSeed: 0,
+  shuffleCount: 0,
   gamePhase: 1,
+  setupStage: 4,
   playerFaction: 3,
   winner: 0,
   roundNumber: 3,
@@ -129,6 +132,10 @@ export const sampleState: GameState = {
     cardsAddedToDecree: 0,
     officerActionsUsed: 0,
     hasOrganized: false,
-    hasSlipped: false
+    hasSlipped: false,
+    usedPersistentEffectIDs: [],
+    birdsongMainActionTaken: false,
+    daylightMainActionTaken: false,
+    eveningMainActionTaken: false
   }
 };

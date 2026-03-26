@@ -6,23 +6,14 @@ import (
 )
 
 func effectiveStep(state game.GameState) game.TurnStep {
-	if state.CurrentStep != game.StepUnspecified {
-		return state.CurrentStep
-	}
-
-	switch state.CurrentPhase {
-	case game.Birdsong:
-		return game.StepBirdsong
-	case game.Daylight:
-		return game.StepDaylightActions
-	case game.Evening:
-		return game.StepEvening
-	default:
-		return game.StepUnspecified
-	}
+	return state.TurnWindow().Step
 }
 
 func ValidActions(state game.GameState) []game.Action {
+	if state.GamePhase == game.LifecycleSetup && state.SetupStage != game.SetupStageUnspecified {
+		return ValidSetupActions(state)
+	}
+
 	switch state.FactionTurn {
 	case game.Marquise:
 		return validMarquiseActions(state)
@@ -40,15 +31,19 @@ func ValidActions(state game.GameState) []game.Action {
 func validMarquiseActions(state game.GameState) []game.Action {
 	switch effectiveStep(state) {
 	case game.StepBirdsong:
-		return rules.ValidMarquiseBirdsongWoodActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidMarquiseBirdsongWoodActions(state)...)
 	case game.StepDaylightCraft:
 		actions := rules.ValidCraftActions(state)
+		actions = append(actions, effectActions(state)...)
 		actions = append(actions, rules.MarquisePassPhaseAction())
 		return actions
 	case game.StepDaylightActions:
-		return rules.ValidMarquiseDaylightActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidMarquiseDaylightActions(state)...)
 	case game.StepEvening:
-		return rules.ValidMarquiseEveningActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidMarquiseEveningActions(state)...)
 	default:
 		return []game.Action{}
 	}
@@ -57,9 +52,11 @@ func validMarquiseActions(state game.GameState) []game.Action {
 func validEyrieActions(state game.GameState) []game.Action {
 	switch effectiveStep(state) {
 	case game.StepBirdsong:
-		return rules.ValidAddToDecreeActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidAddToDecreeActions(state)...)
 	case game.StepDaylightCraft:
 		actions := rules.ValidEyrieCraftActions(state)
+		actions = append(actions, effectActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{
@@ -68,9 +65,11 @@ func validEyrieActions(state game.GameState) []game.Action {
 		})
 		return actions
 	case game.StepDaylightActions:
-		return rules.ValidEyrieDaylightActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidEyrieDaylightActions(state)...)
 	case game.StepEvening:
-		return rules.ValidEyrieEveningActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidEyrieEveningActions(state)...)
 	default:
 		return []game.Action{}
 	}
@@ -79,7 +78,7 @@ func validEyrieActions(state game.GameState) []game.Action {
 func validAllianceActions(state game.GameState) []game.Action {
 	switch effectiveStep(state) {
 	case game.StepBirdsong:
-		actions := []game.Action{}
+		actions := effectActions(state)
 		actions = append(actions, rules.ValidRevoltActions(state)...)
 		actions = append(actions, rules.ValidSpreadSympathyActions(state)...)
 		actions = append(actions, game.Action{
@@ -91,6 +90,7 @@ func validAllianceActions(state game.GameState) []game.Action {
 		return actions
 	case game.StepDaylightCraft:
 		actions := rules.ValidAllianceCraftActions(state)
+		actions = append(actions, effectActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{
@@ -99,7 +99,7 @@ func validAllianceActions(state game.GameState) []game.Action {
 		})
 		return actions
 	case game.StepDaylightActions:
-		actions := []game.Action{}
+		actions := effectActions(state)
 		actions = append(actions, rules.ValidMobilizeActions(state)...)
 		actions = append(actions, rules.ValidTrainActions(state)...)
 		actions = append(actions, game.Action{
@@ -110,7 +110,8 @@ func validAllianceActions(state game.GameState) []game.Action {
 		})
 		return actions
 	case game.StepEvening:
-		return rules.ValidAllianceEveningActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidAllianceEveningActions(state)...)
 	default:
 		return []game.Action{}
 	}
@@ -119,9 +120,10 @@ func validAllianceActions(state game.GameState) []game.Action {
 func validVagabondActions(state game.GameState) []game.Action {
 	switch effectiveStep(state) {
 	case game.StepBirdsong:
-		return rules.ValidVagabondBirdsongActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidVagabondBirdsongActions(state)...)
 	case game.StepDaylightCraft, game.StepDaylightActions:
-		actions := []game.Action{}
+		actions := effectActions(state)
 		actions = append(actions, rules.ValidVagabondMoveActions(state)...)
 		actions = append(actions, rules.ValidVagabondBattleActions(state)...)
 		actions = append(actions, rules.ValidExploreActions(state)...)
@@ -138,7 +140,8 @@ func validVagabondActions(state game.GameState) []game.Action {
 		})
 		return actions
 	case game.StepEvening:
-		return rules.ValidVagabondEveningActions(state)
+		actions := effectActions(state)
+		return append(actions, rules.ValidVagabondEveningActions(state)...)
 	default:
 		return []game.Action{}
 	}

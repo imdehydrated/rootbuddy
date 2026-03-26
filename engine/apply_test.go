@@ -355,6 +355,9 @@ func TestApplyActionCraft(t *testing.T) {
 	if !hasCard(next.Marquise.CardsInHand, 21) {
 		t.Fatalf("expected other card 21 to remain in hand")
 	}
+	if len(next.PersistentEffects[game.Marquise]) != 1 || next.PersistentEffects[game.Marquise][0] != 20 {
+		t.Fatalf("expected crafted persistent effect to be tracked in play, got %+v", next.PersistentEffects)
+	}
 	if len(next.TurnProgress.UsedWorkshopClearings) != 3 {
 		t.Fatalf("expected 3 recorded used workshops, got %d", len(next.TurnProgress.UsedWorkshopClearings))
 	}

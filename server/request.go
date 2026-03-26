@@ -3,12 +3,14 @@ package server
 import "github.com/imdehydrated/rootbuddy/game"
 
 type ValidActionsRequest struct {
-	State game.GameState `json:"state"`
+	State  game.GameState `json:"state"`
+	GameID string         `json:"gameID,omitempty"`
 }
 
 type ApplyActionRequest struct {
 	State  game.GameState `json:"state"`
 	Action game.Action    `json:"action"`
+	GameID string         `json:"gameID,omitempty"`
 }
 
 type ResolveBattleRequest struct {
@@ -18,6 +20,13 @@ type ResolveBattleRequest struct {
 	DefenderRoll int                  `json:"defenderRoll"`
 	Modifiers    game.BattleModifiers `json:"modifiers"`
 	UseModifiers bool                 `json:"useModifiers"`
+	GameID       string               `json:"gameID,omitempty"`
+}
+
+type BattleContextRequest struct {
+	State  game.GameState `json:"state"`
+	Action game.Action    `json:"action"`
+	GameID string         `json:"gameID,omitempty"`
 }
 
 type SetupRequest struct {
@@ -27,4 +36,5 @@ type SetupRequest struct {
 	MapID             game.MapID             `json:"mapID"`
 	VagabondCharacter game.VagabondCharacter `json:"vagabondCharacter"`
 	EyrieLeader       game.EyrieLeader       `json:"eyrieLeader"`
+	RandomSeed        int64                  `json:"randomSeed,omitempty"`
 }

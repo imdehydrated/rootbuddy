@@ -2,8 +2,6 @@ package engine
 
 import (
 	"errors"
-	"math/rand"
-	"time"
 
 	"github.com/imdehydrated/rootbuddy/carddata"
 	"github.com/imdehydrated/rootbuddy/game"
@@ -17,6 +15,7 @@ type SetupRequest struct {
 	MapID             game.MapID
 	VagabondCharacter game.VagabondCharacter
 	EyrieLeader       game.EyrieLeader
+	RandomSeed        int64
 }
 
 var baseQuestRegistry = buildQuestRegistry()
@@ -56,11 +55,12 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 	state := game.GameState{
 		Map:               mapdata.AutumnMap(),
 		GameMode:          req.GameMode,
-		GamePhase:         game.LifecyclePlaying,
+		RandomSeed:        req.RandomSeed,
+		GamePhase:         game.LifecycleSetup,
+		SetupStage:        game.SetupStageUnspecified,
 		PlayerFaction:     req.PlayerFaction,
 		RoundNumber:       1,
-		CurrentPhase:      game.Birdsong,
-		CurrentStep:       game.StepBirdsong,
+		CurrentStep:       game.StepUnspecified,
 		TurnOrder:         filteredTurnOrder(req.Factions),
 		VictoryPoints:     make(map[game.Faction]int, len(req.Factions)),
 		ItemSupply:        InitialItemSupply(),
@@ -71,18 +71,17 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 	if len(state.TurnOrder) == 0 {
 		return game.GameState{}, errors.New("setup produced no turn order")
 	}
-	state.FactionTurn = state.TurnOrder[0]
 
 	populateRuins(&state)
-	setupMarquise(&state, present)
-	setupEyrie(&state, present, req.EyrieLeader)
-	setupAlliance(&state, present)
-	setupVagabond(&state, present, req.VagabondCharacter)
-	setupDeckAndHands(&state, present)
+	initializeMarquiseSetupState(&state, present)
+	initializeEyrieSetupState(&state, present, req.EyrieLeader)
+	initializeAllianceSetupState(&state, present)
+	initializeVagabondSetupState(&state, present, req.VagabondCharacter)
 
 	for _, faction := range state.TurnOrder {
 		state.VictoryPoints[faction] = 0
 	}
+	advanceSetupStage(&state)
 
 	return state, nil
 }
@@ -157,7 +156,7 @@ func populateRuins(state *game.GameState) {
 	}
 
 	ruinItems := append([]game.ItemType(nil), RuinItems()...)
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := nextShuffleRNG(state)
 	rng.Shuffle(len(ruinItems), func(i, j int) {
 		ruinItems[i], ruinItems[j] = ruinItems[j], ruinItems[i]
 	})
@@ -171,58 +170,21 @@ func populateRuins(state *game.GameState) {
 	}
 }
 
-func setupMarquise(state *game.GameState, present map[game.Faction]bool) {
+func initializeMarquiseSetupState(state *game.GameState, present map[game.Faction]bool) {
 	if !present[game.Marquise] {
 		return
 	}
 
-	state.Marquise.WarriorSupply = 14
-	state.Marquise.SawmillsPlaced = 1
-	state.Marquise.WorkshopsPlaced = 1
-	state.Marquise.RecruitersPlaced = 1
-	state.Marquise.KeepClearingID = 1
-
-	placeToken(state, game.Marquise, 1, game.TokenKeep)
-	for _, clearing := range state.Map.Clearings {
-		if clearing.ID == 8 {
-			continue
-		}
-		placeWarriors(state, game.Marquise, clearing.ID, 1)
-	}
-
-	placeBuilding(state, game.Marquise, 1, game.Sawmill)
-	placeBuilding(state, game.Marquise, 2, game.Workshop)
-	placeBuilding(state, game.Marquise, 10, game.Recruiter)
+	state.Marquise.WarriorSupply = 25
 }
 
-func availableCorner(exclude ...int) int {
-	blocked := map[int]bool{}
-	for _, id := range exclude {
-		if id != 0 {
-			blocked[id] = true
-		}
-	}
-
-	for _, corner := range []int{8, 1, 3, 7} {
-		if !blocked[corner] {
-			return corner
-		}
-	}
-	return 1
-}
-
-func setupEyrie(state *game.GameState, present map[game.Faction]bool, leader game.EyrieLeader) {
+func initializeEyrieSetupState(state *game.GameState, present map[game.Faction]bool, leader game.EyrieLeader) {
 	if !present[game.Eyrie] {
 		return
 	}
 
-	startClearing := availableCorner(state.Marquise.KeepClearingID)
-	if state.Marquise.KeepClearingID == 1 {
-		startClearing = 8
-	}
-
-	state.Eyrie.WarriorSupply = 14
-	state.Eyrie.RoostsPlaced = 1
+	state.Eyrie.WarriorSupply = 20
+	state.Eyrie.RoostsPlaced = 0
 	state.Eyrie.Leader = leader
 	state.Eyrie.AvailableLeaders = []game.EyrieLeader{
 		game.LeaderBuilder,
@@ -231,16 +193,9 @@ func setupEyrie(state *game.GameState, present map[game.Faction]bool, leader gam
 		game.LeaderDespot,
 	}
 	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, leader)
-
-	placeBuilding(state, game.Eyrie, startClearing, game.Roost)
-	placeWarriors(state, game.Eyrie, startClearing, 6)
-
-	vizierColumns := vizierColumnsForLeader(leader)
-	appendCardToDecree(&state.Eyrie.Decree, vizierColumns[0], game.LoyalVizier1)
-	appendCardToDecree(&state.Eyrie.Decree, vizierColumns[1], game.LoyalVizier2)
 }
 
-func setupAlliance(state *game.GameState, present map[game.Faction]bool) {
+func initializeAllianceSetupState(state *game.GameState, present map[game.Faction]bool) {
 	if !present[game.Alliance] {
 		return
 	}
@@ -250,14 +205,12 @@ func setupAlliance(state *game.GameState, present map[game.Faction]bool) {
 	state.Alliance.SympathyPlaced = 0
 }
 
-func setupVagabond(state *game.GameState, present map[game.Faction]bool, character game.VagabondCharacter) {
+func initializeVagabondSetupState(state *game.GameState, present map[game.Faction]bool, character game.VagabondCharacter) {
 	if !present[game.Vagabond] {
 		return
 	}
 
 	state.Vagabond.Character = character
-	state.Vagabond.ForestID = 7
-	state.Vagabond.InForest = true
 	state.Vagabond.Items = VagabondStartingItems(character)
 	state.Vagabond.Relationships = map[game.Faction]game.RelationshipLevel{}
 	for _, faction := range state.TurnOrder {
@@ -268,17 +221,65 @@ func setupVagabond(state *game.GameState, present map[game.Faction]bool, charact
 	}
 
 	questDeck := carddata.QuestDeck()
-	state.QuestDeck = shuffleQuestIDs(questDeck)
+	state.QuestDeck = shuffleQuestIDs(state, questDeck)
 	drawSetupQuests(state, 3)
 }
 
-func shuffleQuestIDs(quests []game.Quest) []game.QuestID {
+func factionPresentInTurnOrder(state game.GameState, faction game.Faction) bool {
+	for _, turnFaction := range state.TurnOrder {
+		if turnFaction == faction {
+			return true
+		}
+	}
+	return false
+}
+
+func buildPresenceMap(state game.GameState) map[game.Faction]bool {
+	present := map[game.Faction]bool{}
+	for _, faction := range state.TurnOrder {
+		present[faction] = true
+	}
+	return present
+}
+
+func advanceSetupStage(state *game.GameState) {
+	if state.GamePhase != game.LifecycleSetup {
+		return
+	}
+
+	switch {
+	case factionPresentInTurnOrder(*state, game.Marquise) && state.Marquise.KeepClearingID == 0:
+		state.SetupStage = game.SetupStageMarquise
+		state.FactionTurn = game.Marquise
+	case factionPresentInTurnOrder(*state, game.Eyrie) && state.Eyrie.RoostsPlaced == 0:
+		state.SetupStage = game.SetupStageEyrie
+		state.FactionTurn = game.Eyrie
+	case factionPresentInTurnOrder(*state, game.Vagabond) && !state.Vagabond.InForest && state.Vagabond.ForestID == 0:
+		state.SetupStage = game.SetupStageVagabond
+		state.FactionTurn = game.Vagabond
+	default:
+		finalizeSetup(state)
+	}
+}
+
+func finalizeSetup(state *game.GameState) {
+	setupDeckAndHands(state, buildPresenceMap(*state))
+	state.SetupStage = game.SetupStageComplete
+	state.GamePhase = game.LifecyclePlaying
+	if len(state.TurnOrder) > 0 {
+		state.FactionTurn = state.TurnOrder[0]
+	}
+	state.CurrentPhase = game.Birdsong
+	state.CurrentStep = game.StepBirdsong
+}
+
+func shuffleQuestIDs(state *game.GameState, quests []game.Quest) []game.QuestID {
 	ids := make([]game.QuestID, 0, len(quests))
 	for _, quest := range quests {
 		ids = append(ids, quest.ID)
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := nextShuffleRNG(state)
 	rng.Shuffle(len(ids), func(i, j int) {
 		ids[i], ids[j] = ids[j], ids[i]
 	})
@@ -311,14 +312,14 @@ func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {
 	}
 
 	if state.GameMode == game.GameModeOnline {
-		state.Deck = ShuffleDeck(BuildDeck(baseCards))
+		state.Deck = ShuffleDeck(state, BuildDeck(baseCards))
 	}
 
 	for _, faction := range state.TurnOrder {
 		if faction == game.Alliance {
 			if state.GameMode == game.GameModeOnline {
-				if state.PlayerFaction == game.Alliance {
-					state.Alliance.Supporters = DrawCards(state, game.Alliance, 3)
+				if tracksHandForFaction(*state, game.Alliance) {
+					state.Alliance.Supporters = drawCardsToSlice(state, 3)
 				} else {
 					consumeDeckCards(state, 3)
 				}
@@ -348,4 +349,26 @@ func consumeDeckCards(state *game.GameState, count int) {
 			return
 		}
 	}
+}
+
+func drawCardsToSlice(state *game.GameState, count int) []game.Card {
+	if state.GameMode != game.GameModeOnline || count <= 0 {
+		return nil
+	}
+
+	drawn := make([]game.Card, 0, count)
+	for i := 0; i < count; i++ {
+		cardID, ok := drawOneCardID(state)
+		if !ok {
+			break
+		}
+
+		card, found := CardByID(cardID)
+		if !found {
+			continue
+		}
+		drawn = append(drawn, card)
+	}
+
+	return drawn
 }

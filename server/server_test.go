@@ -320,6 +320,46 @@ func TestHandleApplyActionRejectsMissingMovementPayload(t *testing.T) {
 	}
 }
 
+func TestHandleApplyActionAcceptsVagabondForestMovement(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			Map: game.Map{
+				Clearings: []game.Clearing{
+					{ID: 1},
+				},
+				Forests: []game.Forest{
+					{ID: 1, AdjacentClearings: []int{1}},
+				},
+			},
+			Vagabond: game.VagabondState{
+				ClearingID: 1,
+				Items: []game.Item{
+					{Type: game.ItemBoots, Status: game.ItemReady},
+				},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionMovement,
+			Movement: &game.MovementAction{
+				Faction:    game.Vagabond,
+				Count:      1,
+				MaxCount:   1,
+				From:       1,
+				ToForestID: 1,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Vagabond forest move apply action, got %d", rec.Code)
+	}
+}
+
 func TestHandleApplyActionAcceptsPassPhase(t *testing.T) {
 	body, _ := json.Marshal(ApplyActionRequest{
 		State: game.GameState{
@@ -349,6 +389,79 @@ func TestHandleApplyActionAcceptsPassPhase(t *testing.T) {
 	}
 	if resp.State.CurrentPhase != game.Daylight || resp.State.CurrentStep != game.StepDaylightActions {
 		t.Fatalf("expected pass phase to advance to daylight actions, got phase=%v step=%v", resp.State.CurrentPhase, resp.State.CurrentStep)
+	}
+}
+
+func TestHandleApplyActionAcceptsDiscardEffect(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			PersistentEffects: map[game.Faction][]game.CardID{
+				game.Marquise: {15},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionDiscardEffect,
+			DiscardEffect: &game.DiscardEffectAction{
+				Faction: game.Marquise,
+				CardID:  15,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for discard effect apply action, got %d", rec.Code)
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode discard effect apply response: %v", err)
+	}
+	if len(resp.State.PersistentEffects) != 0 {
+		t.Fatalf("expected discarded effect to be removed from persistent effects, got %+v", resp.State.PersistentEffects)
+	}
+	if len(resp.State.DiscardPile) != 1 || resp.State.DiscardPile[0] != 15 {
+		t.Fatalf("expected discarded effect to move to discard pile, got %+v", resp.State.DiscardPile)
+	}
+}
+
+func TestHandleApplyActionAcceptsUsePersistentEffect(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			PersistentEffects: map[game.Faction][]game.CardID{
+				game.Marquise: {7},
+			},
+			Map: game.Map{
+				Clearings: []game.Clearing{
+					{
+						ID: 1,
+						Warriors: map[game.Faction]int{
+							game.Marquise: 1,
+						},
+					},
+				},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionUsePersistentEffect,
+			UsePersistentEffect: &game.UsePersistentEffectAction{
+				Faction:  game.Marquise,
+				EffectID: "royal_claim",
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for use persistent effect apply action, got %d", rec.Code)
 	}
 }
 
@@ -543,6 +656,61 @@ func TestHandleResolveBattleRejectsOutOfRangeRolls(t *testing.T) {
 	}
 }
 
+func TestHandleBattleContext(t *testing.T) {
+	body, _ := json.Marshal(BattleContextRequest{
+		State: game.GameState{
+			GameMode:      game.GameModeAssist,
+			PlayerFaction: game.Marquise,
+			PersistentEffects: map[game.Faction][]game.CardID{
+				game.Marquise: {30},
+				game.Eyrie:    {1, 3},
+			},
+			OtherHandCounts: map[game.Faction]int{
+				game.Eyrie: 2,
+			},
+			Map: game.Map{
+				Clearings: []game.Clearing{
+					{
+						ID:   1,
+						Suit: game.Fox,
+					},
+				},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionBattle,
+			Battle: &game.BattleAction{
+				Faction:       game.Marquise,
+				ClearingID:    1,
+				TargetFaction: game.Eyrie,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/battles/context", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for battle context, got %d", rec.Code)
+	}
+
+	var resp BattleContextResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode battle context response: %v", err)
+	}
+	if !resp.BattleContext.AttackerHasScoutingParty {
+		t.Fatalf("expected scouting party to be surfaced in battle context, got %+v", resp.BattleContext)
+	}
+	if resp.BattleContext.CanDefenderAmbush {
+		t.Fatalf("expected scouting party to suppress defender ambush, got %+v", resp.BattleContext)
+	}
+	if !resp.BattleContext.CanDefenderArmorers || !resp.BattleContext.CanDefenderSappers {
+		t.Fatalf("expected defender persistent battle effects to be exposed, got %+v", resp.BattleContext)
+	}
+}
+
 func TestHandleSetup(t *testing.T) {
 	body, _ := json.Marshal(SetupRequest{
 		GameMode:          game.GameModeOnline,
@@ -566,10 +734,244 @@ func TestHandleSetup(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode setup response: %v", err)
 	}
-	if resp.State.GamePhase != game.LifecyclePlaying {
-		t.Fatalf("expected playing setup state, got %+v", resp.State)
+	if resp.State.GamePhase != game.LifecycleSetup {
+		t.Fatalf("expected setup lifecycle state, got %+v", resp.State)
+	}
+	if resp.GameID == "" {
+		t.Fatalf("expected online setup to return a game ID, got %+v", resp)
+	}
+	if resp.State.SetupStage != game.SetupStageMarquise {
+		t.Fatalf("expected setup to begin at Marquise stage, got %+v", resp.State)
 	}
 	if len(resp.State.Map.Clearings) != 12 {
 		t.Fatalf("expected autumn map clearings, got %+v", resp.State.Map.Clearings)
+	}
+}
+
+func TestOnlineSetupApplyRedactsHiddenHandsAfterFinalSetup(t *testing.T) {
+	setupBody, _ := json.Marshal(SetupRequest{
+		GameMode:          game.GameModeOnline,
+		PlayerFaction:     game.Marquise,
+		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:             game.AutumnMapID,
+		VagabondCharacter: game.CharThief,
+		EyrieLeader:       game.LeaderBuilder,
+	})
+
+	setupReq := httptest.NewRequest(http.MethodPost, "/api/game/setup", bytes.NewReader(setupBody))
+	setupRec := httptest.NewRecorder()
+	NewServer().ServeHTTP(setupRec, setupReq)
+
+	if setupRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for setup, got %d", setupRec.Code)
+	}
+
+	var setupResp SetupResponse
+	if err := json.Unmarshal(setupRec.Body.Bytes(), &setupResp); err != nil {
+		t.Fatalf("failed to decode setup response: %v", err)
+	}
+
+	state := setupResp.State
+	gameID := setupResp.GameID
+
+	applyAndDecode := func(action game.Action) game.GameState {
+		body, _ := json.Marshal(ApplyActionRequest{
+			State:  state,
+			Action: action,
+			GameID: gameID,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+		rec := httptest.NewRecorder()
+		NewServer().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 for apply action, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		var resp ApplyActionResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode apply response: %v", err)
+		}
+		state = resp.State
+		return state
+	}
+
+	state = applyAndDecode(game.Action{
+		Type: game.ActionMarquiseSetup,
+		MarquiseSetup: &game.MarquiseSetupAction{
+			Faction:             game.Marquise,
+			KeepClearingID:      1,
+			SawmillClearingID:   1,
+			WorkshopClearingID:  5,
+			RecruiterClearingID: 10,
+		},
+	})
+	state = applyAndDecode(game.Action{
+		Type: game.ActionEyrieSetup,
+		EyrieSetup: &game.EyrieSetupAction{
+			Faction:    game.Eyrie,
+			ClearingID: 3,
+		},
+	})
+	state = applyAndDecode(game.Action{
+		Type: game.ActionVagabondSetup,
+		VagabondSetup: &game.VagabondSetupAction{
+			Faction:  game.Vagabond,
+			ForestID: 7,
+		},
+	})
+
+	if state.GamePhase != game.LifecyclePlaying {
+		t.Fatalf("expected final setup action to enter playing state, got %+v", state)
+	}
+	if len(state.Marquise.CardsInHand) != 3 {
+		t.Fatalf("expected player hand to stay visible, got %+v", state.Marquise.CardsInHand)
+	}
+	if len(state.Eyrie.CardsInHand) != 0 || len(state.Alliance.CardsInHand) != 0 || len(state.Vagabond.CardsInHand) != 0 {
+		t.Fatalf("expected non-player hands to be redacted, got eyrie=%+v alliance=%+v vagabond=%+v", state.Eyrie.CardsInHand, state.Alliance.CardsInHand, state.Vagabond.CardsInHand)
+	}
+	if state.OtherHandCounts[game.Eyrie] != 3 || state.OtherHandCounts[game.Alliance] != 3 || state.OtherHandCounts[game.Vagabond] != 3 {
+		t.Fatalf("expected redacted other hand counts after setup, got %+v", state.OtherHandCounts)
+	}
+	if len(state.Deck) != 39 {
+		t.Fatalf("expected redacted deck to preserve remaining count only, got %+v", state.Deck)
+	}
+	for _, cardID := range state.Deck {
+		if cardID != 0 {
+			t.Fatalf("expected redacted deck order placeholders, got %+v", state.Deck)
+		}
+	}
+}
+
+func TestHandleApplyActionRejectsUnknownGameID(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID: "missing",
+		State:  game.GameState{},
+		Action: game.Action{
+			Type: game.ActionPassPhase,
+			PassPhase: &game.PassPhaseAction{
+				Faction: game.Marquise,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown game ID, got %d", rec.Code)
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != "unknown game id" {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+}
+
+func TestHandleApplyActionReturnsCodebreakersRevealForPlayerPerspective(t *testing.T) {
+	gameID := "codebreakers-test"
+	authoritative := game.GameState{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		TrackAllHands: true,
+		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie},
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Marquise: {28},
+		},
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{
+				{ID: 8, Name: "Birdy Bindle"},
+				{ID: 12, Name: "Ambush"},
+			},
+		},
+	}
+	store.save(gameID, authoritative)
+	visible := redactStateForPlayer(authoritative)
+
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID: gameID,
+		State:  visible,
+		Action: game.Action{
+			Type: game.ActionUsePersistentEffect,
+			UsePersistentEffect: &game.UsePersistentEffectAction{
+				Faction:       game.Marquise,
+				EffectID:      "codebreakers",
+				TargetFaction: game.Eyrie,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Codebreakers apply action, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode Codebreakers apply response: %v", err)
+	}
+	if resp.EffectResult == nil || len(resp.EffectResult.Cards) != 2 {
+		t.Fatalf("expected Codebreakers reveal result, got %+v", resp.EffectResult)
+	}
+	if len(resp.State.Eyrie.CardsInHand) != 0 {
+		t.Fatalf("expected redacted visible state to keep Eyrie hand hidden, got %+v", resp.State.Eyrie.CardsInHand)
+	}
+}
+
+func TestHandleApplyActionReturnsStandAndDeliverTransferredCardForPlayer(t *testing.T) {
+	gameID := "stand-test"
+	authoritative := game.GameState{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		TrackAllHands: true,
+		RandomSeed:    3,
+		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie},
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Marquise: {41},
+		},
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{
+				{ID: 8, Name: "Birdy Bindle"},
+			},
+		},
+	}
+	store.save(gameID, authoritative)
+	visible := redactStateForPlayer(authoritative)
+
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID: gameID,
+		State:  visible,
+		Action: game.Action{
+			Type: game.ActionUsePersistentEffect,
+			UsePersistentEffect: &game.UsePersistentEffectAction{
+				Faction:       game.Marquise,
+				EffectID:      "stand_and_deliver",
+				TargetFaction: game.Eyrie,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for Stand and Deliver apply action, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode Stand and Deliver apply response: %v", err)
+	}
+	if resp.EffectResult == nil || len(resp.EffectResult.Cards) != 1 || resp.EffectResult.Cards[0].ID != 8 {
+		t.Fatalf("expected transferred card result, got %+v", resp.EffectResult)
+	}
+	if len(resp.State.Marquise.CardsInHand) != 1 || resp.State.Marquise.CardsInHand[0].ID != 8 {
+		t.Fatalf("expected visible state to include transferred card, got %+v", resp.State.Marquise.CardsInHand)
 	}
 }

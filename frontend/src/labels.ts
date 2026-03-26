@@ -3,6 +3,7 @@ import type { Action } from "./types";
 export const suitLabels = ["Fox", "Rabbit", "Mouse", "Bird"];
 export const phaseLabels = ["Birdsong", "Daylight", "Evening"];
 export const stepLabels = ["Unspecified", "Birdsong", "Daylight Craft", "Daylight Actions", "Evening"];
+export const setupStageLabels = ["Unspecified", "Marquise Setup", "Eyrie Setup", "Vagabond Setup", "Complete"];
 export const factionLabels = ["Marquise", "Woodland Alliance", "Eyrie", "Vagabond"];
 export const buildingLabels = ["Sawmill", "Workshop", "Recruiter", "Roost", "Base"];
 export const eyrieLeaderLabels = ["Builder", "Charismatic", "Commander", "Despot"];
@@ -40,7 +41,12 @@ export const ACTION_TYPE = {
   ADD_CARD_TO_HAND: 25,
   REMOVE_CARD_FROM_HAND: 26,
   OTHER_PLAYER_DRAW: 27,
-  OTHER_PLAYER_PLAY: 28
+  OTHER_PLAYER_PLAY: 28,
+  DISCARD_EFFECT: 29,
+  MARQUISE_SETUP: 30,
+  EYRIE_SETUP: 31,
+  VAGABOND_SETUP: 32,
+  USE_PERSISTENT_EFFECT: 33
 } as const;
 
 export function describeAction(action: Action): string {
@@ -103,6 +109,31 @@ export function describeAction(action: Action): string {
       return `Record ${factionLabels[action.otherPlayerDraw?.faction ?? 0] ?? "Unknown"} drawing ${action.otherPlayerDraw?.count ?? 0} card(s)`;
     case ACTION_TYPE.OTHER_PLAYER_PLAY:
       return `Record ${factionLabels[action.otherPlayerPlay?.faction ?? 0] ?? "Unknown"} playing card ${action.otherPlayerPlay?.cardID ?? "?"}`;
+    case ACTION_TYPE.DISCARD_EFFECT:
+      return `Discard effect card ${action.discardEffect?.cardID ?? "?"}`;
+    case ACTION_TYPE.MARQUISE_SETUP:
+      return `Marquise setup: keep ${action.marquiseSetup?.keepClearingID ?? "?"}, sawmill ${action.marquiseSetup?.sawmillClearingID ?? "?"}, workshop ${action.marquiseSetup?.workshopClearingID ?? "?"}, recruiter ${action.marquiseSetup?.recruiterClearingID ?? "?"}`;
+    case ACTION_TYPE.EYRIE_SETUP:
+      return `Eyrie setup: start in clearing ${action.eyrieSetup?.clearingID ?? "?"}`;
+    case ACTION_TYPE.VAGABOND_SETUP:
+      return `Vagabond setup: start in forest ${action.vagabondSetup?.forestID ?? "?"}`;
+    case ACTION_TYPE.USE_PERSISTENT_EFFECT: {
+      const effectID = action.usePersistentEffect?.effectID ?? "";
+      switch (effectID) {
+        case "better_burrow_bank":
+          return `Use Better Burrow Bank with ${factionLabels[action.usePersistentEffect?.targetFaction ?? 0] ?? "Unknown"}`;
+        case "codebreakers":
+          return `Use Codebreakers on ${factionLabels[action.usePersistentEffect?.targetFaction ?? 0] ?? "Unknown"}`;
+        case "royal_claim":
+          return "Use Royal Claim";
+        case "stand_and_deliver":
+          return `Use Stand and Deliver! on ${factionLabels[action.usePersistentEffect?.targetFaction ?? 0] ?? "Unknown"}`;
+        case "tax_collector":
+          return `Use Tax Collector in clearing ${action.usePersistentEffect?.clearingID ?? "?"}`;
+        default:
+          return `Use persistent effect ${effectID || "?"}`;
+      }
+    }
     default:
       return "Unknown action";
   }

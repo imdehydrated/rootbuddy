@@ -4,7 +4,7 @@ import { eyrieLeaderLabels, factionLabels, vagabondCharacterLabels } from "../la
 import type { GameState } from "../types";
 
 type SetupWizardProps = {
-  onStart: (state: GameState) => void;
+  onStart: (state: GameState, gameID: string | null) => void;
   onUseSample: () => void;
 };
 
@@ -52,7 +52,7 @@ export function SetupWizard({ onStart, onUseSample }: SetupWizardProps) {
     try {
       setSubmitting(true);
       setStatus("Creating game...");
-      const state = await setupGame({
+      const result = await setupGame({
         gameMode,
         playerFaction,
         factions,
@@ -60,7 +60,7 @@ export function SetupWizard({ onStart, onUseSample }: SetupWizardProps) {
         vagabondCharacter,
         eyrieLeader
       });
-      onStart(state);
+      onStart(result.state, result.gameID);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create game";
       setStatus(message);
