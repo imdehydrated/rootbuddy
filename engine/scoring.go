@@ -9,12 +9,21 @@ func addVictoryPoints(state *game.GameState, faction game.Faction, points int) {
 	if points <= 0 {
 		return
 	}
+	if hasActiveDominance(*state, faction) {
+		return
+	}
+	if faction == game.Vagabond && state.CoalitionActive {
+		return
+	}
 
 	if state.VictoryPoints == nil {
 		state.VictoryPoints = map[game.Faction]int{}
 	}
 
 	state.VictoryPoints[faction] += points
+	if state.VictoryPoints[faction] >= 30 {
+		setWinner(state, faction)
+	}
 }
 
 func scoreMarquiseBuilding(state *game.GameState, buildingType game.BuildingType, alreadyPlaced int) {

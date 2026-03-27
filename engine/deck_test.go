@@ -160,8 +160,27 @@ func TestApplyActionOtherPlayerDrawAndPlayTrackCountsAndDiscard(t *testing.T) {
 	if next.OtherHandCounts[game.Eyrie] != 1 {
 		t.Fatalf("expected other hand count to net to 1, got %+v", next.OtherHandCounts)
 	}
+	if hiddenCardCount(next, game.Eyrie, game.HiddenCardZoneHand) != 1 {
+		t.Fatalf("expected one hidden hand placeholder to remain, got %+v", next.HiddenCards)
+	}
 	if !reflect.DeepEqual(next.DiscardPile, []game.CardID{25}) {
 		t.Fatalf("expected played card to be discarded, got %+v", next.DiscardPile)
+	}
+}
+
+func TestIncrementOtherHandCountCreatesHiddenCardPlaceholdersInAssistMode(t *testing.T) {
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Marquise,
+	}
+
+	incrementOtherHandCount(&state, game.Eyrie, 2)
+
+	if state.OtherHandCounts[game.Eyrie] != 2 {
+		t.Fatalf("expected assist hidden draw to sync hand count, got %+v", state.OtherHandCounts)
+	}
+	if hiddenCardCount(state, game.Eyrie, game.HiddenCardZoneHand) != 2 {
+		t.Fatalf("expected assist hidden draw to create hand placeholders, got %+v", state.HiddenCards)
 	}
 }
 

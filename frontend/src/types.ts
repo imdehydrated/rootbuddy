@@ -32,6 +32,13 @@ export interface Quest {
   requiredItems: number[];
 }
 
+export interface HiddenCard {
+  id: number;
+  ownerFaction: number;
+  zone: string;
+  knownCardID: number;
+}
+
 export type HighlightedClearing = {
   clearingID: number;
   role: "source" | "target" | "affected";
@@ -86,6 +93,7 @@ export interface GameState {
   setupStage: number;
   playerFaction: number;
   winner: number;
+  winningCoalition: number[];
   roundNumber: number;
   factionTurn: number;
   currentPhase: number;
@@ -94,11 +102,17 @@ export interface GameState {
   victoryPoints: Record<string, number>;
   deck: number[];
   discardPile: number[];
+  availableDominance: number[];
+  activeDominance: Record<string, number>;
+  coalitionActive: boolean;
+  coalitionPartner: number;
   itemSupply: Record<string, number>;
   persistentEffects: Record<string, number[]>;
   questDeck: number[];
   questDiscard: number[];
   otherHandCounts: Record<string, number>;
+  hiddenCards: HiddenCard[];
+  nextHiddenCardID: number;
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
@@ -339,6 +353,16 @@ export interface Action {
   discardEffect?: {
     faction: number;
     cardID: number;
+  } | null;
+  activateDominance?: {
+    faction: number;
+    cardID: number;
+    targetFaction: number;
+  } | null;
+  takeDominance?: {
+    faction: number;
+    dominanceCardID: number;
+    spentCardID: number;
   } | null;
   marquiseSetup?: {
     faction: number;

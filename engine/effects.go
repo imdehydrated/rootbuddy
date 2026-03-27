@@ -164,7 +164,7 @@ func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Car
 		removedTokens := 0
 		removedSympathy := 0
 		for _, target := range []game.Faction{game.Marquise, game.Eyrie, game.Alliance} {
-			if target == faction {
+			if !game.AreEnemies(*state, faction, target) {
 				continue
 			}
 
@@ -178,7 +178,10 @@ func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Car
 		if removedSympathy > 0 && faction != game.Alliance {
 			transferOutrageCard(state, faction, clearing.Suit)
 		}
-		if faction != game.Vagabond && !state.Vagabond.InForest && state.Vagabond.ClearingID == clearing.ID {
+		if faction != game.Vagabond &&
+			game.AreEnemies(*state, faction, game.Vagabond) &&
+			!state.Vagabond.InForest &&
+			state.Vagabond.ClearingID == clearing.ID {
 			damageVagabondItems(state, 3)
 		}
 	}

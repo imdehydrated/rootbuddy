@@ -60,6 +60,8 @@ func mergeAuthoritativeState(visible game.GameState, authoritative game.GameStat
 	merged.QuestDeck = append([]game.QuestID(nil), authoritative.QuestDeck...)
 	merged.QuestDiscard = append([]game.QuestID(nil), authoritative.QuestDiscard...)
 	merged.OtherHandCounts = copyOtherHandCounts(authoritative.OtherHandCounts)
+	merged.HiddenCards = append([]game.HiddenCard(nil), authoritative.HiddenCards...)
+	merged.NextHiddenCardID = authoritative.NextHiddenCardID
 	merged.Marquise.CardsInHand = append([]game.Card(nil), authoritative.Marquise.CardsInHand...)
 	merged.Eyrie.CardsInHand = append([]game.Card(nil), authoritative.Eyrie.CardsInHand...)
 	merged.Alliance.CardsInHand = append([]game.Card(nil), authoritative.Alliance.CardsInHand...)
@@ -86,6 +88,8 @@ func redactStateForPlayer(state game.GameState) game.GameState {
 	if redacted.GameMode != game.GameModeOnline {
 		return redacted
 	}
+	redacted.HiddenCards = nil
+	redacted.NextHiddenCardID = 0
 
 	if redacted.OtherHandCounts == nil {
 		redacted.OtherHandCounts = map[game.Faction]int{}

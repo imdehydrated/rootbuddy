@@ -24,6 +24,9 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 	if action.Battle == nil {
 		return game.Action{}
 	}
+	if !game.AreEnemies(state, action.Battle.Faction, action.Battle.TargetFaction) {
+		return game.Action{}
+	}
 
 	battleSuit := clearingSuit(state, action.Battle.ClearingID)
 	attackerHasScoutingParty := hasPersistentEffect(state, action.Battle.Faction, "scouting_party")

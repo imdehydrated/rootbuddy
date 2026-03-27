@@ -66,6 +66,8 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 		ItemSupply:        InitialItemSupply(),
 		PersistentEffects: map[game.Faction][]game.CardID{},
 		OtherHandCounts:   map[game.Faction]int{},
+		HiddenCards:       []game.HiddenCard{},
+		NextHiddenCardID:  1,
 	}
 
 	if len(state.TurnOrder) == 0 {
@@ -323,6 +325,10 @@ func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {
 				} else {
 					consumeDeckCards(state, 3)
 				}
+			} else if faction != state.PlayerFaction {
+				for i := 0; i < 3; i++ {
+					addHiddenCard(state, game.Alliance, game.HiddenCardZoneSupporters, 0)
+				}
 			}
 			continue
 		}
@@ -338,7 +344,9 @@ func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {
 		if state.GameMode == game.GameModeOnline {
 			DrawCards(state, faction, 3)
 		} else {
-			state.OtherHandCounts[faction] = 3
+			for i := 0; i < 3; i++ {
+				addHiddenCard(state, faction, game.HiddenCardZoneHand, 0)
+			}
 		}
 	}
 }

@@ -32,8 +32,11 @@ func applyAddToDecree(state *game.GameState, action game.Action) {
 			break
 		}
 
+		if _, ok := spendFactionHandCard(state, game.Eyrie, cardID); !ok {
+			continue
+		}
+
 		appendCardToDecree(&state.Eyrie.Decree, action.AddToDecree.Columns[i], cardID)
-		state.Eyrie.CardsInHand = removeCardByID(state.Eyrie.CardsInHand, cardID)
 	}
 }
 

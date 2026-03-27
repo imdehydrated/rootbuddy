@@ -85,6 +85,10 @@ func DiscardCard(state *game.GameState, cardID game.CardID) {
 	if cardID <= 0 {
 		return
 	}
+	if card, ok := CardByID(cardID); ok && card.Kind == game.DominanceCard {
+		addAvailableDominance(state, cardID)
+		return
+	}
 	state.DiscardPile = append(state.DiscardPile, cardID)
 }
 
@@ -179,6 +183,12 @@ func incrementOtherHandCount(state *game.GameState, faction game.Faction, count 
 	if count <= 0 || faction == state.PlayerFaction {
 		return
 	}
+	if state.GameMode == game.GameModeAssist {
+		for i := 0; i < count; i++ {
+			addHiddenCard(state, faction, game.HiddenCardZoneHand, 0)
+		}
+		return
+	}
 	if state.OtherHandCounts == nil {
 		state.OtherHandCounts = map[game.Faction]int{}
 	}
@@ -186,7 +196,14 @@ func incrementOtherHandCount(state *game.GameState, faction game.Faction, count 
 }
 
 func decrementOtherHandCount(state *game.GameState, faction game.Faction, count int) {
-	if count <= 0 || faction == state.PlayerFaction || state.OtherHandCounts == nil {
+	if count <= 0 || faction == state.PlayerFaction {
+		return
+	}
+	if state.GameMode == game.GameModeAssist {
+		consumeHiddenCards(state, faction, game.HiddenCardZoneHand, count)
+		return
+	}
+	if state.OtherHandCounts == nil {
 		return
 	}
 	state.OtherHandCounts[faction] -= count

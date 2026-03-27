@@ -137,6 +137,55 @@ func TestSetupActionsAdvanceToPlayingStateAndDealHands(t *testing.T) {
 	}
 }
 
+func TestAssistSetupCreatesHiddenPlaceholdersByZone(t *testing.T) {
+	state, err := SetupGame(SetupRequest{
+		GameMode:          game.GameModeAssist,
+		PlayerFaction:     game.Marquise,
+		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:             game.AutumnMapID,
+		VagabondCharacter: game.CharRanger,
+		EyrieLeader:       game.LeaderBuilder,
+	})
+	if err != nil {
+		t.Fatalf("expected setup to succeed, got %v", err)
+	}
+
+	state = ApplyAction(state, game.Action{
+		Type: game.ActionMarquiseSetup,
+		MarquiseSetup: &game.MarquiseSetupAction{
+			Faction:             game.Marquise,
+			KeepClearingID:      1,
+			SawmillClearingID:   1,
+			WorkshopClearingID:  5,
+			RecruiterClearingID: 10,
+		},
+	})
+	state = ApplyAction(state, game.Action{
+		Type: game.ActionEyrieSetup,
+		EyrieSetup: &game.EyrieSetupAction{
+			Faction:    game.Eyrie,
+			ClearingID: 3,
+		},
+	})
+	state = ApplyAction(state, game.Action{
+		Type: game.ActionVagabondSetup,
+		VagabondSetup: &game.VagabondSetupAction{
+			Faction:  game.Vagabond,
+			ForestID: 7,
+		},
+	})
+
+	if hiddenCardCount(state, game.Eyrie, game.HiddenCardZoneHand) != 3 {
+		t.Fatalf("expected Eyrie hidden hand placeholders, got %+v", state.HiddenCards)
+	}
+	if hiddenCardCount(state, game.Vagabond, game.HiddenCardZoneHand) != 3 {
+		t.Fatalf("expected Vagabond hidden hand placeholders, got %+v", state.HiddenCards)
+	}
+	if hiddenCardCount(state, game.Alliance, game.HiddenCardZoneSupporters) != 3 {
+		t.Fatalf("expected Alliance hidden supporter placeholders, got %+v", state.HiddenCards)
+	}
+}
+
 func TestValidEyrieSetupActionsPreferOppositeCorner(t *testing.T) {
 	state, err := SetupGame(SetupRequest{
 		GameMode:      game.GameModeAssist,

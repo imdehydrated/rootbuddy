@@ -45,6 +45,57 @@ func TestValidateStateRejectsNegativeOtherHandCount(t *testing.T) {
 	}
 }
 
+func TestValidateStateRejectsCoalitionWithoutVagabondDominance(t *testing.T) {
+	state := game.GameState{
+		GamePhase:        game.LifecyclePlaying,
+		SetupStage:       game.SetupStageComplete,
+		CurrentPhase:     game.Birdsong,
+		CurrentStep:      game.StepBirdsong,
+		CoalitionActive:  true,
+		CoalitionPartner: game.Marquise,
+	}
+
+	if err := ValidateState(state); err == nil {
+		t.Fatalf("expected coalition without active Vagabond dominance to fail validation")
+	}
+}
+
+func TestValidateStateRejectsDuplicateAvailableDominance(t *testing.T) {
+	state := game.GameState{
+		GamePhase:          game.LifecyclePlaying,
+		SetupStage:         game.SetupStageComplete,
+		CurrentPhase:       game.Birdsong,
+		CurrentStep:        game.StepBirdsong,
+		AvailableDominance: []game.CardID{14, 14},
+	}
+
+	if err := ValidateState(state); err == nil {
+		t.Fatalf("expected duplicate available dominance cards to fail validation")
+	}
+}
+
+func TestValidateStateRejectsAssistPlaceholderCountMismatch(t *testing.T) {
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		GamePhase:     game.LifecyclePlaying,
+		SetupStage:    game.SetupStageComplete,
+		CurrentPhase:  game.Birdsong,
+		CurrentStep:   game.StepBirdsong,
+		PlayerFaction: game.Marquise,
+		OtherHandCounts: map[game.Faction]int{
+			game.Eyrie: 2,
+		},
+		HiddenCards: []game.HiddenCard{
+			{ID: 1, OwnerFaction: game.Eyrie, Zone: game.HiddenCardZoneHand},
+		},
+		NextHiddenCardID: 2,
+	}
+
+	if err := ValidateState(state); err == nil {
+		t.Fatalf("expected assist placeholder mismatch to fail validation")
+	}
+}
+
 func TestApplyActionProducesValidState(t *testing.T) {
 	state := game.GameState{
 		GamePhase:    game.LifecyclePlaying,

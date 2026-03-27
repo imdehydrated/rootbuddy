@@ -24,6 +24,12 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.BattleResolution.ClearingID <= 0 {
 			return "battle resolution must have a valid clearing ID"
 		}
+		if req.Action.BattleResolution.Faction == req.Action.BattleResolution.TargetFaction {
+			return "battle resolution must target a different faction"
+		}
+		if !game.AreEnemies(req.State, req.Action.BattleResolution.Faction, req.Action.BattleResolution.TargetFaction) {
+			return "battle resolution must target an enemy faction"
+		}
 		if req.Action.BattleResolution.AttackerLosses < 0 || req.Action.BattleResolution.DefenderLosses < 0 {
 			return "battle resolution losses cannot be negative"
 		}
@@ -164,6 +170,20 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.DiscardEffect.CardID <= 0 {
 			return "discard effect action must have a valid card ID"
 		}
+	case game.ActionActivateDominance:
+		if req.Action.ActivateDominance == nil {
+			return "activate dominance payload is required"
+		}
+		if req.Action.ActivateDominance.CardID <= 0 {
+			return "activate dominance action must have a valid card ID"
+		}
+	case game.ActionTakeDominance:
+		if req.Action.TakeDominance == nil {
+			return "take dominance payload is required"
+		}
+		if req.Action.TakeDominance.DominanceCardID <= 0 || req.Action.TakeDominance.SpentCardID <= 0 {
+			return "take dominance action must have valid dominance and spent card IDs"
+		}
 	case game.ActionMarquiseSetup:
 		if req.Action.MarquiseSetup == nil {
 			return "marquise setup payload is required"
@@ -212,6 +232,9 @@ func validateResolveBattleRequest(req ResolveBattleRequest) string {
 	if req.Action.Battle.Faction == req.Action.Battle.TargetFaction {
 		return "battle action must target a different faction"
 	}
+	if !game.AreEnemies(req.State, req.Action.Battle.Faction, req.Action.Battle.TargetFaction) {
+		return "battle action must target an enemy faction"
+	}
 	if req.AttackerRoll < 0 || req.AttackerRoll > 3 || req.DefenderRoll < 0 || req.DefenderRoll > 3 {
 		return "battle rolls must be between 0 and 3"
 	}
@@ -231,6 +254,9 @@ func validateBattleContextRequest(req BattleContextRequest) string {
 	}
 	if req.Action.Battle.Faction == req.Action.Battle.TargetFaction {
 		return "battle action must target a different faction"
+	}
+	if !game.AreEnemies(req.State, req.Action.Battle.Faction, req.Action.Battle.TargetFaction) {
+		return "battle action must target an enemy faction"
 	}
 
 	return ""

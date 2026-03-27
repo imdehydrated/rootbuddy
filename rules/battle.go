@@ -76,7 +76,13 @@ func ValidBattles(faction game.Faction, m game.Map) []game.Action {
 }
 
 func ValidBattlesInState(faction game.Faction, state game.GameState) []game.Action {
-	battles := ValidBattles(faction, state.Map)
+	battles := []game.Action{}
+	for _, action := range ValidBattles(faction, state.Map) {
+		if action.Battle == nil || !game.AreEnemies(state, faction, action.Battle.TargetFaction) {
+			continue
+		}
+		battles = append(battles, action)
+	}
 	if faction == game.Vagabond || state.Vagabond.InForest || state.Vagabond.ClearingID == 0 {
 		return battles
 	}
@@ -86,14 +92,16 @@ func ValidBattlesInState(faction game.Faction, state game.GameState) []game.Acti
 			continue
 		}
 
-		battles = append(battles, game.Action{
-			Type: game.ActionBattle,
-			Battle: &game.BattleAction{
-				Faction:       faction,
-				ClearingID:    clearing.ID,
-				TargetFaction: game.Vagabond,
-			},
-		})
+		if game.AreEnemies(state, faction, game.Vagabond) {
+			battles = append(battles, game.Action{
+				Type: game.ActionBattle,
+				Battle: &game.BattleAction{
+					Faction:       faction,
+					ClearingID:    clearing.ID,
+					TargetFaction: game.Vagabond,
+				},
+			})
+		}
 		break
 	}
 

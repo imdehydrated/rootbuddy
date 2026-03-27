@@ -167,7 +167,7 @@ func vagabondFactionsInClearing(clearing game.Clearing) []game.Faction {
 func hostileFactionCountInClearing(state game.GameState, clearing game.Clearing) int {
 	count := 0
 	for _, faction := range vagabondFactionsInClearing(clearing) {
-		if vagabondRelationshipLevel(state, faction) == game.RelHostile {
+		if game.VagabondHostileTo(state, faction) {
 			count++
 		}
 	}

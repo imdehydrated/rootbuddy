@@ -12,7 +12,7 @@ func applySpreadSympathy(state *game.GameState, action game.Action) {
 		return
 	}
 
-	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.SpreadSympathy.SupporterCardIDs)
+	spendAllianceSupporters(state, action.SpreadSympathy.SupporterCardIDs)
 	DiscardCards(state, action.SpreadSympathy.SupporterCardIDs)
 	state.Map.Clearings[index].Tokens = append(state.Map.Clearings[index].Tokens, game.Token{
 		Faction: game.Alliance,
@@ -101,7 +101,7 @@ func applyRevolt(state *game.GameState, action game.Action) {
 		return
 	}
 
-	state.Alliance.Supporters = removeCardsByID(state.Alliance.Supporters, action.Revolt.SupporterCardIDs)
+	spendAllianceSupporters(state, action.Revolt.SupporterCardIDs)
 	DiscardCards(state, action.Revolt.SupporterCardIDs)
 	clearing := &state.Map.Clearings[index]
 	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
@@ -129,13 +129,19 @@ func applyMobilize(state *game.GameState, action game.Action) {
 	if action.Mobilize == nil {
 		return
 	}
+	if canUseObservedHiddenCards(*state, game.Alliance) {
+		if !moveHiddenCard(state, game.Alliance, game.HiddenCardZoneHand, game.HiddenCardZoneSupporters) {
+			return
+		}
+		return
+	}
 
 	for _, card := range state.Alliance.CardsInHand {
 		if card.ID != action.Mobilize.CardID {
 			continue
 		}
 
-		if _, ok := removeCardFromFactionHand(state, game.Alliance, card.ID); !ok {
+		if _, ok := spendFactionHandCard(state, game.Alliance, card.ID); !ok {
 			return
 		}
 		addAllianceSupporter(state, card)
@@ -148,7 +154,7 @@ func applyTrain(state *game.GameState, action game.Action) {
 		return
 	}
 
-	if _, ok := removeCardFromFactionHand(state, game.Alliance, action.Train.CardID); !ok {
+	if _, ok := spendFactionHandCard(state, game.Alliance, action.Train.CardID); !ok {
 		return
 	}
 	DiscardCard(state, action.Train.CardID)

@@ -66,11 +66,28 @@ func cloneState(state game.GameState) game.GameState {
 		copy(next.DiscardPile, state.DiscardPile)
 	}
 
+	if state.AvailableDominance != nil {
+		next.AvailableDominance = make([]game.CardID, len(state.AvailableDominance))
+		copy(next.AvailableDominance, state.AvailableDominance)
+	}
+
 	if state.VictoryPoints != nil {
 		next.VictoryPoints = make(map[game.Faction]int, len(state.VictoryPoints))
 		for faction, points := range state.VictoryPoints {
 			next.VictoryPoints[faction] = points
 		}
+	}
+
+	if state.ActiveDominance != nil {
+		next.ActiveDominance = make(map[game.Faction]game.CardID, len(state.ActiveDominance))
+		for faction, cardID := range state.ActiveDominance {
+			next.ActiveDominance[faction] = cardID
+		}
+	}
+
+	if state.WinningCoalition != nil {
+		next.WinningCoalition = make([]game.Faction, len(state.WinningCoalition))
+		copy(next.WinningCoalition, state.WinningCoalition)
 	}
 
 	if state.ItemSupply != nil {
@@ -102,6 +119,11 @@ func cloneState(state game.GameState) game.GameState {
 		for faction, count := range state.OtherHandCounts {
 			next.OtherHandCounts[faction] = count
 		}
+	}
+
+	if state.HiddenCards != nil {
+		next.HiddenCards = make([]game.HiddenCard, len(state.HiddenCards))
+		copy(next.HiddenCards, state.HiddenCards)
 	}
 
 	if state.Marquise.CardsInHand != nil {

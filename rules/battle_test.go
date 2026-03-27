@@ -193,3 +193,37 @@ func TestValidBattles(t *testing.T) {
 		})
 	}
 }
+
+func TestValidBattlesInStateSkipsCoalitionPartnerTargets(t *testing.T) {
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Marquise,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+		},
+	}
+
+	got := ValidBattlesInState(game.Marquise, state)
+	unwant := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Vagabond,
+		},
+	}
+
+	if containsAction(got, unwant) {
+		t.Fatalf("did not expect battle against coalition Vagabond partner, got %+v", got)
+	}
+}

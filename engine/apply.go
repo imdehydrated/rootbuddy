@@ -34,6 +34,8 @@ var applyActionHandlers = map[game.ActionType]actionHandler{
 	game.ActionOtherPlayerDraw:    applyOtherPlayerDraw,
 	game.ActionOtherPlayerPlay:    applyOtherPlayerPlay,
 	game.ActionDiscardEffect:      applyDiscardEffect,
+	game.ActionActivateDominance:  applyActivateDominance,
+	game.ActionTakeDominance:      applyTakeDominance,
 	game.ActionMarquiseSetup:      applyMarquiseSetup,
 	game.ActionEyrieSetup:         applyEyrieSetup,
 	game.ActionVagabondSetup:      applyVagabondSetup,
@@ -46,6 +48,7 @@ func ApplyAction(state game.GameState, action game.Action) game.GameState {
 
 func ApplyActionDetailed(state game.GameState, action game.Action) (game.GameState, *game.EffectResult) {
 	next := cloneState(state)
+	materializeAssistHandPlaceholders(&next)
 	var result *game.EffectResult
 
 	switch action.Type {

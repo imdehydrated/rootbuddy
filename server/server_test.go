@@ -465,6 +465,82 @@ func TestHandleApplyActionAcceptsUsePersistentEffect(t *testing.T) {
 	}
 }
 
+func TestHandleApplyActionAcceptsActivateDominance(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			GamePhase: game.LifecyclePlaying,
+			Marquise: game.MarquiseState{
+				CardsInHand: []game.Card{
+					{ID: 14, Name: "Dominance", Suit: game.Bird, Kind: game.DominanceCard},
+				},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionActivateDominance,
+			ActivateDominance: &game.ActivateDominanceAction{
+				Faction: game.Marquise,
+				CardID:  14,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for activate dominance apply action, got %d", rec.Code)
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode activate dominance response: %v", err)
+	}
+	if resp.State.ActiveDominance[game.Marquise] != 14 {
+		t.Fatalf("expected active dominance to be tracked, got %+v", resp.State.ActiveDominance)
+	}
+}
+
+func TestHandleApplyActionAcceptsTakeDominance(t *testing.T) {
+	body, _ := json.Marshal(ApplyActionRequest{
+		State: game.GameState{
+			GamePhase:          game.LifecyclePlaying,
+			AvailableDominance: []game.CardID{27},
+			Marquise: game.MarquiseState{
+				CardsInHand: []game.Card{
+					{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
+				},
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionTakeDominance,
+			TakeDominance: &game.TakeDominanceAction{
+				Faction:         game.Marquise,
+				DominanceCardID: 27,
+				SpentCardID:     24,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/apply", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for take dominance apply action, got %d", rec.Code)
+	}
+
+	var resp ApplyActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode take dominance response: %v", err)
+	}
+	if len(resp.State.Marquise.CardsInHand) != 1 || resp.State.Marquise.CardsInHand[0].ID != 27 {
+		t.Fatalf("expected taken dominance card in hand, got %+v", resp.State.Marquise.CardsInHand)
+	}
+}
+
 func TestHandleResolveBattle(t *testing.T) {
 	body, _ := json.Marshal(ResolveBattleRequest{
 		State: game.GameState{
@@ -622,6 +698,42 @@ func TestHandleResolveBattleRejectsWrongActionType(t *testing.T) {
 
 	resp := decodeErrorResponse(t, rec)
 	if resp.Error != "battle resolution requires a battle action" {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+}
+
+func TestHandleResolveBattleRejectsCoalitionPartnerTarget(t *testing.T) {
+	body, _ := json.Marshal(ResolveBattleRequest{
+		State: game.GameState{
+			CoalitionActive:  true,
+			CoalitionPartner: game.Marquise,
+			ActiveDominance: map[game.Faction]game.CardID{
+				game.Vagabond: 14,
+			},
+		},
+		Action: game.Action{
+			Type: game.ActionBattle,
+			Battle: &game.BattleAction{
+				Faction:       game.Marquise,
+				ClearingID:    1,
+				TargetFaction: game.Vagabond,
+			},
+		},
+		AttackerRoll: 1,
+		DefenderRoll: 1,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/battles/resolve", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for coalition-partner battle target, got %d", rec.Code)
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != "battle action must target an enemy faction" {
 		t.Fatalf("unexpected error response: %+v", resp)
 	}
 }

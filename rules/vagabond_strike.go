@@ -14,6 +14,9 @@ func ValidStrikeActions(state game.GameState) []game.Action {
 
 	actions := []game.Action{}
 	for _, targetFaction := range vagabondFactionsInClearing(clearing) {
+		if !game.AreEnemies(state, game.Vagabond, targetFaction) {
+			continue
+		}
 		actions = append(actions, game.Action{
 			Type: game.ActionStrike,
 			Strike: &game.StrikeAction{

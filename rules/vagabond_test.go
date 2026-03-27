@@ -311,6 +311,128 @@ func TestValidVagabondBattleActionsTargetsMarquiseWood(t *testing.T) {
 	}
 }
 
+func TestValidVagabondBattleActionsSkipsCoalitionPartner(t *testing.T) {
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Marquise,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+			},
+		},
+	}
+
+	if got := ValidVagabondBattleActions(state); len(got) != 0 {
+		t.Fatalf("did not expect battle actions against coalition partner, got %+v", got)
+	}
+}
+
+func TestValidVagabondMoveActionsIgnoresCoalitionPartnerHostileTax(t *testing.T) {
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Marquise,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:  1,
+					Adj: []int{2},
+				},
+				{
+					ID:  2,
+					Adj: []int{1},
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+			},
+		},
+	}
+
+	want := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Vagabond,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	}
+
+	got := ValidVagabondMoveActions(state)
+	if !containsAction(got, want) {
+		t.Fatalf("expected coalition partner clearing to avoid hostile boot tax %+v, got %+v", want, got)
+	}
+}
+
+func TestValidAidActionsAllowsCoalitionPartnerDespiteHostileRelationship(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Marquise,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			CardsInHand: []game.Card{
+				foxCard,
+			},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+			},
+		},
+	}
+
+	want := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+		},
+	}
+
+	got := ValidAidActions(state)
+	if !containsAction(got, want) {
+		t.Fatalf("expected aid action for coalition partner %+v, got %+v", want, got)
+	}
+}
+
 func TestValidQuestActionsUsesQuestRequirements(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

@@ -32,6 +32,8 @@ type Action struct {
 	OtherPlayerDraw     *OtherPlayerDrawAction
 	OtherPlayerPlay     *OtherPlayerPlayAction
 	DiscardEffect       *DiscardEffectAction
+	ActivateDominance   *ActivateDominanceAction
+	TakeDominance       *TakeDominanceAction
 	MarquiseSetup       *MarquiseSetupAction
 	EyrieSetup          *EyrieSetupAction
 	VagabondSetup       *VagabondSetupAction
@@ -71,6 +73,8 @@ const (
 	ActionOtherPlayerDraw
 	ActionOtherPlayerPlay
 	ActionDiscardEffect
+	ActionActivateDominance
+	ActionTakeDominance
 	ActionMarquiseSetup
 	ActionEyrieSetup
 	ActionVagabondSetup
@@ -306,6 +310,18 @@ type OtherPlayerPlayAction struct {
 type DiscardEffectAction struct {
 	Faction Faction
 	CardID  CardID
+}
+
+type ActivateDominanceAction struct {
+	Faction       Faction
+	CardID        CardID
+	TargetFaction Faction
+}
+
+type TakeDominanceAction struct {
+	Faction         Faction
+	DominanceCardID CardID
+	SpentCardID     CardID
 }
 
 type MarquiseSetupAction struct {

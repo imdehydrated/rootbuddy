@@ -34,6 +34,7 @@ export const sampleState: GameState = {
   setupStage: 4,
   playerFaction: 3,
   winner: 0,
+  winningCoalition: [],
   roundNumber: 3,
   factionTurn: 3,
   currentPhase: 1,
@@ -41,6 +42,10 @@ export const sampleState: GameState = {
   turnOrder: [0, 2, 1, 3],
   deck: [12, 13, 14, 26, 27],
   discardPile: [7, 25, 36],
+  availableDominance: [14],
+  activeDominance: {},
+  coalitionActive: false,
+  coalitionPartner: 0,
   itemSupply: {
     "0": 1,
     "1": 2,
@@ -62,6 +67,8 @@ export const sampleState: GameState = {
     "1": 4,
     "2": 3
   },
+  hiddenCards: [],
+  nextHiddenCardID: 1,
   victoryPoints: {
     "0": 7,
     "1": 4,

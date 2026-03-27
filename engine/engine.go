@@ -36,10 +36,12 @@ func validMarquiseActions(state game.GameState) []game.Action {
 	case game.StepDaylightCraft:
 		actions := rules.ValidCraftActions(state)
 		actions = append(actions, effectActions(state)...)
+		actions = append(actions, validDominanceActions(state)...)
 		actions = append(actions, rules.MarquisePassPhaseAction())
 		return actions
 	case game.StepDaylightActions:
 		actions := effectActions(state)
+		actions = append(actions, validDominanceActions(state)...)
 		return append(actions, rules.ValidMarquiseDaylightActions(state)...)
 	case game.StepEvening:
 		actions := effectActions(state)
@@ -57,6 +59,7 @@ func validEyrieActions(state game.GameState) []game.Action {
 	case game.StepDaylightCraft:
 		actions := rules.ValidEyrieCraftActions(state)
 		actions = append(actions, effectActions(state)...)
+		actions = append(actions, validDominanceActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{
@@ -66,6 +69,7 @@ func validEyrieActions(state game.GameState) []game.Action {
 		return actions
 	case game.StepDaylightActions:
 		actions := effectActions(state)
+		actions = append(actions, validDominanceActions(state)...)
 		return append(actions, rules.ValidEyrieDaylightActions(state)...)
 	case game.StepEvening:
 		actions := effectActions(state)
@@ -91,6 +95,7 @@ func validAllianceActions(state game.GameState) []game.Action {
 	case game.StepDaylightCraft:
 		actions := rules.ValidAllianceCraftActions(state)
 		actions = append(actions, effectActions(state)...)
+		actions = append(actions, validDominanceActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{
@@ -100,6 +105,7 @@ func validAllianceActions(state game.GameState) []game.Action {
 		return actions
 	case game.StepDaylightActions:
 		actions := effectActions(state)
+		actions = append(actions, validDominanceActions(state)...)
 		actions = append(actions, rules.ValidMobilizeActions(state)...)
 		actions = append(actions, rules.ValidTrainActions(state)...)
 		actions = append(actions, game.Action{
@@ -124,6 +130,7 @@ func validVagabondActions(state game.GameState) []game.Action {
 		return append(actions, rules.ValidVagabondBirdsongActions(state)...)
 	case game.StepDaylightCraft, game.StepDaylightActions:
 		actions := effectActions(state)
+		actions = append(actions, validDominanceActions(state)...)
 		actions = append(actions, rules.ValidVagabondMoveActions(state)...)
 		actions = append(actions, rules.ValidVagabondBattleActions(state)...)
 		actions = append(actions, rules.ValidExploreActions(state)...)

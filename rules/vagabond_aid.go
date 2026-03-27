@@ -14,7 +14,7 @@ func ValidAidActions(state game.GameState) []game.Action {
 
 	actions := []game.Action{}
 	for _, targetFaction := range vagabondFactionsInClearing(clearing) {
-		if vagabondRelationshipLevel(state, targetFaction) == game.RelHostile {
+		if game.VagabondHostileTo(state, targetFaction) {
 			continue
 		}
 

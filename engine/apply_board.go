@@ -212,6 +212,9 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	if action.BattleResolution == nil {
 		return
 	}
+	if !game.AreEnemies(*state, action.BattleResolution.Faction, action.BattleResolution.TargetFaction) {
+		return
+	}
 
 	index := findClearingIndex(state.Map, action.BattleResolution.ClearingID)
 	if index == -1 {
@@ -318,7 +321,7 @@ func applyOverwork(state *game.GameState, action game.Action) {
 		return
 	}
 
-	if _, ok := removeCardFromFactionHand(state, game.Marquise, action.Overwork.CardID); !ok {
+	if _, ok := spendFactionHandCard(state, game.Marquise, action.Overwork.CardID); !ok {
 		return
 	}
 	state.Map.Clearings[index].Wood++

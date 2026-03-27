@@ -46,4 +46,5 @@ func beginNextFactionTurn(state *game.GameState) {
 	state.CurrentPhase = game.Birdsong
 	state.CurrentStep = game.StepBirdsong
 	resetTurnProgress(state)
+	checkBirdsongDominanceWin(state)
 }

@@ -1,10 +1,11 @@
 import { ClearingMarker } from "./ClearingMarker";
 import { clearingPosition } from "../gameHelpers";
 import type { BoardLayout } from "../boardLayouts";
-import type { Clearing, HighlightedClearing } from "../types";
+import type { Clearing, Forest, HighlightedClearing } from "../types";
 
 type BoardPanelProps = {
   clearings: Clearing[];
+  forests: Forest[];
   boardLayout: BoardLayout;
   selectedClearingID: number;
   keepClearingID: number;
@@ -25,6 +26,7 @@ type BoardPanelProps = {
 
 export function BoardPanel({
   clearings,
+  forests,
   boardLayout,
   selectedClearingID,
   keepClearingID,
@@ -43,6 +45,32 @@ export function BoardPanel({
   );
   const legalSetupClearings = new Set(setupLegalClearingIDs);
   const selectedSetupClearings = new Set(setupSelectedClearingIDs);
+
+  const forestPosition = (forestID: number) => {
+    const forest = forests.find((entry) => entry.id === forestID);
+    if (forest && forest.adjacentClearings.length > 0) {
+      const adjacentPositions = forest.adjacentClearings
+        .map((clearingID) => boardLayout.clearingPositions[clearingID])
+        .filter((position): position is NonNullable<typeof position> => position !== undefined);
+
+      if (adjacentPositions.length > 0) {
+        const totals = adjacentPositions.reduce(
+          (sum, position) => ({
+            left: sum.left + position.left,
+            top: sum.top + position.top
+          }),
+          { left: 0, top: 0 }
+        );
+
+        return {
+          left: totals.left / adjacentPositions.length,
+          top: totals.top / adjacentPositions.length
+        };
+      }
+    }
+
+    return boardLayout.forestPositions[forestID] ?? null;
+  };
 
   const adjacencySegments = clearings.flatMap((clearing) =>
     clearing.adj
@@ -95,7 +123,7 @@ export function BoardPanel({
             />
           ))}
           {forestTargets.map((forest) => {
-            const position = boardLayout.forestPositions[forest.forestID];
+            const position = forestPosition(forest.forestID);
             if (!position) {
               return null;
             }

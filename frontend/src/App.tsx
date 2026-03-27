@@ -3,6 +3,7 @@ import { applyAction, fetchBattleContext, fetchValidActions, resolveBattle } fro
 import { boardLayoutForState } from "./boardLayouts";
 import { BoardPanel } from "./components/BoardPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
+import { ObservedActionPanel } from "./components/ObservedActionPanel";
 import { SetupFlowPanel } from "./components/SetupFlowPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnStatePanel } from "./components/TurnStatePanel";
@@ -12,7 +13,7 @@ import { ACTION_TYPE, describeAction, factionLabels, phaseLabels, setupStageLabe
 import { sampleState } from "./sampleState";
 import type { Action, BattleContext, BattleModifiers, Clearing, GameState } from "./types";
 
-type ActiveModal = "inspector" | "turn" | "actions" | "battle" | "json" | "help" | null;
+type ActiveModal = "inspector" | "turn" | "actions" | "battle" | "observed" | "json" | "help" | null;
 
 type MarquiseSetupDraft = {
   keepClearingID: number | null;
@@ -60,15 +61,22 @@ function normalizeState(nextState: GameState): GameState {
   normalized.setupStage ??= 0;
   normalized.map.clearings ??= [];
   normalized.map.forests ??= [];
+  normalized.winningCoalition ??= [];
   normalized.turnOrder ??= [];
   normalized.victoryPoints ??= {};
   normalized.deck ??= [];
   normalized.discardPile ??= [];
+  normalized.availableDominance ??= [];
+  normalized.activeDominance ??= {};
+  normalized.coalitionActive ??= false;
+  normalized.coalitionPartner ??= 0;
   normalized.itemSupply ??= {};
   normalized.persistentEffects ??= {};
   normalized.questDeck ??= [];
   normalized.questDiscard ??= [];
   normalized.otherHandCounts ??= {};
+  normalized.hiddenCards ??= [];
+  normalized.nextHiddenCardID ??= 1;
   normalized.marquise.cardsInHand ??= [];
   normalized.eyrie.cardsInHand ??= [];
   normalized.eyrie.availableLeaders ??= [];
@@ -577,6 +585,7 @@ export default function App() {
       <div className="board-stage">
         <BoardPanel
           clearings={parsedState.map.clearings}
+          forests={parsedState.map.forests}
           boardLayout={boardLayout}
           selectedClearingID={selectedClearingID}
           keepClearingID={parsedState.marquise.keepClearingID}
@@ -636,6 +645,11 @@ export default function App() {
             <button type="button" className="secondary" onClick={() => setActiveModal("actions")}>
               Actions
             </button>
+            {parsedState.gameMode === 1 ? (
+              <button type="button" className="secondary" onClick={() => setActiveModal("observed")}>
+                Observed
+              </button>
+            ) : null}
             <button type="button" className="secondary" onClick={() => setActiveModal("battle")}>
               Resolve
             </button>
@@ -751,6 +765,14 @@ export default function App() {
                   </ul>
                 )}
               </section>
+            ) : null}
+
+            {activeModal === "observed" ? (
+              <ObservedActionPanel
+                state={parsedState}
+                onApply={handleApply}
+                onClose={() => setActiveModal(null)}
+              />
             ) : null}
 
             {activeModal === "battle" ? (

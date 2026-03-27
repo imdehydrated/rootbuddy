@@ -43,10 +43,12 @@ export const ACTION_TYPE = {
   OTHER_PLAYER_DRAW: 27,
   OTHER_PLAYER_PLAY: 28,
   DISCARD_EFFECT: 29,
-  MARQUISE_SETUP: 30,
-  EYRIE_SETUP: 31,
-  VAGABOND_SETUP: 32,
-  USE_PERSISTENT_EFFECT: 33
+  ACTIVATE_DOMINANCE: 30,
+  TAKE_DOMINANCE: 31,
+  MARQUISE_SETUP: 32,
+  EYRIE_SETUP: 33,
+  VAGABOND_SETUP: 34,
+  USE_PERSISTENT_EFFECT: 35
 } as const;
 
 export function describeAction(action: Action): string {
@@ -111,6 +113,10 @@ export function describeAction(action: Action): string {
       return `Record ${factionLabels[action.otherPlayerPlay?.faction ?? 0] ?? "Unknown"} playing card ${action.otherPlayerPlay?.cardID ?? "?"}`;
     case ACTION_TYPE.DISCARD_EFFECT:
       return `Discard effect card ${action.discardEffect?.cardID ?? "?"}`;
+    case ACTION_TYPE.ACTIVATE_DOMINANCE:
+      return `Activate dominance card ${action.activateDominance?.cardID ?? "?"}`;
+    case ACTION_TYPE.TAKE_DOMINANCE:
+      return `Take dominance card ${action.takeDominance?.dominanceCardID ?? "?"}`;
     case ACTION_TYPE.MARQUISE_SETUP:
       return `Marquise setup: keep ${action.marquiseSetup?.keepClearingID ?? "?"}, sawmill ${action.marquiseSetup?.sawmillClearingID ?? "?"}, workshop ${action.marquiseSetup?.workshopClearingID ?? "?"}, recruiter ${action.marquiseSetup?.recruiterClearingID ?? "?"}`;
     case ACTION_TYPE.EYRIE_SETUP:

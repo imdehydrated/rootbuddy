@@ -125,6 +125,57 @@ func TestApplyActionCraftFavorDamagesVagabondInAffectedClearing(t *testing.T) {
 	}
 }
 
+func TestApplyActionCraftFavorDoesNotHitCoalitionPartnerVagabond(t *testing.T) {
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Eyrie,
+		ActiveDominance: map[game.Faction]game.CardID{
+			game.Vagabond: 14,
+		},
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   4,
+					Suit: game.Mouse,
+				},
+			},
+		},
+		PlayerFaction: game.Vagabond,
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{
+				{ID: 36, Name: "Favor of the Mice"},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 4,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemTea, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction: game.Eyrie,
+			CardID:  36,
+		},
+	})
+
+	damaged := 0
+	for _, item := range next.Vagabond.Items {
+		if item.Status == game.ItemDamaged {
+			damaged++
+		}
+	}
+	if damaged != 0 {
+		t.Fatalf("expected coalition partner favor to leave Vagabond untouched, got %+v", next.Vagabond.Items)
+	}
+}
+
 func TestApplyActionDiscardEffectMovesPersistentCardToDiscard(t *testing.T) {
 	state := game.GameState{
 		PersistentEffects: map[game.Faction][]game.CardID{

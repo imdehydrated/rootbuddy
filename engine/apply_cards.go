@@ -12,7 +12,7 @@ func applyCraft(state *game.GameState, action game.Action) {
 		return
 	}
 
-	if _, ok := removeCardFromFactionHand(state, action.Craft.Faction, action.Craft.CardID); !ok {
+	if _, ok := spendFactionHandCard(state, action.Craft.Faction, action.Craft.CardID); !ok {
 		return
 	}
 
@@ -95,7 +95,7 @@ func applyRemoveCardFromHand(state *game.GameState, action game.Action) {
 		return
 	}
 
-	if _, ok := removeCardFromFactionHand(state, action.RemoveCardFromHand.Faction, action.RemoveCardFromHand.CardID); !ok {
+	if _, ok := spendFactionHandCard(state, action.RemoveCardFromHand.Faction, action.RemoveCardFromHand.CardID); !ok {
 		return
 	}
 
@@ -133,4 +133,49 @@ func applyDiscardEffect(state *game.GameState, action game.Action) {
 	}
 
 	DiscardCard(state, action.DiscardEffect.CardID)
+}
+
+func applyActivateDominance(state *game.GameState, action game.Action) {
+	if action.ActivateDominance == nil {
+		return
+	}
+	if hasActiveDominance(*state, action.ActivateDominance.Faction) {
+		return
+	}
+
+	if _, ok := spendFactionHandCard(state, action.ActivateDominance.Faction, action.ActivateDominance.CardID); !ok {
+		return
+	}
+
+	if state.ActiveDominance == nil {
+		state.ActiveDominance = map[game.Faction]game.CardID{}
+	}
+	state.ActiveDominance[action.ActivateDominance.Faction] = action.ActivateDominance.CardID
+
+	if action.ActivateDominance.Faction == game.Vagabond {
+		state.CoalitionActive = true
+		state.CoalitionPartner = action.ActivateDominance.TargetFaction
+	}
+}
+
+func applyTakeDominance(state *game.GameState, action game.Action) {
+	if action.TakeDominance == nil {
+		return
+	}
+
+	if !removeAvailableDominance(state, action.TakeDominance.DominanceCardID) {
+		return
+	}
+	if _, ok := spendFactionHandCard(state, action.TakeDominance.Faction, action.TakeDominance.SpentCardID); !ok {
+		addAvailableDominance(state, action.TakeDominance.DominanceCardID)
+		return
+	}
+
+	DiscardCard(state, action.TakeDominance.SpentCardID)
+	card, ok := CardByID(action.TakeDominance.DominanceCardID)
+	if !ok {
+		addAvailableDominance(state, action.TakeDominance.DominanceCardID)
+		return
+	}
+	appendCardToFactionHand(state, action.TakeDominance.Faction, card)
 }

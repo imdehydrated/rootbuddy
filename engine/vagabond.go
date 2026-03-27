@@ -386,7 +386,16 @@ func applyAid(state *game.GameState, action game.Action) {
 		return
 	}
 
-	cards, card, ok := removeCardFromCards(state.Vagabond.CardsInHand, action.Aid.CardID)
+	card, ok := game.Card{}, false
+	if tracksHandForFaction(*state, game.Vagabond) {
+		var cards []game.Card
+		cards, card, ok = removeCardFromCards(state.Vagabond.CardsInHand, action.Aid.CardID)
+		if ok {
+			state.Vagabond.CardsInHand = cards
+		}
+	} else {
+		card, ok = spendFactionHandCard(state, game.Vagabond, action.Aid.CardID)
+	}
 	if !ok {
 		return
 	}
@@ -394,7 +403,6 @@ func applyAid(state *game.GameState, action game.Action) {
 		return
 	}
 
-	state.Vagabond.CardsInHand = cards
 	appendCardToFactionHand(state, action.Aid.TargetFaction, card)
 	improveVagabondRelationship(state, action.Aid.TargetFaction)
 	if vagabondRelationshipLevel(*state, action.Aid.TargetFaction) == game.RelAllied {
@@ -430,6 +438,9 @@ func applyQuest(state *game.GameState, action game.Action) {
 
 func applyStrike(state *game.GameState, action game.Action) {
 	if action.Strike == nil {
+		return
+	}
+	if !game.AreEnemies(*state, game.Vagabond, action.Strike.TargetFaction) {
 		return
 	}
 
