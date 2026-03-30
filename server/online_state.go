@@ -139,8 +139,9 @@ func copyOtherHandCounts(source map[game.Faction]int) map[game.Faction]int {
 	return cloned
 }
 
-func redactStateForPlayer(state game.GameState) game.GameState {
+func redactStateForPlayer(state game.GameState, perspective game.Faction) game.GameState {
 	redacted := engine.CloneState(state)
+	redacted.PlayerFaction = perspective
 	redacted.TrackAllHands = false
 	if redacted.GameMode != game.GameModeOnline {
 		return redacted
@@ -156,7 +157,7 @@ func redactStateForPlayer(state game.GameState) game.GameState {
 	redacted.QuestDeck = make([]game.QuestID, len(state.QuestDeck))
 
 	for _, faction := range redacted.TurnOrder {
-		if faction == redacted.PlayerFaction {
+		if faction == perspective {
 			continue
 		}
 
@@ -164,7 +165,7 @@ func redactStateForPlayer(state game.GameState) game.GameState {
 		clearFactionHand(&redacted, faction)
 	}
 
-	if redacted.PlayerFaction != game.Alliance {
+	if perspective != game.Alliance {
 		redacted.Alliance.Supporters = nil
 	}
 

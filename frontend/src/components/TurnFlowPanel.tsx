@@ -22,7 +22,7 @@ export function TurnFlowPanel({
 
   return (
     <section className="panel sidebar-panel">
-      <p className="eyebrow">Turn Flow</p>
+      <p className="eyebrow">Turn Controls</p>
 
       <div className="summary-stack">
         <span className="summary-label">Acting Faction</span>
@@ -40,7 +40,6 @@ export function TurnFlowPanel({
             </option>
           ))}
         </select>
-        <span className="summary-line">Use these controls for normal flow corrections. Full turn editing stays under Advanced.</span>
       </div>
 
       <div className="shortcut-grid" style={{ marginTop: "0.9rem" }}>

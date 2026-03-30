@@ -59,6 +59,7 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := req.State
+	perspective := state.PlayerFaction
 	if req.GameID != "" {
 		authoritative, ok := store.load(req.GameID)
 		if !ok {
@@ -66,13 +67,34 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		state = mergeAuthoritativeState(req.State, authoritative)
+
+		if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+			token := playerTokenFromRequest(r)
+			if token == "" {
+				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerTokenRequired.Error()})
+				return
+			}
+
+			playerFaction, claimed := lobby.claimedFaction(token)
+			if !claimed {
+				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerNotFound.Error()})
+				return
+			}
+			if playerFaction != authoritative.FactionTurn {
+				writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "not your turn"})
+				return
+			}
+
+			perspective = playerFaction
+			state.PlayerFaction = playerFaction
+		}
 	}
 
 	next, effectResult := engine.ApplyActionDetailed(state, req.Action)
 	if req.GameID != "" {
 		store.save(req.GameID, next)
 		effectResult = redactEffectResultForPlayer(state, next, req.Action, effectResult)
-		next = redactStateForPlayer(next)
+		next = redactStateForPlayer(next, perspective)
 	}
 
 	writeJSON(w, http.StatusOK, ApplyActionResponse{
@@ -181,7 +203,7 @@ func HandleSetup(w http.ResponseWriter, r *http.Request) {
 		authoritative := engine.CloneState(state)
 		authoritative.TrackAllHands = true
 		store.save(gameID, authoritative)
-		state = redactStateForPlayer(authoritative)
+		state = redactStateForPlayer(authoritative, req.PlayerFaction)
 	}
 
 	writeJSON(w, http.StatusOK, SetupResponse{
@@ -208,7 +230,23 @@ func HandleLoadGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if state.GameMode == game.GameModeOnline {
-		state = redactStateForPlayer(state)
+		perspective := state.PlayerFaction
+		if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+			token := playerTokenFromRequest(r)
+			if token == "" {
+				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerTokenRequired.Error()})
+				return
+			}
+
+			playerFaction, claimed := lobby.claimedFaction(token)
+			if !claimed {
+				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerNotFound.Error()})
+				return
+			}
+			perspective = playerFaction
+		}
+
+		state = redactStateForPlayer(state, perspective)
 	}
 
 	writeJSON(w, http.StatusOK, LoadGameResponse{

@@ -24,6 +24,8 @@ function formatSavedAt(savedAt: string | undefined): string {
 
 export function SessionStatusPanel({ state, hasSavedSession, serverGameID, savedSessionInfo }: SessionStatusPanelProps) {
   const modeLabel = state.gameMode === 0 ? "Online" : "Assist";
+  const lifecycleLabel =
+    state.gamePhase === 0 ? "Setup in progress" : state.gamePhase === 2 ? "Reviewing final result" : "Active game";
   const hiddenInfoLabel =
     state.gameMode === 0
       ? "Server-authoritative hidden info with player redaction."
@@ -34,8 +36,10 @@ export function SessionStatusPanel({ state, hasSavedSession, serverGameID, saved
       <p className="eyebrow">Session</p>
       <div className="summary-stack">
         <span className="summary-label">Mode</span>
+        <span className="summary-line">{lifecycleLabel}</span>
         <span className="summary-line">{modeLabel}</span>
         <span className="summary-line">Perspective: {factionLabels[state.playerFaction] ?? "Unknown"}</span>
+        {state.gamePhase === 2 ? <span className="summary-line">Winner: {factionLabels[state.winner] ?? "Unknown"}</span> : null}
         <span className="summary-line">{hiddenInfoLabel}</span>
       </div>
 

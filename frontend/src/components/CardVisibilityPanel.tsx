@@ -47,7 +47,7 @@ export function CardVisibilityPanel({ state }: CardVisibilityPanelProps) {
 
   return (
     <section className="panel floating-turn-summary">
-      <p className="eyebrow">Card Visibility</p>
+      <p className="eyebrow">{state.gamePhase === 2 ? "Final Card State" : "Card Visibility"}</p>
 
       <div className="summary-stack">
         <span className="summary-label">Your Hand</span>

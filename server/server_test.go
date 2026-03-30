@@ -64,7 +64,7 @@ func TestHandleCORSPreflight(t *testing.T) {
 	if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, OPTIONS" {
 		t.Fatalf("expected CORS allow-methods header, got %q", got)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, X-Player-Token" {
 		t.Fatalf("expected CORS allow-headers header, got %q", got)
 	}
 }
@@ -998,7 +998,7 @@ func TestHandleApplyActionReturnsCodebreakersRevealForPlayerPerspective(t *testi
 		},
 	}
 	store.save(gameID, authoritative)
-	visible := redactStateForPlayer(authoritative)
+	visible := redactStateForPlayer(authoritative, game.Marquise)
 
 	body, _ := json.Marshal(ApplyActionRequest{
 		GameID: gameID,
@@ -1052,7 +1052,7 @@ func TestHandleApplyActionReturnsStandAndDeliverTransferredCardForPlayer(t *test
 		},
 	}
 	store.save(gameID, authoritative)
-	visible := redactStateForPlayer(authoritative)
+	visible := redactStateForPlayer(authoritative, game.Marquise)
 
 	body, _ := json.Marshal(ApplyActionRequest{
 		GameID: gameID,

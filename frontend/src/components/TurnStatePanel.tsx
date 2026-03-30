@@ -12,6 +12,8 @@ import type { GameState } from "../types";
 type TurnStatePanelProps = {
   state: GameState;
   onUpdateState: (mutator: (draft: GameState) => void) => void;
+  title?: string;
+  showCloseButton?: boolean;
   onClose: () => void;
 };
 
@@ -26,14 +28,22 @@ function formatNumberList(values: number[]): string {
   return values.join(", ");
 }
 
-export function TurnStatePanel({ state, onUpdateState, onClose }: TurnStatePanelProps) {
+export function TurnStatePanel({
+  state,
+  onUpdateState,
+  title = "Advanced Turn State",
+  showCloseButton = true,
+  onClose
+}: TurnStatePanelProps) {
   return (
     <section className="panel modal-panel">
       <div className="panel-header">
-        <h2>Advanced Turn State</h2>
-        <button type="button" className="secondary" onClick={onClose}>
-          Close
-        </button>
+        <h2>{title}</h2>
+        {showCloseButton ? (
+          <button type="button" className="secondary" onClick={onClose}>
+            Close
+          </button>
+        ) : null}
       </div>
 
       <p className="message">

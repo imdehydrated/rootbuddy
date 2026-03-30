@@ -7,6 +7,8 @@ type InspectorPanelProps = {
   keepClearingID: number;
   vagabondClearingID: number;
   vagabondInForest: boolean;
+  title?: string;
+  showCloseButton?: boolean;
   onUpdateClearing: (clearingID: number, mutator: (clearing: Clearing) => void) => void;
   onSetKeepClearing: (clearingID: number) => void;
   onSetVagabondClearing: (clearingID: number, inForest: boolean) => void;
@@ -60,6 +62,8 @@ export function InspectorPanel({
   keepClearingID,
   vagabondClearingID,
   vagabondInForest,
+  title = "Selected Clearing",
+  showCloseButton = true,
   onUpdateClearing,
   onSetKeepClearing,
   onSetVagabondClearing,
@@ -75,14 +79,16 @@ export function InspectorPanel({
   return (
     <section className="panel inspector-panel">
       <div className="panel-header">
-        <h2>Selected Clearing</h2>
+        <h2>{title}</h2>
         <div className="inspector-header-actions">
           <span className={`pill suit-pill ${suitClass(clearing.suit)}`}>
             {suitLabels[clearing.suit] ?? "Unknown"} {clearing.id}
           </span>
-          <button type="button" className="secondary inspector-close" onClick={onClose}>
-            Close
-          </button>
+          {showCloseButton ? (
+            <button type="button" className="secondary inspector-close" onClick={onClose}>
+              Close
+            </button>
+          ) : null}
         </div>
       </div>
 

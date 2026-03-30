@@ -789,6 +789,40 @@ textarea {
   gap: 0.28rem;
 }
 
+.saved-session-card {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0.9rem 0 1rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: rgba(39, 72, 60, 0.06);
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.flow-guide-panel {
+  border-color: rgba(39, 72, 60, 0.24);
+}
+
+.flow-guide-hero {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.context-drawer-body {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.context-drawer-body > .panel {
+  margin: 0;
+  background: rgba(255, 249, 240, 0.72);
+}
+
 .summary-line {
   color: var(--ink);
   font-size: 0.92rem;

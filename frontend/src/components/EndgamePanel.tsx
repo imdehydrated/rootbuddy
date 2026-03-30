@@ -114,6 +114,13 @@ export function EndgamePanel({
         ))}
       </div>
 
+      <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+        <span className="summary-label">Next Steps</span>
+        <span className="summary-line">Return to Setup keeps this result available for review.</span>
+        {hasSavedSession ? <span className="summary-line">Clear Saved Result removes the resumable review copy.</span> : null}
+        <span className="summary-line">New Game clears the result and starts a fresh setup.</span>
+      </div>
+
       <div className="sidebar-actions footer">
         <button type="button" className="secondary" onClick={onReturnToSetup}>
           Return to Setup
