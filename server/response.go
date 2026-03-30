@@ -28,6 +28,11 @@ type SetupResponse struct {
 	GameID string         `json:"gameID,omitempty"`
 }
 
+type LoadGameResponse struct {
+	State  game.GameState `json:"state"`
+	GameID string         `json:"gameID,omitempty"`
+}
+
 type ErrorResponse struct {
 	Error string `json:"error"`
 }

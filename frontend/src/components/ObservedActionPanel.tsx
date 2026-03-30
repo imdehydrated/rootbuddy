@@ -5,11 +5,15 @@ import type { Action, GameState } from "../types";
 type ObservedActionPanelProps = {
   state: GameState;
   onApply: (action: Action) => Promise<void>;
-  onClose: () => void;
+  onClose?: () => void;
+  embedded?: boolean;
+  preferredActorFaction?: number | null;
+  preferredTemplate?: ObservedTemplateKey | null;
 };
 
-type ObservedTemplateKey =
+export type ObservedTemplateKey =
   | "battle_resolution"
+  | "pass_phase"
   | "add_to_decree"
   | "craft"
   | "overwork"
@@ -53,6 +57,7 @@ type ObservedFormState = {
 
 const templateLabels: Record<ObservedTemplateKey, string> = {
   battle_resolution: "Battle",
+  pass_phase: "Advance Phase",
   add_to_decree: "Add To Decree",
   craft: "Craft",
   overwork: "Overwork",
@@ -86,15 +91,15 @@ function formatNumberList(values: number[]): string {
 function templatesForFaction(faction: number): ObservedTemplateKey[] {
   switch (faction) {
     case 0:
-      return ["battle_resolution", "craft", "overwork", "other_player_draw", "other_player_play", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "craft", "overwork", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 1:
-      return ["battle_resolution", "spread_sympathy", "revolt", "mobilize", "train", "other_player_draw", "other_player_play", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "spread_sympathy", "revolt", "mobilize", "train", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 2:
-      return ["battle_resolution", "add_to_decree", "craft", "other_player_draw", "other_player_play", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "add_to_decree", "craft", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 3:
-      return ["battle_resolution", "aid", "craft", "other_player_draw", "other_player_play", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "aid", "craft", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     default:
-      return ["battle_resolution", "other_player_draw", "other_player_play"];
+      return ["battle_resolution", "other_player_draw", "other_player_play", "pass_phase"];
   }
 }
 
@@ -162,6 +167,13 @@ function buildObservedAction(form: ObservedFormState): Action {
           attackerLosses: parseNumber(form.attackerLosses),
           defenderLosses: parseNumber(form.defenderLosses),
           sourceEffectID: form.sourceEffectID.trim()
+        }
+      };
+    case "pass_phase":
+      return {
+        type: 24,
+        passPhase: {
+          faction
         }
       };
     case "add_to_decree":
@@ -284,6 +296,8 @@ function templateHint(template: ObservedTemplateKey): string {
   switch (template) {
     case "battle_resolution":
       return "Use when you observed a public battle and know the losses or effect usage. This records the resolved outcome directly.";
+    case "pass_phase":
+      return "Use when the acting faction is done with the current step or phase and you just need to advance turn flow.";
     case "add_to_decree":
       return "Use when you observed which card(s) the Eyrie added to decree.";
     case "craft":
@@ -313,7 +327,14 @@ function templateHint(template: ObservedTemplateKey): string {
   }
 }
 
-export function ObservedActionPanel({ state, onApply, onClose }: ObservedActionPanelProps) {
+export function ObservedActionPanel({
+  state,
+  onApply,
+  onClose,
+  embedded = false,
+  preferredActorFaction = null,
+  preferredTemplate = null
+}: ObservedActionPanelProps) {
   const [form, setForm] = useState<ObservedFormState>(() => initialFormState(state));
   const availableTemplates = templatesForFaction(form.actorFaction);
   const targetFactions = availableTargetFactions(form.actorFaction);
@@ -321,6 +342,36 @@ export function ObservedActionPanel({ state, onApply, onClose }: ObservedActionP
   useEffect(() => {
     setForm(initialFormState(state));
   }, [state.factionTurn, state.playerFaction, state.map.clearings]);
+
+  useEffect(() => {
+    if (preferredActorFaction === null) {
+      return;
+    }
+
+    setForm((current) =>
+      current.actorFaction === preferredActorFaction
+        ? current
+        : {
+            ...current,
+            actorFaction: preferredActorFaction
+          }
+    );
+  }, [preferredActorFaction]);
+
+  useEffect(() => {
+    if (preferredTemplate === null) {
+      return;
+    }
+
+    setForm((current) =>
+      current.template === preferredTemplate
+        ? current
+        : {
+            ...current,
+            template: preferredTemplate
+          }
+    );
+  }, [preferredTemplate]);
 
   useEffect(() => {
     if (availableTemplates.includes(form.template)) {
@@ -355,17 +406,20 @@ export function ObservedActionPanel({ state, onApply, onClose }: ObservedActionP
   };
 
   return (
-    <section className="panel modal-panel">
+    <section className={embedded ? "observed-embedded" : "panel modal-panel"}>
       <div className="panel-header">
-        <h2>Observed Action</h2>
-        <button type="button" className="secondary" onClick={onClose}>
-          Close
-        </button>
+        <h2>{embedded ? "Observed Turn Tools" : "Observed Action"}</h2>
+        {!embedded && onClose ? (
+          <button type="button" className="secondary" onClick={onClose}>
+            Close
+          </button>
+        ) : null}
       </div>
 
       <p className="message">
-        Record public table observations for factions whose full hands are hidden in assist mode. Use the battle template for
-        observed public battle outcomes and effect usage.
+        {embedded
+          ? "Record the current faction's public actions without leaving the main board flow."
+          : "Record public table observations for factions whose full hands are hidden in assist mode. Use the battle template for observed public battle outcomes and effect usage."}
       </p>
 
       <div className="observed-panel-grid">

@@ -1,19 +1,25 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
-import { applyAction, fetchBattleContext, fetchValidActions, resolveBattle } from "./api";
+import { applyAction, fetchBattleContext, fetchValidActions, loadGame, resolveBattle } from "./api";
 import { boardLayoutForState } from "./boardLayouts";
+import { AssistWorkflowPanel } from "./components/AssistWorkflowPanel";
 import { BoardPanel } from "./components/BoardPanel";
+import { CardVisibilityPanel } from "./components/CardVisibilityPanel";
+import { EndgamePanel } from "./components/EndgamePanel";
 import { InspectorPanel } from "./components/InspectorPanel";
-import { ObservedActionPanel } from "./components/ObservedActionPanel";
+import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
+import { SessionStatusPanel } from "./components/SessionStatusPanel";
 import { SetupFlowPanel } from "./components/SetupFlowPanel";
+import { TurnFlowPanel } from "./components/TurnFlowPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
 import { affectedClearings, syncDerivedFactionStateFromBoard } from "./gameHelpers";
 import { ACTION_TYPE, describeAction, factionLabels, phaseLabels, setupStageLabels, stepLabels } from "./labels";
+import { clearSavedSession, loadSavedSession, saveSavedSession, type SavedSession } from "./localSession";
 import { sampleState } from "./sampleState";
 import type { Action, BattleContext, BattleModifiers, Clearing, GameState } from "./types";
 
-type ActiveModal = "inspector" | "turn" | "actions" | "battle" | "observed" | "json" | "help" | null;
+type ActiveModal = "inspector" | "turn" | "actions" | "battle" | "json" | "help" | null;
 
 type MarquiseSetupDraft = {
   keepClearingID: number | null;
@@ -157,8 +163,19 @@ function marquiseSetupMatches(
   return true;
 }
 
+function gameOverHeadline(state: GameState): string {
+  if (state.winningCoalition.length > 0) {
+    return `${state.winningCoalition.map((faction) => factionLabels[faction] ?? `Faction ${faction}`).join(" + ")} win`;
+  }
+
+  return `${factionLabels[state.winner] ?? "Unknown"} win`;
+}
+
 export default function App() {
+  const initialSavedSession = loadSavedSession();
   const [showSetup, setShowSetup] = useState(true);
+  const [hasSavedSession, setHasSavedSession] = useState(() => initialSavedSession !== null);
+  const [savedSessionInfo, setSavedSessionInfo] = useState<SavedSession | null>(initialSavedSession);
   const [serverGameID, setServerGameID] = useState<string | null>(null);
   const [stateText, setStateText] = useState(initialJSON);
   const deferredStateText = useDeferredValue(stateText);
@@ -200,6 +217,39 @@ export default function App() {
   useEffect(() => {
     setMarquiseSetupDraft(emptyMarquiseSetupDraft);
   }, [parsedState.gamePhase, parsedState.setupStage]);
+
+  useEffect(() => {
+    if (showSetup) {
+      return;
+    }
+
+    const session: SavedSession = {
+      state: parsedState,
+      gameID: serverGameID,
+      savedAt: new Date().toISOString()
+    };
+    const saved = saveSavedSession({
+      state: session.state,
+      gameID: session.gameID,
+      savedAt: session.savedAt
+    });
+    if (saved) {
+      setHasSavedSession(true);
+      setSavedSessionInfo(session);
+    }
+  }, [parsedState, serverGameID, showSetup]);
+
+  function resetToSetup(options?: { clearSaved?: boolean; status?: string }) {
+    if (options?.clearSaved) {
+      clearSavedSession();
+      setHasSavedSession(false);
+      setSavedSessionInfo(null);
+    }
+    setServerGameID(null);
+    setShowSetup(true);
+    setActiveModal(null);
+    setStatus(options?.status ?? "Choose factions and create a new game.");
+  }
 
   function syncState(nextState: GameState) {
     const normalizedState = normalizeState(nextState);
@@ -277,7 +327,7 @@ export default function App() {
 
     try {
       setStatus("Fetching valid actions...");
-      await loadActionsForState(parsedState, { openModal: parsedState.gamePhase !== 0 });
+      await loadActionsForState(parsedState);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to fetch actions";
       setStatus(message);
@@ -359,6 +409,38 @@ export default function App() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to resolve battle";
       setStatus(message);
+    }
+  }
+
+  function openBattleForActionIndex(actionIndex: number) {
+    setSelectedBattleIndex(actionIndex);
+    setHoveredActionIndex(actionIndex);
+    setBattleModifiers(emptyBattleModifiers);
+    setAssistDefenderAmbushChoice(null);
+    setActiveModal("battle");
+  }
+
+  async function handleResumeSavedGame() {
+    const savedSession = loadSavedSession();
+    if (!savedSession) {
+      throw new Error("No saved game found.");
+    }
+
+    const loaded = savedSession.gameID ? await loadGame(savedSession.gameID) : { state: savedSession.state, gameID: null };
+    setSavedSessionInfo(savedSession);
+    syncState(loaded.state);
+    setServerGameID(loaded.gameID);
+    setShowSetup(false);
+    setActiveModal(loaded.state.gamePhase === 0 ? null : "help");
+    setStatus("Resumed saved game.");
+
+    if (loaded.state.gamePhase === 0) {
+      try {
+        await loadActionsForState(loaded.state, { successStatus: "Resumed setup. Choose a highlighted setup target." });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load resumed setup actions";
+        setStatus(message);
+      }
     }
   }
 
@@ -554,6 +636,7 @@ export default function App() {
   if (showSetup) {
     return (
       <SetupWizard
+        canResume={hasSavedSession}
         onStart={async (state, gameID) => {
           syncState(state);
           setServerGameID(gameID);
@@ -576,6 +659,13 @@ export default function App() {
           setStatus("Loaded sample state.");
           setActiveModal("help");
         }}
+        onClearSavedSession={() => {
+          clearSavedSession();
+          setHasSavedSession(false);
+          setSavedSessionInfo(null);
+          setStatus("Cleared saved game.");
+        }}
+        onResume={handleResumeSavedGame}
       />
     );
   }
@@ -583,6 +673,11 @@ export default function App() {
   return (
     <main className="app-shell workspace-shell">
       <div className="board-stage">
+        {parsedState.gamePhase === 2 ? (
+          <div className="board-hint endgame-banner">
+            {gameOverHeadline(parsedState)}. Open the Game Over panel for the final standings.
+          </div>
+        ) : null}
         <BoardPanel
           clearings={parsedState.map.clearings}
           forests={parsedState.map.forests}
@@ -617,6 +712,50 @@ export default function App() {
         </section>
 
         <TurnSummaryPanel state={parsedState} />
+        <SessionStatusPanel
+          state={parsedState}
+          hasSavedSession={hasSavedSession}
+          serverGameID={serverGameID}
+          savedSessionInfo={savedSessionInfo}
+        />
+        <PlayerActionsPanel
+          state={parsedState}
+          actions={actions}
+          onApply={handleApply}
+          onGenerateActions={refreshActions}
+          onOpenBattle={openBattleForActionIndex}
+          onOpenAllActions={() => setActiveModal("actions")}
+        />
+        <CardVisibilityPanel state={parsedState} />
+        <TurnFlowPanel
+          state={parsedState}
+          onApply={handleApply}
+          onGenerateActions={refreshActions}
+          onOpenAdvanced={() => setActiveModal("turn")}
+          onUpdateState={updateState}
+        />
+        <EndgamePanel
+          state={parsedState}
+          hasSavedSession={hasSavedSession}
+          serverGameID={serverGameID}
+          onNewGame={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}
+          onReturnToSetup={() => resetToSetup({ status: "Returned to setup. Resume is still available until you clear it." })}
+          onClearSavedSession={() => {
+            clearSavedSession();
+            setHasSavedSession(false);
+            setSavedSessionInfo(null);
+            setStatus("Cleared the saved endgame result.");
+          }}
+          onOpenDebug={() => setActiveModal("json")}
+        />
+        <AssistWorkflowPanel
+          state={parsedState}
+          actions={actions}
+          onApply={handleApply}
+          onGenerateActions={refreshActions}
+          onOpenTurnState={() => setActiveModal("turn")}
+          onOpenBattle={openBattleForActionIndex}
+        />
         {parsedState.gamePhase === 0 ? (
           <SetupFlowPanel
             stage={parsedState.setupStage}
@@ -636,27 +775,36 @@ export default function App() {
             <button type="button" className="secondary" onClick={() => setActiveModal("help")}>
               Help
             </button>
-            <button type="button" className="secondary" onClick={() => setShowSetup(true)}>
+            <button type="button" className="secondary" onClick={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}>
               Setup
             </button>
-            <button type="button" className="secondary" onClick={() => setActiveModal("turn")}>
-              Turn State
-            </button>
-            <button type="button" className="secondary" onClick={() => setActiveModal("actions")}>
-              Actions
-            </button>
-            {parsedState.gameMode === 1 ? (
-              <button type="button" className="secondary" onClick={() => setActiveModal("observed")}>
-                Observed
+            {parsedState.gamePhase !== 2 ? (
+              <button type="button" className="secondary" onClick={() => setActiveModal("actions")}>
+                Full Actions
               </button>
             ) : null}
-            <button type="button" className="secondary" onClick={() => setActiveModal("battle")}>
-              Resolve
-            </button>
-            <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
-              JSON
-            </button>
+            {parsedState.gamePhase !== 2 ? (
+              <button type="button" className="secondary" onClick={() => setActiveModal("battle")}>
+                Resolve
+              </button>
+            ) : null}
           </div>
+          <details className="advanced-tools" style={{ marginTop: "0.9rem" }}>
+            <summary className="panel-summary">
+              <span className="summary-label">Advanced Tools</span>
+              <span className="summary-line">Use only when the guided sidebar flow is not enough.</span>
+            </summary>
+            <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
+              {parsedState.gamePhase !== 2 ? (
+                <button type="button" className="secondary" onClick={() => setActiveModal("turn")}>
+                  Advanced Turn
+                </button>
+              ) : null}
+              <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
+                Debug
+              </button>
+            </div>
+          </details>
           <div className="sidebar-actions footer">
             <button
               type="button"
@@ -670,9 +818,15 @@ export default function App() {
             >
               Reset
             </button>
-            <button type="button" onClick={refreshActions} disabled={!!error || (boardIsEmpty && parsedState.gamePhase !== 0)}>
-              Generate Actions
-            </button>
+            {parsedState.gamePhase !== 2 ? (
+              <button type="button" onClick={refreshActions} disabled={!!error || (boardIsEmpty && parsedState.gamePhase !== 0)}>
+                Generate Actions
+              </button>
+            ) : (
+              <button type="button" onClick={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}>
+                New Game
+              </button>
+            )}
           </div>
         </section>
       </aside>
@@ -744,19 +898,13 @@ export default function App() {
                               Apply
                             </button>
                             {isBattle ? (
-                              <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => {
-                                  setSelectedBattleIndex(index);
-                                  setHoveredActionIndex(index);
-                                  setBattleModifiers(emptyBattleModifiers);
-                                  setAssistDefenderAmbushChoice(null);
-                                  setActiveModal("battle");
-                                }}
-                              >
-                                Use for Battle
-                              </button>
+                                <button
+                                  type="button"
+                                  className="secondary"
+                                  onClick={() => openBattleForActionIndex(index)}
+                                >
+                                  Use for Battle
+                                </button>
                             ) : null}
                           </div>
                         </li>
@@ -765,14 +913,6 @@ export default function App() {
                   </ul>
                 )}
               </section>
-            ) : null}
-
-            {activeModal === "observed" ? (
-              <ObservedActionPanel
-                state={parsedState}
-                onApply={handleApply}
-                onClose={() => setActiveModal(null)}
-              />
             ) : null}
 
             {activeModal === "battle" ? (
@@ -953,11 +1093,12 @@ export default function App() {
             {activeModal === "json" ? (
               <section className="panel modal-panel">
                 <div className="panel-header">
-                  <h2>Advanced JSON</h2>
+                  <h2>Debug JSON</h2>
                   <button type="button" className="secondary" onClick={() => setActiveModal(null)}>
                     Close
                   </button>
                 </div>
+                <p className="message">Use this only for debugging or recovery. Normal play should go through the guided panels.</p>
                 <textarea
                   className="state-editor"
                   value={stateText}
@@ -977,8 +1118,8 @@ export default function App() {
                 </div>
                 <div className="compact-help">
                   <p>1. Click a clearing to place faction-specific warriors, buildings, sympathy, wood, ruins, the Keep, and the Vagabond.</p>
-                  <p>2. Open Turn State and set the current faction, phase, and step.</p>
-                  <p>3. Use Generate Actions, then review or apply them from the Actions popup.</p>
+                  <p>2. Use Turn Flow in the sidebar to set the acting faction and phase, and open Advanced Turn only when you need a manual correction.</p>
+                  <p>3. Use Generate Actions, then apply them from the Player Actions or Assist Workflow panels. Full Actions is the fallback list.</p>
                 </div>
               </section>
             ) : null}

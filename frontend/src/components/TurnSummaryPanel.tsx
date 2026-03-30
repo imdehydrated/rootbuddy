@@ -1,3 +1,4 @@
+import { describeKnownCardIDs } from "../cardCatalog";
 import {
   eyrieLeaderLabels,
   factionLabels,
@@ -64,22 +65,6 @@ function currentFactionLines(state: GameState): string[] {
 }
 
 export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
-  const hiddenHandLines = state.hiddenCards.reduce<Record<string, number>>((counts, card) => {
-    if (card.zone !== "hand") {
-      return counts;
-    }
-    const key = String(card.ownerFaction);
-    counts[key] = (counts[key] ?? 0) + 1;
-    return counts;
-  }, {});
-  const hiddenSupporterLines = state.hiddenCards.reduce<Record<string, number>>((counts, card) => {
-    if (card.zone !== "supporters") {
-      return counts;
-    }
-    const key = String(card.ownerFaction);
-    counts[key] = (counts[key] ?? 0) + 1;
-    return counts;
-  }, {});
   const activeDominanceLines = Object.entries(state.activeDominance).map(([faction, cardID]) => {
     const factionLabel = factionLabels[Number(faction)] ?? `Faction ${faction}`;
     return `${factionLabel}: Card ${cardID}`;
@@ -118,14 +103,6 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
         ))}
       </div>
 
-      {state.gamePhase === 2 ? (
-        <div className="summary-stack">
-          <span className="summary-label">Game Over</span>
-          <span className="summary-line">Winner: {factionLabels[state.winner] ?? "Unknown"}</span>
-          {state.winningCoalition.length > 0 ? <span className="summary-line">Coalition: {coalitionLabel}</span> : null}
-        </div>
-      ) : null}
-
       <div className="summary-stack">
         <span className="summary-label">Current Faction State</span>
         {currentFactionLines(state).map((line) => (
@@ -144,7 +121,7 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
             </span>
           ))}
           {state.availableDominance.length > 0 ? (
-            <span className="summary-line">Available cards: {state.availableDominance.join(", ")}</span>
+            <span className="summary-line">Available cards: {describeKnownCardIDs(state.availableDominance)}</span>
           ) : null}
           {state.coalitionActive ? <span className="summary-line">Coalition: {coalitionLabel}</span> : null}
         </div>
@@ -156,22 +133,6 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
           {state.vagabond.questsAvailable.map((quest) => (
             <span key={quest.id} className="summary-line">
               {quest.name} ({suitLabels[quest.suit] ?? "Unknown"})
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      {Object.keys(hiddenHandLines).length > 0 || Object.keys(hiddenSupporterLines).length > 0 ? (
-        <div className="summary-stack">
-          <span className="summary-label">Hidden Placeholders</span>
-          {Object.entries(hiddenHandLines).map(([faction, count]) => (
-            <span key={faction} className="summary-line">
-              {factionLabels[Number(faction)] ?? `Faction ${faction}`}: hand {count}
-            </span>
-          ))}
-          {Object.entries(hiddenSupporterLines).map(([faction, count]) => (
-            <span key={`supporters-${faction}`} className="summary-line">
-              {factionLabels[Number(faction)] ?? `Faction ${faction}`}: supporters {count}
             </span>
           ))}
         </div>

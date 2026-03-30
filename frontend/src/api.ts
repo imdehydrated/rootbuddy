@@ -96,3 +96,11 @@ export async function setupGame(request: SetupRequest): Promise<{ state: GameSta
     gameID: response.gameID ?? null
   };
 }
+
+export async function loadGame(gameID: string): Promise<{ state: GameState; gameID: string | null }> {
+  const response = await postJSON<{ state: GameState; gameID?: string }>("/game/load", { gameID });
+  return {
+    state: response.state,
+    gameID: response.gameID ?? gameID
+  };
+}

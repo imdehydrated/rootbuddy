@@ -825,6 +825,28 @@ textarea {
   box-shadow: 0 10px 24px rgba(29, 52, 44, 0.2);
 }
 
+.endgame-banner {
+  top: 1.4rem;
+  max-width: 34rem;
+  background: rgba(138, 53, 53, 0.92);
+  box-shadow: 0 14px 28px rgba(94, 30, 30, 0.26);
+}
+
+.endgame-hero {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(138, 53, 53, 0.1), rgba(138, 53, 53, 0.03));
+  border: 1px solid rgba(138, 53, 53, 0.16);
+  margin-bottom: 0.9rem;
+}
+
+.endgame-winner-line {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 .forest-marker {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -908,6 +930,56 @@ textarea {
 
 .observed-preview {
   min-height: 12rem;
+}
+
+.assist-workflow-panel .sidebar-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shortcut-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.embedded-action-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.embedded-action-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.observed-embedded {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.observed-embedded .panel-header {
+  margin-bottom: 0;
+}
+
+.card-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.card-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(39, 72, 60, 0.08);
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  color: var(--ink);
 }
 
 .checkbox-row {

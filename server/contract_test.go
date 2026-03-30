@@ -47,3 +47,22 @@ func TestBattleContextResponseJSONIncludesStableContractKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadGameResponseJSONIncludesStableContractKeys(t *testing.T) {
+	body, err := json.Marshal(LoadGameResponse{
+		State: game.GameState{
+			RandomSeed: 11,
+		},
+		GameID: "game-123",
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal load game response: %v", err)
+	}
+
+	jsonText := string(body)
+	for _, key := range []string{`"state"`, `"RandomSeed"`, `"gameID"`} {
+		if !strings.Contains(jsonText, key) {
+			t.Fatalf("expected load game response JSON to include %s, got %s", key, jsonText)
+		}
+	}
+}

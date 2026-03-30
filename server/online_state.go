@@ -3,6 +3,9 @@ package server
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/imdehydrated/rootbuddy/engine"
@@ -12,11 +15,17 @@ import (
 type onlineStateStore struct {
 	mu    sync.RWMutex
 	games map[string]game.GameState
+	dir   string
 }
 
-var store = &onlineStateStore{
-	games: map[string]game.GameState{},
+func newOnlineStateStore(dir string) *onlineStateStore {
+	return &onlineStateStore{
+		games: map[string]game.GameState{},
+		dir:   dir,
+	}
 }
+
+var store = newOnlineStateStore(filepath.Join(".rootbuddy-saves", "online"))
 
 func newGameID() string {
 	bytes := make([]byte, 16)
@@ -32,9 +41,13 @@ func (s *onlineStateStore) save(gameID string, state game.GameState) {
 		return
 	}
 
+	cloned := engine.CloneState(state)
+
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.games[gameID] = engine.CloneState(state)
+	s.games[gameID] = cloned
+	s.mu.Unlock()
+
+	s.persistToDisk(gameID, cloned)
 }
 
 func (s *onlineStateStore) load(gameID string) (game.GameState, bool) {
@@ -43,13 +56,57 @@ func (s *onlineStateStore) load(gameID string) (game.GameState, bool) {
 	}
 
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	state, ok := s.games[gameID]
+	s.mu.RUnlock()
 	if !ok {
-		return game.GameState{}, false
+		fromDisk, diskOK := s.loadFromDisk(gameID)
+		if !diskOK {
+			return game.GameState{}, false
+		}
+
+		s.mu.Lock()
+		s.games[gameID] = fromDisk
+		s.mu.Unlock()
+		return engine.CloneState(fromDisk), true
 	}
 
 	return engine.CloneState(state), true
+}
+
+func (s *onlineStateStore) persistToDisk(gameID string, state game.GameState) {
+	if s.dir == "" {
+		return
+	}
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+		return
+	}
+
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(s.filePath(gameID), payload, 0o644)
+}
+
+func (s *onlineStateStore) loadFromDisk(gameID string) (game.GameState, bool) {
+	if s.dir == "" {
+		return game.GameState{}, false
+	}
+
+	payload, err := os.ReadFile(s.filePath(gameID))
+	if err != nil {
+		return game.GameState{}, false
+	}
+
+	var state game.GameState
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return game.GameState{}, false
+	}
+	return engine.CloneState(state), true
+}
+
+func (s *onlineStateStore) filePath(gameID string) string {
+	return filepath.Join(s.dir, gameID+".json")
 }
 
 func mergeAuthoritativeState(visible game.GameState, authoritative game.GameState) game.GameState {

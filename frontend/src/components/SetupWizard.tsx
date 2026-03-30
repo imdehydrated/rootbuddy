@@ -6,11 +6,14 @@ import type { GameState } from "../types";
 type SetupWizardProps = {
   onStart: (state: GameState, gameID: string | null) => void;
   onUseSample: () => void;
+  onResume: () => Promise<void>;
+  onClearSavedSession: () => void;
+  canResume: boolean;
 };
 
 const allFactions = [0, 2, 1, 3];
 
-export function SetupWizard({ onStart, onUseSample }: SetupWizardProps) {
+export function SetupWizard({ onStart, onUseSample, onResume, onClearSavedSession, canResume }: SetupWizardProps) {
   const [gameMode, setGameMode] = useState(0);
   const [playerFaction, setPlayerFaction] = useState(0);
   const [factions, setFactions] = useState<number[]>([0, 2, 1, 3]);
@@ -63,6 +66,19 @@ export function SetupWizard({ onStart, onUseSample }: SetupWizardProps) {
       onStart(result.state, result.gameID);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create game";
+      setStatus(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResume() {
+    try {
+      setSubmitting(true);
+      setStatus("Loading saved game...");
+      await onResume();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load saved game";
       setStatus(message);
     } finally {
       setSubmitting(false);
@@ -157,6 +173,16 @@ export function SetupWizard({ onStart, onUseSample }: SetupWizardProps) {
         ) : null}
 
         <div className="sidebar-actions footer">
+          {canResume ? (
+            <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
+              Resume Saved Game
+            </button>
+          ) : null}
+          {canResume ? (
+            <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
+              Clear Saved Game
+            </button>
+          ) : null}
           <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
             Use Sample State
           </button>

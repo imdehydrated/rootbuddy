@@ -38,3 +38,7 @@ type SetupRequest struct {
 	EyrieLeader       game.EyrieLeader       `json:"eyrieLeader"`
 	RandomSeed        int64                  `json:"randomSeed,omitempty"`
 }
+
+type LoadGameRequest struct {
+	GameID string `json:"gameID"`
+}

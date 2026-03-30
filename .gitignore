@@ -6,3 +6,4 @@ AGENTS.md
 frontend/node_modules/
 frontend/dist/
 .gocache/
+.rootbuddy-saves/

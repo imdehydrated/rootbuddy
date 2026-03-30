@@ -189,3 +189,30 @@ func HandleSetup(w http.ResponseWriter, r *http.Request) {
 		GameID: gameID,
 	})
 }
+
+func HandleLoadGame(w http.ResponseWriter, r *http.Request) {
+	var req LoadGameRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+	if req.GameID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gameID is required"})
+		return
+	}
+
+	state, ok := store.load(req.GameID)
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
+		return
+	}
+
+	if state.GameMode == game.GameModeOnline {
+		state = redactStateForPlayer(state)
+	}
+
+	writeJSON(w, http.StatusOK, LoadGameResponse{
+		State:  state,
+		GameID: req.GameID,
+	})
+}

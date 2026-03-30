@@ -30,11 +30,15 @@ export function TurnStatePanel({ state, onUpdateState, onClose }: TurnStatePanel
   return (
     <section className="panel modal-panel">
       <div className="panel-header">
-        <h2>Turn State</h2>
+        <h2>Advanced Turn State</h2>
         <button type="button" className="secondary" onClick={onClose}>
           Close
         </button>
       </div>
+
+      <p className="message">
+        Use this only when the quick sidebar flow is not enough and you need to correct the turn structure directly.
+      </p>
 
       <div className="turn-state-actions">
         <button
