@@ -38,10 +38,19 @@ func loadValidatedRecord(gameID string) (authoritativeGameRecord, *ErrorResponse
 	return record, nil, http.StatusOK
 }
 
-func multiplayerPerspective(gameID string, token string) (game.Faction, bool, *ErrorResponse, int) {
+func multiplayerPerspective(record authoritativeGameRecord, token string) (game.Faction, bool, *ErrorResponse, int) {
+	if !record.RequiresLobby {
+		return 0, false, nil, http.StatusOK
+	}
+
+	gameID := record.GameID
 	lobby, ok := lobbies.getByGameID(gameID)
 	if !ok {
-		return 0, false, nil, http.StatusOK
+		return 0, true, &ErrorResponse{
+			Error:    errLobbySessionUnavailable.Error(),
+			GameID:   gameID,
+			Revision: record.Revision,
+		}, http.StatusConflict
 	}
 	if token == "" {
 		return 0, true, &ErrorResponse{Error: errPlayerTokenRequired.Error(), GameID: gameID}, http.StatusUnauthorized
@@ -78,16 +87,17 @@ func buildReadContext(gameID string, fallbackState game.GameState, token string)
 		return gameRequestContext{}, errResp, status
 	}
 
-	perspective, multiplayer, errResp, status := multiplayerPerspective(gameID, token)
+	perspective, multiplayer, errResp, status := multiplayerPerspective(record, token)
 	if errResp != nil {
 		return gameRequestContext{}, errResp, status
 	}
 
 	if multiplayer {
-		visible := redactStateForPlayer(record.State, perspective)
+		state := engine.CloneState(record.State)
+		state.PlayerFaction = perspective
 		return gameRequestContext{
 			record:      record,
-			state:       visible,
+			state:       state,
 			perspective: perspective,
 			multiplayer: true,
 		}, nil, http.StatusOK
@@ -118,7 +128,7 @@ func buildApplyContext(req ApplyActionRequest, token string) (gameRequestContext
 		return gameRequestContext{}, errResp, status
 	}
 
-	perspective, multiplayer, errResp, status := multiplayerPerspective(req.GameID, token)
+	perspective, multiplayer, errResp, status := multiplayerPerspective(record, token)
 	if errResp != nil {
 		return gameRequestContext{}, errResp, status
 	}

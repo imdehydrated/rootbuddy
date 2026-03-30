@@ -23,6 +23,12 @@ func (r *failingSaveRepository) create(gameID string, state game.GameState) (aut
 	return cloneAuthoritativeGameRecord(record), nil
 }
 
+func (r *failingSaveRepository) createMultiplayer(gameID string, state game.GameState) (authoritativeGameRecord, error) {
+	record := authoritativeGameRecord{GameID: gameID, Revision: 1, RequiresLobby: true, State: engine.CloneState(state)}
+	r.record = record
+	return cloneAuthoritativeGameRecord(record), nil
+}
+
 func (r *failingSaveRepository) load(gameID string) (authoritativeGameRecord, bool, error) {
 	if gameID != r.record.GameID {
 		return authoritativeGameRecord{}, false, nil
@@ -78,6 +84,27 @@ func startLobbyBackedGame(t *testing.T) (string, string, string, game.GameState,
 	return lobby.GameID, hostToken, birdToken, state, revision
 }
 
+func replaceAuthoritativeState(t *testing.T, gameID string, mutate func(state *game.GameState)) authoritativeGameRecord {
+	t.Helper()
+
+	record, ok, err := store.load(gameID)
+	if err != nil {
+		t.Fatalf("failed to load authoritative record: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected authoritative record for %s", gameID)
+	}
+
+	state := engine.CloneState(record.State)
+	mutate(&state)
+
+	saved, err := store.save(gameID, state)
+	if err != nil {
+		t.Fatalf("failed to replace authoritative state: %v", err)
+	}
+	return saved
+}
+
 func TestHandleValidActionsMultiplayerIgnoresClientStateTampering(t *testing.T) {
 	previousStore := store
 	previousLobbies := lobbies
@@ -127,6 +154,231 @@ func TestHandleValidActionsMultiplayerIgnoresClientStateTampering(t *testing.T) 
 	}
 	if !foundSetup {
 		t.Fatalf("expected authoritative setup actions, got %+v", resp.Actions)
+	}
+}
+
+func TestHandleValidActionsMultiplayerReturnsEmptyForInactivePlayer(t *testing.T) {
+	previousStore := store
+	previousLobbies := lobbies
+	store = newOnlineStateStore(t.TempDir())
+	lobbies = newLobbyStore()
+	defer func() {
+		store = previousStore
+		lobbies = previousLobbies
+	}()
+
+	gameID, _, birdToken, hostState, revision := startLobbyBackedGame(t)
+
+	body, _ := json.Marshal(ValidActionsRequest{
+		GameID: gameID,
+		State:  hostState,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/valid", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", birdToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for inactive multiplayer valid actions, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp ValidActionsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode valid actions response: %v", err)
+	}
+	if resp.Revision != revision {
+		t.Fatalf("expected revision %d, got %d", revision, resp.Revision)
+	}
+	if len(resp.Actions) != 0 {
+		t.Fatalf("expected no actions for inactive player, got %+v", resp.Actions)
+	}
+}
+
+func TestHandleLoadGameFailsWhenLobbyBackedSessionIsUnavailable(t *testing.T) {
+	previousStore := store
+	previousLobbies := lobbies
+	store = newOnlineStateStore(t.TempDir())
+	lobbies = newLobbyStore()
+	defer func() {
+		store = previousStore
+		lobbies = previousLobbies
+	}()
+
+	gameID, hostToken, _, _, revision := startLobbyBackedGame(t)
+	lobbies = newLobbyStore()
+
+	body, _ := json.Marshal(LoadGameRequest{GameID: gameID})
+	req := httptest.NewRequest(http.MethodPost, "/api/game/load", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 when lobby-backed session is unavailable, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errLobbySessionUnavailable.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != revision {
+		t.Fatalf("expected revision %d, got %d", revision, resp.Revision)
+	}
+}
+
+func TestHandleBattleContextMultiplayerUsesAuthoritativeHiddenHands(t *testing.T) {
+	previousStore := store
+	previousLobbies := lobbies
+	store = newOnlineStateStore(t.TempDir())
+	lobbies = newLobbyStore()
+	defer func() {
+		store = previousStore
+		lobbies = previousLobbies
+	}()
+
+	gameID, hostToken, _, hostState, _ := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.Map = game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		}
+		state.Marquise.CardsInHand = nil
+		state.Eyrie.CardsInHand = []game.Card{
+			{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
+		}
+		state.OtherHandCounts = map[game.Faction]int{
+			game.Eyrie: 1,
+		}
+	})
+
+	body, _ := json.Marshal(BattleContextRequest{
+		GameID: gameID,
+		State:  hostState,
+		Action: game.Action{
+			Type: game.ActionBattle,
+			Battle: &game.BattleAction{
+				Faction:       game.Marquise,
+				ClearingID:    1,
+				TargetFaction: game.Eyrie,
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/battles/context", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for multiplayer battle context, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp BattleContextResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode battle context response: %v", err)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+	if resp.BattleContext.CanDefenderAmbush {
+		t.Fatalf("expected authoritative hidden hand to suppress false ambush, got %+v", resp.BattleContext)
+	}
+}
+
+func TestHandleResolveBattleMultiplayerIgnoresFalseHiddenAmbushClaim(t *testing.T) {
+	previousStore := store
+	previousLobbies := lobbies
+	store = newOnlineStateStore(t.TempDir())
+	lobbies = newLobbyStore()
+	defer func() {
+		store = previousStore
+		lobbies = previousLobbies
+	}()
+
+	gameID, hostToken, _, hostState, _ := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.Map = game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		}
+		state.Eyrie.CardsInHand = []game.Card{
+			{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
+		}
+		state.OtherHandCounts = map[game.Faction]int{
+			game.Eyrie: 1,
+		}
+	})
+
+	body, _ := json.Marshal(ResolveBattleRequest{
+		GameID: gameID,
+		State:  hostState,
+		Action: game.Action{
+			Type: game.ActionBattle,
+			Battle: &game.BattleAction{
+				Faction:       game.Marquise,
+				ClearingID:    1,
+				TargetFaction: game.Eyrie,
+			},
+		},
+		AttackerRoll: 1,
+		DefenderRoll: 0,
+		UseModifiers: true,
+		Modifiers: game.BattleModifiers{
+			DefenderAmbush: true,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/battles/resolve", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for multiplayer resolve battle, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp ResolveBattleResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode resolve battle response: %v", err)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+	if resp.Action.BattleResolution == nil {
+		t.Fatalf("expected battle resolution, got %+v", resp.Action)
+	}
+	if resp.Action.BattleResolution.DefenderAmbushed {
+		t.Fatalf("expected false ambush claim to be ignored, got %+v", resp.Action.BattleResolution)
 	}
 }
 

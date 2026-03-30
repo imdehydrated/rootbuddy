@@ -82,6 +82,30 @@ func TestOnlineStateStoreSaveIfRevisionDetectsStaleWrites(t *testing.T) {
 	}
 }
 
+func TestOnlineStateStorePersistsLobbyRequirement(t *testing.T) {
+	tempDir := t.TempDir()
+	testStore := newOnlineStateStore(tempDir)
+	state := game.GameState{
+		GameMode: game.GameModeOnline,
+	}
+
+	if _, err := testStore.createMultiplayer("lobby-backed", state); err != nil {
+		t.Fatalf("failed to create multiplayer record: %v", err)
+	}
+
+	reloaded := newOnlineStateStore(tempDir)
+	record, ok, err := reloaded.load("lobby-backed")
+	if err != nil {
+		t.Fatalf("failed to reload multiplayer record: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected multiplayer record to reload")
+	}
+	if !record.RequiresLobby {
+		t.Fatalf("expected multiplayer record to retain lobby requirement, got %+v", record)
+	}
+}
+
 func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 	previousStore := store
 	store = newOnlineStateStore(t.TempDir())

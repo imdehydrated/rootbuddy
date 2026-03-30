@@ -60,8 +60,8 @@ func HandleValidActions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if context.multiplayer && context.perspective != context.record.State.FactionTurn {
-		writeError(w, http.StatusForbidden, &ErrorResponse{
-			Error:    "not your turn",
+		writeJSON(w, http.StatusOK, ValidActionsResponse{
+			Actions:  []game.Action{},
 			GameID:   req.GameID,
 			Revision: context.record.Revision,
 		})
@@ -293,7 +293,7 @@ func HandleLoadGame(w http.ResponseWriter, r *http.Request) {
 
 	state := record.State
 	if state.GameMode == game.GameModeOnline {
-		perspective, multiplayer, errResp, status := multiplayerPerspective(req.GameID, playerTokenFromRequest(r))
+		perspective, multiplayer, errResp, status := multiplayerPerspective(record, playerTokenFromRequest(r))
 		if errResp != nil {
 			writeError(w, status, errResp)
 			return

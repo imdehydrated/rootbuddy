@@ -17,14 +17,16 @@ import (
 var errRevisionConflict = errors.New("revision conflict")
 
 type authoritativeGameRecord struct {
-	GameID   string         `json:"gameID"`
-	Revision int64          `json:"revision"`
-	SavedAt  time.Time      `json:"savedAt"`
-	State    game.GameState `json:"state"`
+	GameID        string         `json:"gameID"`
+	Revision      int64          `json:"revision"`
+	SavedAt       time.Time      `json:"savedAt"`
+	RequiresLobby bool           `json:"requiresLobby,omitempty"`
+	State         game.GameState `json:"state"`
 }
 
 type onlineStateRepository interface {
 	create(gameID string, state game.GameState) (authoritativeGameRecord, error)
+	createMultiplayer(gameID string, state game.GameState) (authoritativeGameRecord, error)
 	load(gameID string) (authoritativeGameRecord, bool, error)
 	save(gameID string, state game.GameState) (authoritativeGameRecord, error)
 	saveIfRevision(gameID string, expectedRevision int64, state game.GameState) (authoritativeGameRecord, error)
@@ -59,7 +61,15 @@ func (s *onlineStateStore) create(gameID string, state game.GameState) (authorit
 		return authoritativeGameRecord{}, errors.New("game id is required")
 	}
 
-	return s.writeRecord(gameID, 1, state)
+	return s.writeRecord(gameID, 1, false, state)
+}
+
+func (s *onlineStateStore) createMultiplayer(gameID string, state game.GameState) (authoritativeGameRecord, error) {
+	if gameID == "" {
+		return authoritativeGameRecord{}, errors.New("game id is required")
+	}
+
+	return s.writeRecord(gameID, 1, true, state)
 }
 
 func (s *onlineStateStore) load(gameID string) (authoritativeGameRecord, bool, error) {
@@ -97,11 +107,13 @@ func (s *onlineStateStore) save(gameID string, state game.GameState) (authoritat
 	}
 
 	revision := int64(1)
+	requiresLobby := false
 	if ok {
 		revision = record.Revision + 1
+		requiresLobby = record.RequiresLobby
 	}
 
-	return s.writeRecordLocked(gameID, revision, state)
+	return s.writeRecordLocked(gameID, revision, requiresLobby, state)
 }
 
 func (s *onlineStateStore) saveIfRevision(gameID string, expectedRevision int64, state game.GameState) (authoritativeGameRecord, error) {
@@ -123,22 +135,23 @@ func (s *onlineStateStore) saveIfRevision(gameID string, expectedRevision int64,
 		return authoritativeGameRecord{}, errRevisionConflict
 	}
 
-	return s.writeRecordLocked(gameID, expectedRevision+1, state)
+	return s.writeRecordLocked(gameID, expectedRevision+1, record.RequiresLobby, state)
 }
 
-func (s *onlineStateStore) writeRecord(gameID string, revision int64, state game.GameState) (authoritativeGameRecord, error) {
+func (s *onlineStateStore) writeRecord(gameID string, revision int64, requiresLobby bool, state game.GameState) (authoritativeGameRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.writeRecordLocked(gameID, revision, state)
+	return s.writeRecordLocked(gameID, revision, requiresLobby, state)
 }
 
-func (s *onlineStateStore) writeRecordLocked(gameID string, revision int64, state game.GameState) (authoritativeGameRecord, error) {
+func (s *onlineStateStore) writeRecordLocked(gameID string, revision int64, requiresLobby bool, state game.GameState) (authoritativeGameRecord, error) {
 	record := authoritativeGameRecord{
-		GameID:   gameID,
-		Revision: revision,
-		SavedAt:  time.Now().UTC(),
-		State:    engine.CloneState(state),
+		GameID:        gameID,
+		Revision:      revision,
+		SavedAt:       time.Now().UTC(),
+		RequiresLobby: requiresLobby,
+		State:         engine.CloneState(state),
 	}
 
 	if err := s.persistRecordLocked(record); err != nil {

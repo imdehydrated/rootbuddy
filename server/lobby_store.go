@@ -13,19 +13,20 @@ import (
 )
 
 var (
-	errPlayerTokenRequired = errors.New("player token is required")
-	errUnknownJoinCode     = errors.New("unknown join code")
-	errLobbyNotFound       = errors.New("lobby not found")
-	errPlayerNotFound      = errors.New("player not found")
-	errLobbyFull           = errors.New("lobby is full")
-	errLobbyNotWaiting     = errors.New("lobby is not accepting changes")
-	errHostOnly            = errors.New("only the host can perform this action")
-	errFactionRequired     = errors.New("claim a faction before readying")
-	errFactionUnavailable  = errors.New("faction is not available in this lobby")
-	errFactionClaimed      = errors.New("faction is already claimed")
-	errLobbyNotReady       = errors.New("all players must claim a unique faction and be ready")
-	errGameIDGeneration    = errors.New("failed to generate game id")
-	errCannotLeaveInGame   = errors.New("cannot leave an in-progress lobby")
+	errPlayerTokenRequired     = errors.New("player token is required")
+	errUnknownJoinCode         = errors.New("unknown join code")
+	errLobbyNotFound           = errors.New("lobby not found")
+	errPlayerNotFound          = errors.New("player not found")
+	errLobbyFull               = errors.New("lobby is full")
+	errLobbyNotWaiting         = errors.New("lobby is not accepting changes")
+	errHostOnly                = errors.New("only the host can perform this action")
+	errFactionRequired         = errors.New("claim a faction before readying")
+	errFactionUnavailable      = errors.New("faction is not available in this lobby")
+	errFactionClaimed          = errors.New("faction is already claimed")
+	errLobbyNotReady           = errors.New("all players must claim a unique faction and be ready")
+	errLobbySessionUnavailable = errors.New("multiplayer session is unavailable")
+	errGameIDGeneration        = errors.New("failed to generate game id")
+	errCannotLeaveInGame       = errors.New("cannot leave an in-progress lobby")
 )
 
 type lobbyStore struct {
@@ -274,7 +275,7 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, err
 	}
 
 	authoritative.TrackAllHands = true
-	record, err := store.create(gameID, authoritative)
+	record, err := store.createMultiplayer(gameID, authoritative)
 	if err != nil {
 		return Lobby{}, game.GameState{}, 0, err
 	}
