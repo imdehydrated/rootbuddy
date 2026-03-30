@@ -337,6 +337,11 @@ func TestHandleApplyActionAcceptsVagabondForestMovement(t *testing.T) {
 					{Type: game.ItemBoots, Status: game.ItemReady},
 				},
 			},
+			GamePhase:    game.LifecyclePlaying,
+			SetupStage:   game.SetupStageComplete,
+			FactionTurn:  game.Vagabond,
+			CurrentPhase: game.Daylight,
+			CurrentStep:  game.StepDaylightActions,
 		},
 		Action: game.Action{
 			Type: game.ActionMovement,
@@ -395,6 +400,11 @@ func TestHandleApplyActionAcceptsPassPhase(t *testing.T) {
 func TestHandleApplyActionAcceptsDiscardEffect(t *testing.T) {
 	body, _ := json.Marshal(ApplyActionRequest{
 		State: game.GameState{
+			GamePhase:    game.LifecyclePlaying,
+			SetupStage:   game.SetupStageComplete,
+			FactionTurn:  game.Marquise,
+			CurrentPhase: game.Daylight,
+			CurrentStep:  game.StepDaylightActions,
 			PersistentEffects: map[game.Faction][]game.CardID{
 				game.Marquise: {15},
 			},
@@ -852,6 +862,9 @@ func TestHandleSetup(t *testing.T) {
 	if resp.GameID == "" {
 		t.Fatalf("expected online setup to return a game ID, got %+v", resp)
 	}
+	if resp.Revision <= 0 {
+		t.Fatalf("expected online setup to return a revision, got %+v", resp)
+	}
 	if resp.State.SetupStage != game.SetupStageMarquise {
 		t.Fatalf("expected setup to begin at Marquise stage, got %+v", resp.State)
 	}
@@ -997,7 +1010,10 @@ func TestHandleApplyActionReturnsCodebreakersRevealForPlayerPerspective(t *testi
 			},
 		},
 	}
-	store.save(gameID, authoritative)
+	record, err := store.create(gameID, authoritative)
+	if err != nil {
+		t.Fatalf("failed to save authoritative state: %v", err)
+	}
 	visible := redactStateForPlayer(authoritative, game.Marquise)
 
 	body, _ := json.Marshal(ApplyActionRequest{
@@ -1029,6 +1045,9 @@ func TestHandleApplyActionReturnsCodebreakersRevealForPlayerPerspective(t *testi
 	if resp.EffectResult == nil || len(resp.EffectResult.Cards) != 2 {
 		t.Fatalf("expected Codebreakers reveal result, got %+v", resp.EffectResult)
 	}
+	if resp.Revision != record.Revision+1 {
+		t.Fatalf("expected apply response revision %d, got %d", record.Revision+1, resp.Revision)
+	}
 	if len(resp.State.Eyrie.CardsInHand) != 0 {
 		t.Fatalf("expected redacted visible state to keep Eyrie hand hidden, got %+v", resp.State.Eyrie.CardsInHand)
 	}
@@ -1051,7 +1070,10 @@ func TestHandleApplyActionReturnsStandAndDeliverTransferredCardForPlayer(t *test
 			},
 		},
 	}
-	store.save(gameID, authoritative)
+	record, err := store.create(gameID, authoritative)
+	if err != nil {
+		t.Fatalf("failed to save authoritative state: %v", err)
+	}
 	visible := redactStateForPlayer(authoritative, game.Marquise)
 
 	body, _ := json.Marshal(ApplyActionRequest{
@@ -1082,6 +1104,9 @@ func TestHandleApplyActionReturnsStandAndDeliverTransferredCardForPlayer(t *test
 	}
 	if resp.EffectResult == nil || len(resp.EffectResult.Cards) != 1 || resp.EffectResult.Cards[0].ID != 8 {
 		t.Fatalf("expected transferred card result, got %+v", resp.EffectResult)
+	}
+	if resp.Revision != record.Revision+1 {
+		t.Fatalf("expected apply response revision %d, got %d", record.Revision+1, resp.Revision)
 	}
 	if len(resp.State.Marquise.CardsInHand) != 1 || resp.State.Marquise.CardsInHand[0].ID != 8 {
 		t.Fatalf("expected visible state to include transferred card, got %+v", resp.State.Marquise.CardsInHand)

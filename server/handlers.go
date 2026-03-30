@@ -30,6 +30,13 @@ func decodeJSON(r *http.Request, value any) error {
 	return nil
 }
 
+func writeError(w http.ResponseWriter, status int, resp *ErrorResponse) {
+	if resp == nil {
+		resp = &ErrorResponse{Error: "request failed"}
+	}
+	writeJSON(w, status, *resp)
+}
+
 func HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -41,9 +48,30 @@ func HandleValidActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	context, errResp, status := buildReadContext(req.GameID, req.State, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if req.GameID == "" {
+		if errResp := validateClientState(context.state); errResp != nil {
+			writeError(w, http.StatusBadRequest, errResp)
+			return
+		}
+	}
+	if context.multiplayer && context.perspective != context.record.State.FactionTurn {
+		writeError(w, http.StatusForbidden, &ErrorResponse{
+			Error:    "not your turn",
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, ValidActionsResponse{
-		Actions: engine.ValidActions(req.State),
-		GameID:  req.GameID,
+		Actions:  engine.ValidActions(context.state),
+		GameID:   req.GameID,
+		Revision: context.record.Revision,
 	})
 }
 
@@ -53,54 +81,49 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
-	if validationError := validateApplyActionRequest(req); validationError != "" {
+
+	context, errResp, status := buildApplyContext(req, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if req.GameID == "" {
+		if errResp := validateClientState(context.state); errResp != nil {
+			writeError(w, http.StatusBadRequest, errResp)
+			return
+		}
+	}
+
+	effectiveReq := req
+	effectiveReq.State = context.state
+	if validationError := validateApplyActionRequest(effectiveReq); validationError != "" {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
 		return
 	}
 
-	state := req.State
-	perspective := state.PlayerFaction
-	if req.GameID != "" {
-		authoritative, ok := store.load(req.GameID)
-		if !ok {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
-			return
-		}
-		state = mergeAuthoritativeState(req.State, authoritative)
-
-		if lobby, ok := lobbies.getByGameID(req.GameID); ok {
-			token := playerTokenFromRequest(r)
-			if token == "" {
-				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerTokenRequired.Error()})
-				return
-			}
-
-			playerFaction, claimed := lobby.claimedFaction(token)
-			if !claimed {
-				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerNotFound.Error()})
-				return
-			}
-			if playerFaction != authoritative.FactionTurn {
-				writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "not your turn"})
-				return
-			}
-
-			perspective = playerFaction
-			state.PlayerFaction = playerFaction
-		}
+	next, effectResult := engine.ApplyActionDetailed(context.state, req.Action)
+	record, errResp, status := saveMutationResult(context, next, req.ClientRevision)
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
 	}
 
-	next, effectResult := engine.ApplyActionDetailed(state, req.Action)
 	if req.GameID != "" {
-		store.save(req.GameID, next)
-		effectResult = redactEffectResultForPlayer(state, next, req.Action, effectResult)
-		next = redactStateForPlayer(next, perspective)
+		effectResult = redactEffectResultForPlayer(context.state, next, req.Action, effectResult)
+		next = redactStateForPlayer(record.State, context.perspective)
+	}
+	if req.GameID == "" {
+		if err := engine.ValidateState(next); err != nil {
+			writeError(w, http.StatusInternalServerError, &ErrorResponse{Error: "post-mutation state is invalid"})
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, ApplyActionResponse{
 		State:        next,
 		EffectResult: effectResult,
 		GameID:       req.GameID,
+		Revision:     record.Revision,
 	})
 }
 
@@ -110,25 +133,38 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
-	if validationError := validateResolveBattleRequest(req); validationError != "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
+
+	context, errResp, status := buildReadContext(req.GameID, req.State, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if req.GameID == "" {
+		if errResp := validateClientState(context.state); errResp != nil {
+			writeError(w, http.StatusBadRequest, errResp)
+			return
+		}
+	}
+	if context.multiplayer && context.perspective != context.record.State.FactionTurn {
+		writeError(w, http.StatusForbidden, &ErrorResponse{
+			Error:    "not your turn",
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
 		return
 	}
 
-	state := req.State
-	if req.GameID != "" {
-		authoritative, ok := store.load(req.GameID)
-		if !ok {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
-			return
-		}
-		state = mergeAuthoritativeState(req.State, authoritative)
+	effectiveReq := req
+	effectiveReq.State = context.state
+	if validationError := validateResolveBattleRequest(effectiveReq); validationError != "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
+		return
 	}
 
 	var action game.Action
 	if req.UseModifiers {
 		action = engine.ResolveBattleWithModifiers(
-			state,
+			context.state,
 			req.Action,
 			req.AttackerRoll,
 			req.DefenderRoll,
@@ -136,7 +172,7 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		)
 	} else {
 		action = engine.ResolveBattle(
-			state,
+			context.state,
 			req.Action,
 			req.AttackerRoll,
 			req.DefenderRoll,
@@ -144,8 +180,9 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, ResolveBattleResponse{
-		Action: action,
-		GameID: req.GameID,
+		Action:   action,
+		GameID:   req.GameID,
+		Revision: context.record.Revision,
 	})
 }
 
@@ -155,24 +192,38 @@ func HandleBattleContext(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
-	if validationError := validateBattleContextRequest(req); validationError != "" {
+
+	context, errResp, status := buildReadContext(req.GameID, req.State, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if req.GameID == "" {
+		if errResp := validateClientState(context.state); errResp != nil {
+			writeError(w, http.StatusBadRequest, errResp)
+			return
+		}
+	}
+	if context.multiplayer && context.perspective != context.record.State.FactionTurn {
+		writeError(w, http.StatusForbidden, &ErrorResponse{
+			Error:    "not your turn",
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
+
+	effectiveReq := req
+	effectiveReq.State = context.state
+	if validationError := validateBattleContextRequest(effectiveReq); validationError != "" {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
 		return
 	}
 
-	state := req.State
-	if req.GameID != "" {
-		authoritative, ok := store.load(req.GameID)
-		if !ok {
-			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
-			return
-		}
-		state = mergeAuthoritativeState(req.State, authoritative)
-	}
-
 	writeJSON(w, http.StatusOK, BattleContextResponse{
-		BattleContext: engine.BattleContext(state, req.Action),
+		BattleContext: engine.BattleContext(context.state, req.Action),
 		GameID:        req.GameID,
+		Revision:      context.record.Revision,
 	})
 }
 
@@ -196,19 +247,30 @@ func HandleSetup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
+	if errResp := validateClientState(state); errResp != nil {
+		writeError(w, http.StatusInternalServerError, &ErrorResponse{Error: "generated setup state is invalid"})
+		return
+	}
 
 	gameID := ""
+	revision := int64(0)
 	if state.GameMode == game.GameModeOnline {
 		gameID = newGameID()
 		authoritative := engine.CloneState(state)
 		authoritative.TrackAllHands = true
-		store.save(gameID, authoritative)
-		state = redactStateForPlayer(authoritative, req.PlayerFaction)
+		record, err := store.create(gameID, authoritative)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, &ErrorResponse{Error: "failed to persist authoritative game state"})
+			return
+		}
+		state = redactStateForPlayer(record.State, req.PlayerFaction)
+		revision = record.Revision
 	}
 
 	writeJSON(w, http.StatusOK, SetupResponse{
-		State:  state,
-		GameID: gameID,
+		State:    state,
+		GameID:   gameID,
+		Revision: revision,
 	})
 }
 
@@ -223,34 +285,29 @@ func HandleLoadGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, ok := store.load(req.GameID)
-	if !ok {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "unknown game id"})
+	record, errResp, status := loadValidatedRecord(req.GameID)
+	if errResp != nil {
+		writeError(w, status, errResp)
 		return
 	}
 
+	state := record.State
 	if state.GameMode == game.GameModeOnline {
-		perspective := state.PlayerFaction
-		if lobby, ok := lobbies.getByGameID(req.GameID); ok {
-			token := playerTokenFromRequest(r)
-			if token == "" {
-				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerTokenRequired.Error()})
-				return
-			}
-
-			playerFaction, claimed := lobby.claimedFaction(token)
-			if !claimed {
-				writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerNotFound.Error()})
-				return
-			}
-			perspective = playerFaction
+		perspective, multiplayer, errResp, status := multiplayerPerspective(req.GameID, playerTokenFromRequest(r))
+		if errResp != nil {
+			writeError(w, status, errResp)
+			return
+		}
+		if !multiplayer {
+			perspective = state.PlayerFaction
 		}
 
 		state = redactStateForPlayer(state, perspective)
 	}
 
 	writeJSON(w, http.StatusOK, LoadGameResponse{
-		State:  state,
-		GameID: req.GameID,
+		State:    state,
+		GameID:   req.GameID,
+		Revision: record.Revision,
 	})
 }

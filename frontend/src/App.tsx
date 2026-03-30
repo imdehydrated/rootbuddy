@@ -190,6 +190,7 @@ export default function App() {
   const [hasSavedSession, setHasSavedSession] = useState(() => initialSavedSession !== null);
   const [savedSessionInfo, setSavedSessionInfo] = useState<SavedSession | null>(initialSavedSession);
   const [serverGameID, setServerGameID] = useState<string | null>(null);
+  const [serverRevision, setServerRevision] = useState<number | null>(initialSavedSession?.revision ?? null);
   const [stateText, setStateText] = useState(initialJSON);
   const deferredStateText = useDeferredValue(stateText);
   const [parsedState, setParsedState] = useState<GameState>(initialState);
@@ -242,18 +243,20 @@ export default function App() {
     const session: SavedSession = {
       state: parsedState,
       gameID: serverGameID,
+      revision: serverRevision,
       savedAt: new Date().toISOString()
     };
     const saved = saveSavedSession({
       state: session.state,
       gameID: session.gameID,
+      revision: session.revision,
       savedAt: session.savedAt
     });
     if (saved) {
       setHasSavedSession(true);
       setSavedSessionInfo(session);
     }
-  }, [parsedState, serverGameID, showSetup]);
+  }, [parsedState, serverGameID, serverRevision, showSetup]);
 
   function resetToSetup(options?: { clearSaved?: boolean; status?: string }) {
     if (options?.clearSaved) {
@@ -262,6 +265,7 @@ export default function App() {
       setSavedSessionInfo(null);
     }
     setServerGameID(null);
+    setServerRevision(null);
     setShowSetup(true);
     setActiveModal(null);
     setShowAdvancedTurnPanel(false);
@@ -287,7 +291,10 @@ export default function App() {
 
   async function loadActionsForState(baseState: GameState, options?: { successStatus?: string }) {
     const requestState = normalizeState(baseState);
-    const nextActions = await fetchValidActions(requestState, serverGameID);
+    const { actions: nextActions, revision } = await fetchValidActions(requestState, serverGameID);
+    if (revision !== null) {
+      setServerRevision(revision);
+    }
 
     startTransition(() => {
       setParsedState(requestState);
@@ -367,7 +374,15 @@ export default function App() {
 
     try {
       setStatus("Applying action...");
-      const { state: nextState, effectResult } = await applyAction(parsedState, actionToApply, serverGameID);
+      const { state: nextState, effectResult, revision } = await applyAction(
+        parsedState,
+        actionToApply,
+        serverGameID,
+        serverRevision
+      );
+      if (revision !== null) {
+        setServerRevision(revision);
+      }
       if (nextState.gamePhase === 0) {
         await loadActionsForState(nextState, { successStatus: "Setup step applied." });
         setActiveModal(null);
@@ -414,7 +429,19 @@ export default function App() {
         },
         serverGameID
       );
-      const { state: nextState, effectResult } = await applyAction(parsedState, resolved, serverGameID);
+      if (resolved.revision !== null) {
+        setServerRevision(resolved.revision);
+      }
+      const requestRevision = resolved.revision ?? serverRevision;
+      const { state: nextState, effectResult, revision } = await applyAction(
+        parsedState,
+        resolved.action,
+        serverGameID,
+        requestRevision
+      );
+      if (revision !== null) {
+        setServerRevision(revision);
+      }
       syncState(nextState);
       setStatus(
         nextState.gamePhase === 2 ? gameOverStatusMessage(nextState) : effectResult?.message ?? "Battle resolved and applied."
@@ -441,10 +468,18 @@ export default function App() {
       throw new Error("No saved game found.");
     }
 
-    const loaded = savedSession.gameID ? await loadGame(savedSession.gameID) : { state: savedSession.state, gameID: null };
-    setSavedSessionInfo(savedSession);
+    const loaded = savedSession.gameID
+      ? await loadGame(savedSession.gameID)
+      : { state: savedSession.state, gameID: null, revision: savedSession.revision };
+    setSavedSessionInfo({
+      state: loaded.state,
+      gameID: loaded.gameID,
+      revision: loaded.revision,
+      savedAt: savedSession.savedAt
+    });
     syncState(loaded.state);
     setServerGameID(loaded.gameID);
+    setServerRevision(loaded.revision);
     setShowSetup(false);
     setShowBoardEditor(false);
     setShowGuideHelp(loaded.state.gamePhase === 1);
@@ -576,7 +611,10 @@ export default function App() {
       try {
         const nextContext = await fetchBattleContext(parsedState, selectedBattleAction, serverGameID);
         if (!cancelled) {
-          setBattleContext(nextContext);
+          if (nextContext.revision !== null) {
+            setServerRevision(nextContext.revision);
+          }
+          setBattleContext(nextContext.battleContext);
         }
       } catch {
         if (!cancelled) {
@@ -661,9 +699,10 @@ export default function App() {
       <SetupWizard
         canResume={hasSavedSession}
         savedSessionInfo={savedSessionInfo}
-        onStart={async (state, gameID) => {
+        onStart={async (state, gameID, revision) => {
           syncState(state);
           setServerGameID(gameID);
+          setServerRevision(revision);
           setShowSetup(false);
           setShowBoardEditor(false);
           setStatus(state.gamePhase === 0 ? "Setup started." : "Game created.");
@@ -681,6 +720,7 @@ export default function App() {
         onUseSample={() => {
           syncState(initialState);
           setServerGameID(null);
+          setServerRevision(null);
           setShowSetup(false);
           setShowBoardEditor(false);
           setStatus("Loaded sample state.");
@@ -945,6 +985,7 @@ export default function App() {
                 onClick={() => {
                   syncState(initialState);
                   setServerGameID(null);
+                  setServerRevision(null);
                   setShowBoardEditor(false);
                   setStatus("Board reset. Click a clearing to start setting the board.");
                   setShowGuideHelp(true);

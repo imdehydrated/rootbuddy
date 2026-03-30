@@ -1,4 +1,19 @@
 import type { Action, BattleContext, BattleModifiers, EffectResult, GameState, SetupRequest } from "./types";
+import type {
+  ApplyActionRequestDTO,
+  ApplyActionResponseDTO,
+  BattleContextRequestDTO,
+  BattleContextResponseDTO,
+  LoadGameRequestDTO,
+  LoadGameResponseDTO,
+  ResolveBattleRequestDTO,
+  ResolveBattleResponseDTO,
+  ServerErrorResponse,
+  SetupRequestDTO,
+  SetupResponseDTO,
+  ValidActionsRequestDTO,
+  ValidActionsResponseDTO
+} from "./serverContract";
 
 const API_BASE = "http://localhost:8080/api";
 
@@ -30,29 +45,42 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body)
   });
 
-  const json = await response.json();
+  const json = (await response.json()) as ServerErrorResponse | T;
   if (!response.ok) {
-    const message = typeof json?.error === "string" ? json.error : "request failed";
+    const message =
+      typeof (json as ServerErrorResponse)?.error === "string"
+        ? (json as ServerErrorResponse).error
+        : "request failed";
     throw new Error(message);
   }
 
   return normalizeJSONKeys(json) as T;
 }
 
-export async function fetchValidActions(state: GameState, gameID?: string | null): Promise<Action[]> {
-  const response = await postJSON<{ actions: Action[] }>("/actions/valid", { state, gameID });
-  return response.actions;
+export async function fetchValidActions(
+  state: GameState,
+  gameID?: string | null
+): Promise<{ actions: Action[]; revision: number | null }> {
+  const body: ValidActionsRequestDTO = { state, gameID };
+  const response = await postJSON<ValidActionsResponseDTO>("/actions/valid", body);
+  return {
+    actions: response.actions,
+    revision: response.revision ?? null
+  };
 }
 
 export async function applyAction(
   state: GameState,
   action: Action,
-  gameID?: string | null
-): Promise<{ state: GameState; effectResult: EffectResult | null }> {
-  const response = await postJSON<{ state: GameState; effectResult?: EffectResult }>("/actions/apply", { state, action, gameID });
+  gameID?: string | null,
+  clientRevision?: number | null
+): Promise<{ state: GameState; effectResult: EffectResult | null; revision: number | null }> {
+  const body: ApplyActionRequestDTO = { state, action, gameID, clientRevision };
+  const response = await postJSON<ApplyActionResponseDTO>("/actions/apply", body);
   return {
     state: response.state,
-    effectResult: response.effectResult ?? null
+    effectResult: response.effectResult ?? null,
+    revision: response.revision ?? null
   };
 }
 
@@ -63,8 +91,8 @@ export async function resolveBattle(
   defenderRoll: number,
   modifiers?: BattleModifiers,
   gameID?: string | null
-): Promise<Action> {
-  const response = await postJSON<{ action: Action }>("/battles/resolve", {
+): Promise<{ action: Action; revision: number | null }> {
+  const body: ResolveBattleRequestDTO = {
     state,
     action,
     attackerRoll,
@@ -72,35 +100,47 @@ export async function resolveBattle(
     modifiers,
     useModifiers: modifiers !== undefined,
     gameID
-  });
-  return response.action;
+  };
+  const response = await postJSON<ResolveBattleResponseDTO>("/battles/resolve", body);
+  return {
+    action: response.action,
+    revision: response.revision ?? null
+  };
 }
 
 export async function fetchBattleContext(
   state: GameState,
   action: Action,
   gameID?: string | null
-): Promise<BattleContext> {
-  const response = await postJSON<{ battleContext: BattleContext }>("/battles/context", {
-    state,
-    action,
-    gameID
-  });
-  return response.battleContext;
-}
-
-export async function setupGame(request: SetupRequest): Promise<{ state: GameState; gameID: string | null }> {
-  const response = await postJSON<{ state: GameState; gameID?: string }>("/game/setup", request);
+): Promise<{ battleContext: BattleContext; revision: number | null }> {
+  const body: BattleContextRequestDTO = { state, action, gameID };
+  const response = await postJSON<BattleContextResponseDTO>("/battles/context", body);
   return {
-    state: response.state,
-    gameID: response.gameID ?? null
+    battleContext: response.battleContext,
+    revision: response.revision ?? null
   };
 }
 
-export async function loadGame(gameID: string): Promise<{ state: GameState; gameID: string | null }> {
-  const response = await postJSON<{ state: GameState; gameID?: string }>("/game/load", { gameID });
+export async function setupGame(
+  request: SetupRequest
+): Promise<{ state: GameState; gameID: string | null; revision: number | null }> {
+  const body: SetupRequestDTO = request;
+  const response = await postJSON<SetupResponseDTO>("/game/setup", body);
   return {
     state: response.state,
-    gameID: response.gameID ?? gameID
+    gameID: response.gameID ?? null,
+    revision: response.revision ?? null
+  };
+}
+
+export async function loadGame(
+  gameID: string
+): Promise<{ state: GameState; gameID: string | null; revision: number | null }> {
+  const body: LoadGameRequestDTO = { gameID };
+  const response = await postJSON<LoadGameResponseDTO>("/game/load", body);
+  return {
+    state: response.state,
+    gameID: response.gameID ?? gameID,
+    revision: response.revision ?? null
   };
 }

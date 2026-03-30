@@ -5,6 +5,7 @@ const STORAGE_KEY = "rootbuddy_saved_game_v1";
 export type SavedSession = {
   state: GameState;
   gameID: string | null;
+  revision: number | null;
   savedAt: string;
 };
 
@@ -19,12 +20,17 @@ export function loadSavedSession(): SavedSession | null {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as SavedSession;
+    const parsed = JSON.parse(raw) as Partial<SavedSession>;
     if (!parsed || typeof parsed !== "object" || !parsed.state) {
       return null;
     }
 
-    return parsed;
+    return {
+      state: parsed.state,
+      gameID: parsed.gameID ?? null,
+      revision: parsed.revision ?? null,
+      savedAt: parsed.savedAt ?? ""
+    };
   } catch {
     return null;
   }

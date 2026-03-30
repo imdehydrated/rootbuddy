@@ -5,7 +5,7 @@ import type { SavedSession } from "../localSession";
 import type { GameState } from "../types";
 
 type SetupWizardProps = {
-  onStart: (state: GameState, gameID: string | null) => void;
+  onStart: (state: GameState, gameID: string | null, revision: number | null) => void;
   onUseSample: () => void;
   onResume: () => Promise<void>;
   onClearSavedSession: () => void;
@@ -141,7 +141,7 @@ export function SetupWizard({
         vagabondCharacter,
         eyrieLeader
       });
-      onStart(result.state, result.gameID);
+      onStart(result.state, result.gameID, result.revision);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create game";
       setStatus(message);

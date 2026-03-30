@@ -128,16 +128,17 @@ func HandleStartLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lobby, state, err := lobbies.startLobby(token)
+	lobby, state, revision, err := lobbies.startLobby(token)
 	if err != nil {
 		writeJSON(w, lobbyErrorStatus(err), ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, StartLobbyResponse{
-		Lobby:  lobby,
-		State:  state,
-		GameID: lobby.GameID,
+		Lobby:    lobby,
+		State:    state,
+		GameID:   lobby.GameID,
+		Revision: revision,
 	})
 }
 

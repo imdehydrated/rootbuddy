@@ -226,9 +226,9 @@ func (s *lobbyStore) setReady(token string, ready *bool) (Lobby, error) {
 	return cloneLobby(lobby), nil
 }
 
-func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, error) {
+func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, error) {
 	if token == "" {
-		return Lobby{}, game.GameState{}, errPlayerTokenRequired
+		return Lobby{}, game.GameState{}, 0, errPlayerTokenRequired
 	}
 
 	s.mu.Lock()
@@ -236,21 +236,21 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, error) {
 
 	lobby, player, err := s.playerLobbyLocked(token)
 	if err != nil {
-		return Lobby{}, game.GameState{}, err
+		return Lobby{}, game.GameState{}, 0, err
 	}
 	if lobby.State != LobbyWaiting {
-		return Lobby{}, game.GameState{}, errLobbyNotWaiting
+		return Lobby{}, game.GameState{}, 0, errLobbyNotWaiting
 	}
 	if !player.IsHost {
-		return Lobby{}, game.GameState{}, errHostOnly
+		return Lobby{}, game.GameState{}, 0, errHostOnly
 	}
 	if !lobbyReadyToStart(*lobby) {
-		return Lobby{}, game.GameState{}, errLobbyNotReady
+		return Lobby{}, game.GameState{}, 0, errLobbyNotReady
 	}
 
 	hostFaction, ok := lobby.claimedFaction(token)
 	if !ok {
-		return Lobby{}, game.GameState{}, errLobbyNotReady
+		return Lobby{}, game.GameState{}, 0, errLobbyNotReady
 	}
 
 	authoritative, err := engine.SetupGame(engine.SetupRequest{
@@ -262,22 +262,28 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, error) {
 		EyrieLeader:       lobby.EyrieLeader,
 	})
 	if err != nil {
-		return Lobby{}, game.GameState{}, err
+		return Lobby{}, game.GameState{}, 0, err
+	}
+	if err := engine.ValidateState(authoritative); err != nil {
+		return Lobby{}, game.GameState{}, 0, err
 	}
 
 	gameID := newGameID()
 	if gameID == "" {
-		return Lobby{}, game.GameState{}, errGameIDGeneration
+		return Lobby{}, game.GameState{}, 0, errGameIDGeneration
 	}
 
 	authoritative.TrackAllHands = true
-	store.save(gameID, authoritative)
+	record, err := store.create(gameID, authoritative)
+	if err != nil {
+		return Lobby{}, game.GameState{}, 0, err
+	}
 
 	lobby.GameID = gameID
 	lobby.State = LobbyInGame
 	s.byGame[gameID] = lobby
 
-	return cloneLobby(lobby), redactStateForPlayer(authoritative, hostFaction), nil
+	return cloneLobby(lobby), redactStateForPlayer(record.State, hostFaction), record.Revision, nil
 }
 
 func (s *lobbyStore) leaveLobby(token string) (*Lobby, bool, error) {

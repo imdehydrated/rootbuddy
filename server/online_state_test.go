@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/imdehydrated/rootbuddy/engine"
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
@@ -23,18 +24,61 @@ func TestOnlineStateStorePersistsAndReloadsFromDisk(t *testing.T) {
 		},
 	}
 
-	original.save("persist-test", state)
+	if _, err := original.create("persist-test", state); err != nil {
+		t.Fatalf("failed to persist online state: %v", err)
+	}
 
 	reloaded := newOnlineStateStore(tempDir)
-	loaded, ok := reloaded.load("persist-test")
+	loaded, ok, err := reloaded.load("persist-test")
+	if err != nil {
+		t.Fatalf("failed to reload persisted state: %v", err)
+	}
 	if !ok {
 		t.Fatalf("expected persisted online state to reload from disk")
 	}
-	if loaded.RandomSeed != 17 {
+	if loaded.Revision != 1 {
+		t.Fatalf("expected initial revision 1, got %+v", loaded)
+	}
+	if loaded.State.RandomSeed != 17 {
 		t.Fatalf("expected persisted state to retain random seed, got %+v", loaded)
 	}
-	if len(loaded.Marquise.CardsInHand) != 1 || loaded.Marquise.CardsInHand[0].ID != 24 {
-		t.Fatalf("expected persisted hand to reload, got %+v", loaded.Marquise.CardsInHand)
+	if len(loaded.State.Marquise.CardsInHand) != 1 || loaded.State.Marquise.CardsInHand[0].ID != 24 {
+		t.Fatalf("expected persisted hand to reload, got %+v", loaded.State.Marquise.CardsInHand)
+	}
+}
+
+func TestOnlineStateStoreSaveIfRevisionDetectsStaleWrites(t *testing.T) {
+	tempDir := t.TempDir()
+	testStore := newOnlineStateStore(tempDir)
+	state := game.GameState{
+		GameMode:     game.GameModeOnline,
+		GamePhase:    game.LifecyclePlaying,
+		SetupStage:   game.SetupStageComplete,
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+	}
+
+	record, err := testStore.create("revision-test", state)
+	if err != nil {
+		t.Fatalf("failed to create record: %v", err)
+	}
+
+	updated := engine.CloneState(record.State)
+	updated.RoundNumber = 2
+	saved, err := testStore.saveIfRevision("revision-test", record.Revision, updated)
+	if err != nil {
+		t.Fatalf("failed to save matching revision: %v", err)
+	}
+	if saved.Revision != record.Revision+1 {
+		t.Fatalf("expected incremented revision, got %+v", saved)
+	}
+
+	stale := engine.CloneState(record.State)
+	stale.RoundNumber = 3
+	_, err = testStore.saveIfRevision("revision-test", record.Revision, stale)
+	if err != errRevisionConflict {
+		t.Fatalf("expected revision conflict, got %v", err)
 	}
 }
 
@@ -58,7 +102,10 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 			CardsInHand: []game.Card{{ID: 8, Name: "Birdy Bindle"}},
 		},
 	}
-	store.save("load-test", authoritative)
+	record, err := store.create("load-test", authoritative)
+	if err != nil {
+		t.Fatalf("failed to save authoritative state: %v", err)
+	}
 
 	body, _ := json.Marshal(LoadGameRequest{GameID: "load-test"})
 	req := httptest.NewRequest(http.MethodPost, "/api/game/load", bytes.NewReader(body))
@@ -73,6 +120,9 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 	var resp LoadGameResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode load game response: %v", err)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected load revision %d, got %d", record.Revision, resp.Revision)
 	}
 	if len(resp.State.Marquise.CardsInHand) != 1 {
 		t.Fatalf("expected player hand to remain visible, got %+v", resp.State.Marquise.CardsInHand)

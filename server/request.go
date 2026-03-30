@@ -8,9 +8,10 @@ type ValidActionsRequest struct {
 }
 
 type ApplyActionRequest struct {
-	State  game.GameState `json:"state"`
-	Action game.Action    `json:"action"`
-	GameID string         `json:"gameID,omitempty"`
+	State          game.GameState `json:"state"`
+	Action         game.Action    `json:"action"`
+	GameID         string         `json:"gameID,omitempty"`
+	ClientRevision int64          `json:"clientRevision,omitempty"`
 }
 
 type ResolveBattleRequest struct {

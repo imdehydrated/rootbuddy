@@ -137,6 +137,9 @@ func TestLobbyLifecycleAndTurnEnforcement(t *testing.T) {
 	if startResp.GameID == "" || startResp.Lobby.GameID == "" {
 		t.Fatalf("expected start response to include game id, got %+v", startResp)
 	}
+	if startResp.Revision <= 0 {
+		t.Fatalf("expected start response revision, got %+v", startResp)
+	}
 	if startResp.Lobby.State != LobbyInGame {
 		t.Fatalf("expected in-game lobby state, got %+v", startResp.Lobby)
 	}
@@ -162,8 +165,9 @@ func TestLobbyLifecycleAndTurnEnforcement(t *testing.T) {
 	}
 
 	wrongTurnBody, _ := json.Marshal(ApplyActionRequest{
-		GameID: startResp.GameID,
-		State:  loadResp.State,
+		GameID:         startResp.GameID,
+		State:          loadResp.State,
+		ClientRevision: loadResp.Revision,
 		Action: game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{

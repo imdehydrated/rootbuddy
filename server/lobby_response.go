@@ -17,9 +17,10 @@ type JoinLobbyResponse struct {
 }
 
 type StartLobbyResponse struct {
-	Lobby  Lobby          `json:"lobby"`
-	State  game.GameState `json:"state"`
-	GameID string         `json:"gameID"`
+	Lobby    Lobby          `json:"lobby"`
+	State    game.GameState `json:"state"`
+	GameID   string         `json:"gameID"`
+	Revision int64          `json:"revision,omitempty"`
 }
 
 type LeaveLobbyResponse struct {

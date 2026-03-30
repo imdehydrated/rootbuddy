@@ -4,28 +4,46 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/imdehydrated/rootbuddy/engine"
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
+var errRevisionConflict = errors.New("revision conflict")
+
+type authoritativeGameRecord struct {
+	GameID   string         `json:"gameID"`
+	Revision int64          `json:"revision"`
+	SavedAt  time.Time      `json:"savedAt"`
+	State    game.GameState `json:"state"`
+}
+
+type onlineStateRepository interface {
+	create(gameID string, state game.GameState) (authoritativeGameRecord, error)
+	load(gameID string) (authoritativeGameRecord, bool, error)
+	save(gameID string, state game.GameState) (authoritativeGameRecord, error)
+	saveIfRevision(gameID string, expectedRevision int64, state game.GameState) (authoritativeGameRecord, error)
+}
+
 type onlineStateStore struct {
 	mu    sync.RWMutex
-	games map[string]game.GameState
+	games map[string]authoritativeGameRecord
 	dir   string
 }
 
 func newOnlineStateStore(dir string) *onlineStateStore {
 	return &onlineStateStore{
-		games: map[string]game.GameState{},
+		games: map[string]authoritativeGameRecord{},
 		dir:   dir,
 	}
 }
 
-var store = newOnlineStateStore(filepath.Join(".rootbuddy-saves", "online"))
+var store onlineStateRepository = newOnlineStateStore(filepath.Join(".rootbuddy-saves", "online"))
 
 func newGameID() string {
 	bytes := make([]byte, 16)
@@ -36,77 +54,160 @@ func newGameID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func (s *onlineStateStore) save(gameID string, state game.GameState) {
+func (s *onlineStateStore) create(gameID string, state game.GameState) (authoritativeGameRecord, error) {
 	if gameID == "" {
-		return
+		return authoritativeGameRecord{}, errors.New("game id is required")
 	}
 
-	cloned := engine.CloneState(state)
+	return s.writeRecord(gameID, 1, state)
+}
+
+func (s *onlineStateStore) load(gameID string) (authoritativeGameRecord, bool, error) {
+	if gameID == "" {
+		return authoritativeGameRecord{}, false, nil
+	}
 
 	s.mu.Lock()
-	s.games[gameID] = cloned
-	s.mu.Unlock()
+	defer s.mu.Unlock()
 
-	s.persistToDisk(gameID, cloned)
+	if record, ok := s.games[gameID]; ok {
+		return cloneAuthoritativeGameRecord(record), true, nil
+	}
+
+	record, ok, err := s.loadRecordFromDisk(gameID)
+	if err != nil || !ok {
+		return authoritativeGameRecord{}, ok, err
+	}
+
+	s.games[gameID] = record
+	return cloneAuthoritativeGameRecord(record), true, nil
 }
 
-func (s *onlineStateStore) load(gameID string) (game.GameState, bool) {
+func (s *onlineStateStore) save(gameID string, state game.GameState) (authoritativeGameRecord, error) {
 	if gameID == "" {
-		return game.GameState{}, false
+		return authoritativeGameRecord{}, errors.New("game id is required")
 	}
 
-	s.mu.RLock()
-	state, ok := s.games[gameID]
-	s.mu.RUnlock()
-	if !ok {
-		fromDisk, diskOK := s.loadFromDisk(gameID)
-		if !diskOK {
-			return game.GameState{}, false
-		}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-		s.mu.Lock()
-		s.games[gameID] = fromDisk
-		s.mu.Unlock()
-		return engine.CloneState(fromDisk), true
+	record, ok, err := s.currentRecordLocked(gameID)
+	if err != nil {
+		return authoritativeGameRecord{}, err
 	}
 
-	return engine.CloneState(state), true
+	revision := int64(1)
+	if ok {
+		revision = record.Revision + 1
+	}
+
+	return s.writeRecordLocked(gameID, revision, state)
 }
 
-func (s *onlineStateStore) persistToDisk(gameID string, state game.GameState) {
+func (s *onlineStateStore) saveIfRevision(gameID string, expectedRevision int64, state game.GameState) (authoritativeGameRecord, error) {
+	if gameID == "" {
+		return authoritativeGameRecord{}, errors.New("game id is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	record, ok, err := s.currentRecordLocked(gameID)
+	if err != nil {
+		return authoritativeGameRecord{}, err
+	}
+	if !ok {
+		return authoritativeGameRecord{}, errors.New("unknown game id")
+	}
+	if record.Revision != expectedRevision {
+		return authoritativeGameRecord{}, errRevisionConflict
+	}
+
+	return s.writeRecordLocked(gameID, expectedRevision+1, state)
+}
+
+func (s *onlineStateStore) writeRecord(gameID string, revision int64, state game.GameState) (authoritativeGameRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.writeRecordLocked(gameID, revision, state)
+}
+
+func (s *onlineStateStore) writeRecordLocked(gameID string, revision int64, state game.GameState) (authoritativeGameRecord, error) {
+	record := authoritativeGameRecord{
+		GameID:   gameID,
+		Revision: revision,
+		SavedAt:  time.Now().UTC(),
+		State:    engine.CloneState(state),
+	}
+
+	if err := s.persistRecordLocked(record); err != nil {
+		return authoritativeGameRecord{}, err
+	}
+
+	s.games[gameID] = record
+	return cloneAuthoritativeGameRecord(record), nil
+}
+
+func (s *onlineStateStore) currentRecordLocked(gameID string) (authoritativeGameRecord, bool, error) {
+	if record, ok := s.games[gameID]; ok {
+		return record, true, nil
+	}
+
+	record, ok, err := s.loadRecordFromDisk(gameID)
+	if err != nil || !ok {
+		return authoritativeGameRecord{}, ok, err
+	}
+
+	s.games[gameID] = record
+	return record, true, nil
+}
+
+func (s *onlineStateStore) persistRecordLocked(record authoritativeGameRecord) error {
 	if s.dir == "" {
-		return
+		return nil
 	}
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
-		return
+		return err
 	}
 
-	payload, err := json.Marshal(state)
+	payload, err := json.Marshal(record)
 	if err != nil {
-		return
+		return err
 	}
-	_ = os.WriteFile(s.filePath(gameID), payload, 0o644)
+
+	return os.WriteFile(s.filePath(record.GameID), payload, 0o644)
 }
 
-func (s *onlineStateStore) loadFromDisk(gameID string) (game.GameState, bool) {
+func (s *onlineStateStore) loadRecordFromDisk(gameID string) (authoritativeGameRecord, bool, error) {
 	if s.dir == "" {
-		return game.GameState{}, false
+		return authoritativeGameRecord{}, false, nil
 	}
 
 	payload, err := os.ReadFile(s.filePath(gameID))
 	if err != nil {
-		return game.GameState{}, false
+		if errors.Is(err, os.ErrNotExist) {
+			return authoritativeGameRecord{}, false, nil
+		}
+		return authoritativeGameRecord{}, false, err
 	}
 
-	var state game.GameState
-	if err := json.Unmarshal(payload, &state); err != nil {
-		return game.GameState{}, false
+	var record authoritativeGameRecord
+	if err := json.Unmarshal(payload, &record); err != nil {
+		return authoritativeGameRecord{}, false, err
 	}
-	return engine.CloneState(state), true
+	record.State = engine.CloneState(record.State)
+	return record, true, nil
 }
 
 func (s *onlineStateStore) filePath(gameID string) string {
 	return filepath.Join(s.dir, gameID+".json")
+}
+
+func cloneAuthoritativeGameRecord(record authoritativeGameRecord) authoritativeGameRecord {
+	cloned := record
+	cloned.State = engine.CloneState(record.State)
+	return cloned
 }
 
 func mergeAuthoritativeState(visible game.GameState, authoritative game.GameState) game.GameState {
