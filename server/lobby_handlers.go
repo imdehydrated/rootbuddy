@@ -55,6 +55,8 @@ func HandleJoinLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	globalHub.broadcastLobbyState(lobby.JoinCode, &lobby)
+
 	writeJSON(w, http.StatusOK, JoinLobbyResponse{
 		Lobby:       lobby,
 		PlayerToken: playerToken,
@@ -96,6 +98,8 @@ func HandleClaimFaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	globalHub.broadcastLobbyState(lobby.JoinCode, &lobby)
+
 	writeJSON(w, http.StatusOK, LobbyResponse{Lobby: lobby})
 }
 
@@ -118,6 +122,8 @@ func HandleLobbyReady(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	globalHub.broadcastLobbyState(lobby.JoinCode, &lobby)
+
 	writeJSON(w, http.StatusOK, LobbyResponse{Lobby: lobby})
 }
 
@@ -132,6 +138,11 @@ func HandleStartLobby(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, lobbyErrorStatus(err), ErrorResponse{Error: err.Error()})
 		return
+	}
+
+	record, errResp, _ := loadValidatedRecord(lobby.GameID)
+	if errResp == nil {
+		globalHub.broadcastGameStart(lobby.JoinCode, record.GameID, record.Revision, record.State)
 	}
 
 	writeJSON(w, http.StatusOK, StartLobbyResponse{
@@ -149,10 +160,19 @@ func HandleLeaveLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentLobby, _ := lobbies.getByToken(token)
+
 	lobby, closed, err := lobbies.leaveLobby(token)
 	if err != nil {
 		writeJSON(w, lobbyErrorStatus(err), ErrorResponse{Error: err.Error()})
 		return
+	}
+
+	if currentLobby.JoinCode != "" {
+		globalHub.disconnectPlayer(currentLobby.JoinCode, token)
+	}
+	if !closed && lobby != nil {
+		globalHub.broadcastLobbyState(lobby.JoinCode, lobby)
 	}
 
 	writeJSON(w, http.StatusOK, LeaveLobbyResponse{
@@ -171,6 +191,19 @@ func lobbyErrorStatus(err error) int {
 		return http.StatusForbidden
 	case errors.Is(err, errLobbyFull), errors.Is(err, errLobbyNotWaiting), errors.Is(err, errFactionClaimed), errors.Is(err, errLobbyNotReady), errors.Is(err, errCannotLeaveInGame):
 		return http.StatusConflict
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+func battleSessionErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, errBattleSessionNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, errBattleSessionPendingResponse), errors.Is(err, errBattleSessionStale), errors.Is(err, errBattleResponseAlreadyProvided):
+		return http.StatusConflict
+	case errors.Is(err, errBattleResponseForbidden):
+		return http.StatusForbidden
 	default:
 		return http.StatusBadRequest
 	}

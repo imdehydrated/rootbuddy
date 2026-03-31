@@ -27,6 +27,12 @@ type BattleContextResponse struct {
 	Revision      int64              `json:"revision,omitempty"`
 }
 
+type BattlePromptResponse struct {
+	Prompt   *BattlePrompt `json:"prompt,omitempty"`
+	GameID   string        `json:"gameID,omitempty"`
+	Revision int64         `json:"revision,omitempty"`
+}
+
 type SetupResponse struct {
 	State    game.GameState `json:"state"`
 	GameID   string         `json:"gameID,omitempty"`
@@ -37,6 +43,12 @@ type LoadGameResponse struct {
 	State    game.GameState `json:"state"`
 	GameID   string         `json:"gameID,omitempty"`
 	Revision int64          `json:"revision,omitempty"`
+}
+
+type GameLogResponse struct {
+	Entries  []ActionLogEntry `json:"entries"`
+	GameID   string           `json:"gameID,omitempty"`
+	Revision int64            `json:"revision,omitempty"`
 }
 
 type ErrorResponse struct {

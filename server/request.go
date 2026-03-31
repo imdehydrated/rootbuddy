@@ -30,6 +30,13 @@ type BattleContextRequest struct {
 	GameID string         `json:"gameID,omitempty"`
 }
 
+type BattleResponseRequest struct {
+	GameID      string `json:"gameID"`
+	UseAmbush   *bool  `json:"useAmbush,omitempty"`
+	UseArmorers *bool  `json:"useArmorers,omitempty"`
+	UseSappers  *bool  `json:"useSappers,omitempty"`
+}
+
 type SetupRequest struct {
 	GameMode          game.GameMode          `json:"gameMode"`
 	PlayerFaction     game.Faction           `json:"playerFaction"`

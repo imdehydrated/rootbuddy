@@ -78,15 +78,49 @@ func TestGameStateMessageJSONIncludesRevisionAndType(t *testing.T) {
 		State: game.GameState{
 			RandomSeed: 21,
 		},
+		ActionLog: []ActionLogEntry{{
+			RoundNumber: 2,
+			Faction:     game.Marquise,
+			ActionType:  game.ActionRecruit,
+			Summary:     "Recruit in clearings [1]",
+			Timestamp:   1234,
+		}},
 	})
 	if err != nil {
 		t.Fatalf("failed to marshal game state message: %v", err)
 	}
 
 	jsonText := string(body)
-	for _, key := range []string{`"type"`, `"gameID"`, `"revision"`, `"state"`, `"RandomSeed"`} {
+	for _, key := range []string{`"type"`, `"gameID"`, `"revision"`, `"state"`, `"RandomSeed"`, `"actionLog"`, `"summary"`} {
 		if !strings.Contains(jsonText, key) {
 			t.Fatalf("expected game state message JSON to include %s, got %s", key, jsonText)
+		}
+	}
+}
+
+func TestBattlePromptMessageJSONIncludesPromptFields(t *testing.T) {
+	body, err := json.Marshal(BattlePromptMessage{
+		Type: socketMessageBattlePrompt,
+		Prompt: &BattlePrompt{
+			GameID:           "game-123",
+			Revision:         5,
+			Action:           game.Action{Type: game.ActionBattle},
+			Stage:            BattlePromptDefenderTurn,
+			WaitingOnFaction: game.Eyrie,
+			BattleContext: game.BattleContext{
+				CanDefenderAmbush: true,
+			},
+			CanUseAmbush: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal battle prompt message: %v", err)
+	}
+
+	jsonText := string(body)
+	for _, key := range []string{`"type"`, `"prompt"`, `"gameID"`, `"stage"`, `"waitingOnFaction"`, `"canUseAmbush"`} {
+		if !strings.Contains(jsonText, key) {
+			t.Fatalf("expected battle prompt message JSON to include %s, got %s", key, jsonText)
 		}
 	}
 }

@@ -67,6 +67,14 @@ export interface EffectResult {
   cards: Card[];
 }
 
+export interface ActionLogEntry {
+  roundNumber: number;
+  faction: number;
+  actionType: number;
+  summary: string;
+  timestamp: number;
+}
+
 export interface Clearing {
   id: number;
   suit: number;
@@ -413,4 +421,19 @@ export interface BattleContext {
   canAttackerBrutalTactics: boolean;
   canDefenderSappers: boolean;
   assistDefenderAmbushPromptRequired: boolean;
+}
+
+export interface BattlePrompt {
+  gameID: string;
+  revision: number;
+  action: Action;
+  stage: "waiting_defender" | "defender_response" | "ready_to_resolve";
+  waitingOnFaction: number;
+  battleContext: BattleContext;
+  canUseAmbush?: boolean;
+  canUseArmorers?: boolean;
+  canUseSappers?: boolean;
+  defenderAmbush?: boolean;
+  defenderUsedArmorers?: boolean;
+  defenderUsedSappers?: boolean;
 }

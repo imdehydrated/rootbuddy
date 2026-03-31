@@ -73,7 +73,7 @@ func (s *lobbyStore) createLobby(req CreateLobbyRequest) (Lobby, string, error) 
 			PlayerToken: playerToken,
 			DisplayName: req.DisplayName,
 			IsHost:      true,
-			Connected:   true,
+			Connected:   false,
 		}},
 		Factions:          factions,
 		MapID:             req.MapID,
@@ -115,7 +115,7 @@ func (s *lobbyStore) joinLobby(joinCode string, displayName string) (Lobby, stri
 	lobby.Players = append(lobby.Players, PlayerSlot{
 		PlayerToken: playerToken,
 		DisplayName: displayName,
-		Connected:   true,
+		Connected:   false,
 	})
 	s.byToken[playerToken] = joinCode
 
@@ -227,6 +227,26 @@ func (s *lobbyStore) setReady(token string, ready *bool) (Lobby, error) {
 	return cloneLobby(lobby), nil
 }
 
+func (s *lobbyStore) setConnected(token string, connected bool) (Lobby, bool, error) {
+	if token == "" {
+		return Lobby{}, false, errPlayerTokenRequired
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	lobby, player, err := s.playerLobbyLocked(token)
+	if err != nil {
+		return Lobby{}, false, err
+	}
+	if player.Connected == connected {
+		return cloneLobby(lobby), false, nil
+	}
+
+	player.Connected = connected
+	return cloneLobby(lobby), true, nil
+}
+
 func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, error) {
 	if token == "" {
 		return Lobby{}, game.GameState{}, 0, errPlayerTokenRequired
@@ -279,12 +299,33 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, err
 	if err != nil {
 		return Lobby{}, game.GameState{}, 0, err
 	}
+	actionLogs.ensureGame(gameID)
 
 	lobby.GameID = gameID
 	lobby.State = LobbyInGame
 	s.byGame[gameID] = lobby
 
 	return cloneLobby(lobby), redactStateForPlayer(record.State, hostFaction), record.Revision, nil
+}
+
+func (s *lobbyStore) closeGameLobby(gameID string) (Lobby, bool, error) {
+	if gameID == "" {
+		return Lobby{}, false, errLobbyNotFound
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	lobby, ok := s.byGame[gameID]
+	if !ok {
+		return Lobby{}, false, errLobbyNotFound
+	}
+	if lobby.State == LobbyClosed {
+		return cloneLobby(lobby), false, nil
+	}
+
+	lobby.State = LobbyClosed
+	return cloneLobby(lobby), true, nil
 }
 
 func (s *lobbyStore) leaveLobby(token string) (*Lobby, bool, error) {

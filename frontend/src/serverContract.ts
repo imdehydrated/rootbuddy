@@ -1,5 +1,7 @@
 import type {
   Action,
+  ActionLogEntry,
+  BattlePrompt,
   BattleContext,
   BattleModifiers,
   EffectResult,
@@ -67,6 +69,12 @@ export type BattleContextResponseDTO = {
   revision?: number;
 };
 
+export type BattlePromptResponseDTO = {
+  prompt?: BattlePrompt;
+  gameID?: string;
+  revision?: number;
+};
+
 export type SetupRequestDTO = SetupRequest;
 
 export type SetupResponseDTO = {
@@ -85,6 +93,12 @@ export type LoadGameResponseDTO = {
   revision?: number;
 };
 
+export type GameLogResponseDTO = {
+  entries: ActionLogEntry[];
+  gameID?: string;
+  revision?: number;
+};
+
 export type MultiplayerSocketMessage =
   | {
       type: "lobby.update";
@@ -95,12 +109,18 @@ export type MultiplayerSocketMessage =
       gameID: string;
       revision: number;
       state: GameState;
+      actionLog?: ActionLogEntry[];
     }
   | {
       type: "game.state";
       gameID: string;
       revision: number;
       state: GameState;
+      actionLog?: ActionLogEntry[];
+    }
+  | {
+      type: "battle.prompt";
+      prompt?: BattlePrompt;
     }
   | {
       type: "conflict";

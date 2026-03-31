@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/imdehydrated/rootbuddy/engine"
 	"github.com/imdehydrated/rootbuddy/game"
@@ -39,6 +40,33 @@ func writeError(w http.ResponseWriter, status int, resp *ErrorResponse) {
 
 func HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func HandleGameLog(w http.ResponseWriter, r *http.Request) {
+	gameID := strings.TrimSpace(r.URL.Query().Get("gameID"))
+	if gameID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gameID is required"})
+		return
+	}
+
+	record, errResp, status := loadValidatedRecord(gameID)
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+
+	if record.RequiresLobby {
+		if _, _, errResp, status := multiplayerPerspective(record, playerTokenFromRequest(r)); errResp != nil {
+			writeError(w, status, errResp)
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, GameLogResponse{
+		Entries:  actionLogs.get(gameID),
+		GameID:   gameID,
+		Revision: record.Revision,
+	})
 }
 
 func HandleValidActions(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +135,28 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, errResp)
 		return
 	}
+	if req.GameID != "" {
+		battleSessions.clear(req.GameID)
+	}
+	if req.GameID != "" && context.multiplayer {
+		actionLogs.append(req.GameID, newActionLogEntry(context.state.RoundNumber, context.perspective, req.Action))
+	}
+	var lobby Lobby
+	hasLobby := false
+	if req.GameID != "" {
+		lobby, hasLobby = lobbies.getByGameID(req.GameID)
+		if record.State.GamePhase == game.LifecycleGameOver && hasLobby {
+			if closedLobby, _, err := lobbies.closeGameLobby(req.GameID); err == nil {
+				lobby = closedLobby
+			}
+		}
+		if hasLobby {
+			globalHub.broadcastGameState(lobby.JoinCode, record.GameID, record.Revision, record.State)
+			if record.State.GamePhase == game.LifecycleGameOver {
+				globalHub.broadcastLobbyState(lobby.JoinCode, &lobby)
+			}
+		}
+	}
 
 	if req.GameID != "" {
 		effectResult = redactEffectResultForPlayer(context.state, next, req.Action, effectResult)
@@ -161,14 +211,55 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	modifiers := req.Modifiers
+	if context.multiplayer {
+		battleContext := engine.BattleContext(context.state, req.Action)
+		if requiresDefenderResponse(battleContext) {
+			session, ok := battleSessions.get(req.GameID)
+			if !ok {
+				writeJSON(w, http.StatusConflict, ErrorResponse{
+					Error:    errBattleSessionPendingResponse.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			if session.Revision != context.record.Revision || !battleActionsMatch(session.Action, req.Action) {
+				battleSessions.clear(req.GameID)
+				writeJSON(w, http.StatusConflict, ErrorResponse{
+					Error:    errBattleSessionStale.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			if !session.DefenderResponded {
+				writeJSON(w, http.StatusConflict, ErrorResponse{
+					Error:    errBattleSessionPendingResponse.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			modifiers.DefenderAmbush = session.DefenderAmbush
+			modifiers.DefenderUsesArmorers = session.DefenderUsedArmorers
+			modifiers.DefenderUsesSappers = session.DefenderUsedSappers
+		}
+	}
+
+	useModifiers := req.UseModifiers
+	if context.multiplayer && (modifiers.DefenderAmbush || modifiers.DefenderUsesArmorers || modifiers.DefenderUsesSappers) {
+		useModifiers = true
+	}
+
 	var action game.Action
-	if req.UseModifiers {
+	if useModifiers {
 		action = engine.ResolveBattleWithModifiers(
 			context.state,
 			req.Action,
 			req.AttackerRoll,
 			req.DefenderRoll,
-			req.Modifiers,
+			modifiers,
 		)
 	} else {
 		action = engine.ResolveBattle(
@@ -224,6 +315,166 @@ func HandleBattleContext(w http.ResponseWriter, r *http.Request) {
 		BattleContext: engine.BattleContext(context.state, req.Action),
 		GameID:        req.GameID,
 		Revision:      context.record.Revision,
+	})
+}
+
+func HandleOpenBattle(w http.ResponseWriter, r *http.Request) {
+	var req BattleContextRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	context, errResp, status := buildReadContext(req.GameID, req.State, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if req.GameID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "battle opening requires gameID"})
+		return
+	}
+	if !context.multiplayer {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "battle opening is only supported for lobby-backed multiplayer games"})
+		return
+	}
+	if context.perspective != context.record.State.FactionTurn {
+		writeError(w, http.StatusForbidden, &ErrorResponse{
+			Error:    "not your turn",
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
+
+	effectiveReq := req
+	effectiveReq.State = context.state
+	if validationError := validateBattleContextRequest(effectiveReq); validationError != "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
+		return
+	}
+
+	battleContext := engine.BattleContext(context.state, req.Action)
+	if !requiresDefenderResponse(battleContext) {
+		writeJSON(w, http.StatusOK, BattlePromptResponse{
+			Prompt: battlePromptView(battleSession{
+				GameID:          req.GameID,
+				Revision:        context.record.Revision,
+				Action:          req.Action,
+				BattleContext:   battleContext,
+				AttackerFaction: req.Action.Battle.Faction,
+				DefenderFaction: req.Action.Battle.TargetFaction,
+			}, context.perspective),
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
+
+	session, _ := battleSessions.open(req.GameID, context.record.Revision, req.Action, battleContext)
+	if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+		globalHub.broadcastBattlePrompt(lobby.JoinCode, &session)
+	}
+
+	writeJSON(w, http.StatusOK, BattlePromptResponse{
+		Prompt:   battlePromptView(session, context.perspective),
+		GameID:   req.GameID,
+		Revision: context.record.Revision,
+	})
+}
+
+func HandleBattleSession(w http.ResponseWriter, r *http.Request) {
+	gameID := strings.TrimSpace(r.URL.Query().Get("gameID"))
+	if gameID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gameID is required"})
+		return
+	}
+
+	record, errResp, status := loadValidatedRecord(gameID)
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+
+	perspective, multiplayer, errResp, status := multiplayerPerspective(record, playerTokenFromRequest(r))
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if !multiplayer {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "battle sessions are only supported for lobby-backed multiplayer games"})
+		return
+	}
+
+	session, ok := battleSessions.get(gameID)
+	if !ok || session.Revision != record.Revision {
+		if ok && session.Revision != record.Revision {
+			battleSessions.clear(gameID)
+		}
+		writeJSON(w, http.StatusOK, BattlePromptResponse{
+			GameID:   gameID,
+			Revision: record.Revision,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, BattlePromptResponse{
+		Prompt:   battlePromptView(session, perspective),
+		GameID:   gameID,
+		Revision: record.Revision,
+	})
+}
+
+func HandleBattleResponse(w http.ResponseWriter, r *http.Request) {
+	token := playerTokenFromRequest(r)
+	if token == "" {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: errPlayerTokenRequired.Error()})
+		return
+	}
+
+	var req BattleResponseRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+	if req.GameID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "gameID is required"})
+		return
+	}
+
+	record, errResp, status := loadValidatedRecord(req.GameID)
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	perspective, multiplayer, errResp, status := multiplayerPerspective(record, token)
+	if errResp != nil {
+		writeError(w, status, errResp)
+		return
+	}
+	if !multiplayer {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "battle responses are only supported for lobby-backed multiplayer games"})
+		return
+	}
+
+	session, err := battleSessions.applyDefenderResponse(req.GameID, record.Revision, perspective, req)
+	if err != nil {
+		writeJSON(w, battleSessionErrorStatus(err), ErrorResponse{
+			Error:    err.Error(),
+			GameID:   req.GameID,
+			Revision: record.Revision,
+		})
+		return
+	}
+
+	if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+		globalHub.broadcastBattlePrompt(lobby.JoinCode, &session)
+	}
+
+	writeJSON(w, http.StatusOK, BattlePromptResponse{
+		Prompt:   battlePromptView(session, perspective),
+		GameID:   req.GameID,
+		Revision: record.Revision,
 	})
 }
 
