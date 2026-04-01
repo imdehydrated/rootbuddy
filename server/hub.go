@@ -184,14 +184,6 @@ func (h *hub) broadcastLobbyState(joinCode string, lobby *Lobby) {
 
 	staleClients := h.syncLobbyClients(lobby)
 
-	payload := marshalSocketMessage(LobbyUpdateMessage{
-		Type:  socketMessageLobbyUpdate,
-		Lobby: cloneLobby(lobby),
-	})
-	if payload == nil {
-		return
-	}
-
 	h.mu.RLock()
 	lobbyClients := h.clients[joinCode]
 	snapshot := make([]*wsClient, 0, len(lobbyClients))
@@ -201,6 +193,18 @@ func (h *hub) broadcastLobbyState(joinCode string, lobby *Lobby) {
 	h.mu.RUnlock()
 
 	for _, client := range snapshot {
+		self, ok := lobby.playerSlot(client.playerToken)
+		if !ok {
+			continue
+		}
+		payload := marshalSocketMessage(LobbyUpdateMessage{
+			Type:  socketMessageLobbyUpdate,
+			Lobby: cloneLobby(lobby),
+			Self:  self,
+		})
+		if payload == nil {
+			continue
+		}
 		h.enqueue(client, payload)
 	}
 

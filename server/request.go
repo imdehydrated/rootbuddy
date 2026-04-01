@@ -31,10 +31,13 @@ type BattleContextRequest struct {
 }
 
 type BattleResponseRequest struct {
-	GameID      string `json:"gameID"`
-	UseAmbush   *bool  `json:"useAmbush,omitempty"`
-	UseArmorers *bool  `json:"useArmorers,omitempty"`
-	UseSappers  *bool  `json:"useSappers,omitempty"`
+	GameID              string `json:"gameID"`
+	UseAmbush           *bool  `json:"useAmbush,omitempty"`
+	UseDefenderArmorers *bool  `json:"useDefenderArmorers,omitempty"`
+	UseSappers          *bool  `json:"useSappers,omitempty"`
+	UseCounterAmbush    *bool  `json:"useCounterAmbush,omitempty"`
+	UseAttackerArmorers *bool  `json:"useAttackerArmorers,omitempty"`
+	UseBrutalTactics    *bool  `json:"useBrutalTactics,omitempty"`
 }
 
 type SetupRequest struct {

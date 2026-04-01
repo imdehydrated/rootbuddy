@@ -1,5 +1,21 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
-import { applyAction, fetchBattleContext, fetchValidActions, loadGame, resolveBattle } from "./api";
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import {
+  applyAction,
+  claimLobbyFaction,
+  createLobby,
+  fetchBattleSession,
+  fetchBattleContext,
+  fetchLobbyState,
+  fetchValidActions,
+  joinLobby,
+  leaveLobby,
+  loadGame,
+  openBattle,
+  resolveBattle,
+  setLobbyReady,
+  startLobby,
+  submitBattleResponse
+} from "./api";
 import { boardLayoutForState } from "./boardLayouts";
 import { AssistWorkflowPanel } from "./components/AssistWorkflowPanel";
 import { BoardPanel } from "./components/BoardPanel";
@@ -9,6 +25,8 @@ import { EndgamePanel } from "./components/EndgamePanel";
 import { FlowGuidePanel } from "./components/FlowGuidePanel";
 import { GuideHelpPanel } from "./components/GuideHelpPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
+import { JoinScreen } from "./components/JoinScreen";
+import { LobbyScreen } from "./components/LobbyScreen";
 import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
 import { SessionStatusPanel } from "./components/SessionStatusPanel";
 import { SetupFlowPanel } from "./components/SetupFlowPanel";
@@ -18,9 +36,19 @@ import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
 import { affectedClearings, syncDerivedFactionStateFromBoard } from "./gameHelpers";
 import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels } from "./labels";
-import { clearSavedSession, loadSavedSession, saveSavedSession, type SavedSession } from "./localSession";
+import {
+  clearSavedMultiplayerSession,
+  clearSavedSession,
+  loadSavedMultiplayerSession,
+  loadSavedSession,
+  saveSavedMultiplayerSession,
+  saveSavedSession,
+  type SavedSession
+} from "./localSession";
+import type { MultiplayerConnectionStatus, MultiplayerSession, SetupScreen } from "./multiplayer";
 import { sampleState } from "./sampleState";
-import type { Action, BattleContext, BattleModifiers, Clearing, GameState } from "./types";
+import type { Action, BattleContext, BattleModifiers, BattlePrompt, Clearing, GameState, Lobby, LobbyPlayer } from "./types";
+import { RootBuddyWebSocketClient } from "./wsClient";
 
 type ActiveModal = "json" | null;
 
@@ -186,9 +214,26 @@ function gameOverStatusMessage(state: GameState): string {
 
 export default function App() {
   const initialSavedSession = loadSavedSession();
+  const initialSavedMultiplayerSession = loadSavedMultiplayerSession();
   const [showSetup, setShowSetup] = useState(true);
+  const [setupScreen, setSetupScreen] = useState<SetupScreen>("wizard");
   const [hasSavedSession, setHasSavedSession] = useState(() => initialSavedSession !== null);
   const [savedSessionInfo, setSavedSessionInfo] = useState<SavedSession | null>(initialSavedSession);
+  const [multiplayerSession, setMultiplayerSession] = useState<MultiplayerSession | null>(
+    initialSavedMultiplayerSession
+      ? {
+          playerToken: initialSavedMultiplayerSession.playerToken,
+          displayName: initialSavedMultiplayerSession.displayName,
+          joinCode: initialSavedMultiplayerSession.joinCode,
+          gameID: initialSavedMultiplayerSession.gameID
+        }
+      : null
+  );
+  const [multiplayerLobby, setMultiplayerLobby] = useState<Lobby | null>(null);
+  const [multiplayerSelf, setMultiplayerSelf] = useState<LobbyPlayer | null>(null);
+  const [multiplayerConnectionStatus, setMultiplayerConnectionStatus] =
+    useState<MultiplayerConnectionStatus>("disconnected");
+  const [multiplayerSubmitting, setMultiplayerSubmitting] = useState(false);
   const [serverGameID, setServerGameID] = useState<string | null>(null);
   const [serverRevision, setServerRevision] = useState<number | null>(initialSavedSession?.revision ?? null);
   const [stateText, setStateText] = useState(initialJSON);
@@ -204,6 +249,7 @@ export default function App() {
   const [defenderRoll, setDefenderRoll] = useState("0");
   const [battleModifiers, setBattleModifiers] = useState<BattleModifiers>(emptyBattleModifiers);
   const [battleContext, setBattleContext] = useState<BattleContext | null>(null);
+  const [multiplayerBattlePrompt, setMultiplayerBattlePrompt] = useState<BattlePrompt | null>(null);
   const [assistDefenderAmbushChoice, setAssistDefenderAmbushChoice] = useState<boolean | null>(null);
   const [error, setError] = useState<string>("");
   const [status, setStatus] = useState<string>("Click a clearing to start setting the board.");
@@ -212,6 +258,8 @@ export default function App() {
   const [showAdvancedTurnPanel, setShowAdvancedTurnPanel] = useState(false);
   const [showBoardEditor, setShowBoardEditor] = useState(false);
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
+  const multiplayerToken = multiplayerSession?.playerToken ?? null;
+  const previousConnectionStatus = useRef<MultiplayerConnectionStatus>("disconnected");
 
   useEffect(() => {
     try {
@@ -239,6 +287,9 @@ export default function App() {
     if (showSetup) {
       return;
     }
+    if (multiplayerToken) {
+      return;
+    }
 
     const session: SavedSession = {
       state: parsedState,
@@ -256,7 +307,243 @@ export default function App() {
       setHasSavedSession(true);
       setSavedSessionInfo(session);
     }
-  }, [parsedState, serverGameID, serverRevision, showSetup]);
+  }, [multiplayerToken, parsedState, serverGameID, serverRevision, showSetup]);
+
+  useEffect(() => {
+    if (!multiplayerSession) {
+      clearSavedMultiplayerSession();
+      return;
+    }
+
+    saveSavedMultiplayerSession({
+      ...multiplayerSession,
+      savedAt: new Date().toISOString()
+    });
+  }, [multiplayerSession]);
+
+  useEffect(() => {
+    const savedMultiplayerSession = initialSavedMultiplayerSession;
+    if (!savedMultiplayerSession) {
+      return;
+    }
+    const savedPlayerToken = savedMultiplayerSession.playerToken;
+
+    let cancelled = false;
+
+    async function resumeMultiplayerSession() {
+      setMultiplayerSubmitting(true);
+      setStatus("Rejoining multiplayer session...");
+      try {
+        const { lobby, self } = await fetchLobbyState(savedPlayerToken);
+        if (cancelled) {
+          return;
+        }
+
+        setMultiplayerLobby(lobby);
+        setMultiplayerSelf(self);
+        setMultiplayerSession((current) =>
+          current
+            ? {
+                ...current,
+                joinCode: lobby.joinCode,
+                gameID: lobby.gameID ?? current.gameID
+              }
+            : current
+        );
+        setSetupScreen("wizard");
+
+        if (lobby.gameID) {
+          const loaded = await loadGame(lobby.gameID, savedPlayerToken);
+          if (cancelled) {
+            return;
+          }
+
+          setMultiplayerSession((current) =>
+            current
+              ? {
+                  ...current,
+                  joinCode: lobby.joinCode,
+                  gameID: loaded.gameID
+                }
+              : current
+          );
+          setServerGameID(loaded.gameID);
+          setServerRevision(loaded.revision);
+          syncState(loaded.state);
+          setShowSetup(false);
+          setShowBoardEditor(false);
+          setShowGuideHelp(false);
+          setStatus(loaded.state.gamePhase === 2 ? "Rejoined finished multiplayer game." : "Rejoined multiplayer game.");
+          return;
+        }
+
+        setShowSetup(true);
+        setStatus(`Rejoined lobby ${lobby.joinCode}.`);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        setMultiplayerSession(null);
+        setMultiplayerLobby(null);
+        setMultiplayerSelf(null);
+        setStatus(err instanceof Error ? err.message : "Saved multiplayer session expired.");
+      } finally {
+        if (!cancelled) {
+          setMultiplayerSubmitting(false);
+        }
+      }
+    }
+
+    void resumeMultiplayerSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!multiplayerToken) {
+      setMultiplayerConnectionStatus("disconnected");
+      return;
+    }
+
+    const client = new RootBuddyWebSocketClient({
+      token: multiplayerToken,
+      onConnectionChange: (nextStatus) => {
+        setMultiplayerConnectionStatus(nextStatus);
+      },
+      onMessage: (message) => {
+        if (message.type === "lobby.update") {
+          setMultiplayerLobby(message.lobby);
+          setMultiplayerSelf(message.self);
+          setShowSetup(true);
+          setMultiplayerSession((current) =>
+            current
+              ? {
+                  ...current,
+                  joinCode: message.lobby.joinCode,
+                  gameID: message.lobby.gameID ?? current.gameID
+                }
+              : current
+          );
+          return;
+        }
+
+        if (message.type === "game.start" || message.type === "game.state" || message.type === "conflict") {
+          setMultiplayerBattlePrompt(null);
+          setMultiplayerLobby((current) =>
+            current
+              ? {
+                  ...current,
+                  gameID: message.gameID,
+                  state: 1
+                }
+              : current
+          );
+          setMultiplayerSession((current) =>
+            current
+              ? {
+                  ...current,
+                  gameID: message.gameID
+                }
+              : current
+          );
+          setServerGameID(message.gameID);
+          setServerRevision(message.revision);
+          syncState(message.state);
+          setShowSetup(false);
+          setShowBoardEditor(false);
+          setShowGuideHelp(false);
+          if (message.type === "conflict") {
+            setStatus(message.error);
+          } else {
+            setStatus(message.type === "game.start" ? "Multiplayer game started." : "Received multiplayer update.");
+          }
+          return;
+        }
+
+        if (message.type === "battle.prompt") {
+          setMultiplayerBattlePrompt(message.prompt ?? null);
+          if (!message.prompt) {
+            return;
+          }
+
+          if (message.prompt.stage === "ready_to_resolve") {
+            setStatus("Battle choices locked in. Resolve when ready.");
+            return;
+          }
+
+          if (message.prompt.waitingOnFaction === parsedState.playerFaction) {
+            setStatus("Battle response needed.");
+          } else {
+            setStatus(`Waiting on ${factionLabels[message.prompt.waitingOnFaction] ?? "another player"} for battle response.`);
+          }
+          return;
+        }
+
+        if (message.type === "session.error") {
+          setStatus(message.error);
+        }
+      }
+    });
+
+    client.connect();
+
+    return () => {
+      client.disconnect();
+    };
+  }, [multiplayerToken, parsedState.playerFaction]);
+
+  useEffect(() => {
+    const previous = previousConnectionStatus.current;
+    previousConnectionStatus.current = multiplayerConnectionStatus;
+
+    if (!multiplayerToken) {
+      return;
+    }
+    if (multiplayerConnectionStatus === previous) {
+      return;
+    }
+    if (multiplayerConnectionStatus === "reconnecting") {
+      setStatus("Realtime connection lost. Reconnecting...");
+      return;
+    }
+    if (multiplayerConnectionStatus === "connected" && (previous === "connecting" || previous === "reconnecting")) {
+      setStatus("Realtime multiplayer connection active.");
+    }
+  }, [multiplayerConnectionStatus, multiplayerToken]);
+
+  useEffect(() => {
+    if (!multiplayerToken || !serverGameID || showSetup) {
+      return;
+    }
+    const gameID = serverGameID;
+
+    let cancelled = false;
+
+    async function loadActiveBattleSession() {
+      try {
+        const session = await fetchBattleSession(gameID, multiplayerToken);
+        if (cancelled) {
+          return;
+        }
+        if (session.revision !== null) {
+          setServerRevision(session.revision);
+        }
+        setMultiplayerBattlePrompt(session.prompt);
+      } catch {
+        if (!cancelled) {
+          setMultiplayerBattlePrompt(null);
+        }
+      }
+    }
+
+    void loadActiveBattleSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [multiplayerToken, serverGameID, showSetup]);
 
   function resetToSetup(options?: { clearSaved?: boolean; status?: string }) {
     if (options?.clearSaved) {
@@ -272,6 +559,27 @@ export default function App() {
     setShowBoardEditor(false);
     setShowGuideHelp(false);
     setStatus(options?.status ?? "Choose factions and create a new game.");
+  }
+
+  function clearMultiplayerState() {
+    setMultiplayerSession(null);
+    setMultiplayerLobby(null);
+    setMultiplayerSelf(null);
+    setMultiplayerBattlePrompt(null);
+    setMultiplayerConnectionStatus("disconnected");
+    setSetupScreen("wizard");
+  }
+
+  function enterLoadedGame(nextState: GameState, gameID: string | null, revision: number | null, nextStatus: string) {
+    syncState(nextState);
+    setServerGameID(gameID);
+    setServerRevision(revision);
+    setMultiplayerBattlePrompt(null);
+    setShowSetup(false);
+    setShowBoardEditor(false);
+    setActiveModal(null);
+    setShowGuideHelp(false);
+    setStatus(nextStatus);
   }
 
   function syncState(nextState: GameState) {
@@ -291,7 +599,7 @@ export default function App() {
 
   async function loadActionsForState(baseState: GameState, options?: { successStatus?: string }) {
     const requestState = normalizeState(baseState);
-    const { actions: nextActions, revision } = await fetchValidActions(requestState, serverGameID);
+    const { actions: nextActions, revision } = await fetchValidActions(requestState, serverGameID, multiplayerToken);
     if (revision !== null) {
       setServerRevision(revision);
     }
@@ -378,7 +686,8 @@ export default function App() {
         parsedState,
         actionToApply,
         serverGameID,
-        serverRevision
+        serverRevision,
+        multiplayerToken
       );
       if (revision !== null) {
         setServerRevision(revision);
@@ -399,14 +708,23 @@ export default function App() {
   }
 
   async function handleResolveAndApply() {
-    if (selectedBattleIndex === null) {
+    const battleAction = multiplayerBattlePrompt?.action ?? (selectedBattleIndex !== null ? actions[selectedBattleIndex] : null);
+    if (!battleAction) {
       setStatus("Select a battle action first.");
       return;
     }
 
-    const action = actions[selectedBattleIndex];
+    const action = battleAction;
     if (action.type !== ACTION_TYPE.BATTLE) {
       setStatus("Selected action is not a battle.");
+      return;
+    }
+    if (multiplayerToken && multiplayerBattlePrompt && multiplayerBattlePrompt.stage !== "ready_to_resolve") {
+      if (multiplayerBattlePrompt.waitingOnFaction === parsedState.playerFaction) {
+        setStatus("Respond to the current battle prompt before resolving.");
+      } else {
+        setStatus(`Waiting on ${factionLabels[multiplayerBattlePrompt.waitingOnFaction] ?? "another player"} before resolving.`);
+      }
       return;
     }
     if (assistDefenderAmbushPromptRequired && assistDefenderAmbushChoice === null) {
@@ -419,15 +737,18 @@ export default function App() {
       const resolved = await resolveBattle(
         parsedState,
         action,
-        Number(attackerRoll),
-        Number(defenderRoll),
-        {
-          ...battleModifiers,
-          defenderAmbush: assistDefenderAmbushPromptRequired
-            ? assistDefenderAmbushChoice === true
-            : battleModifiers.defenderAmbush
-        },
-        serverGameID
+        multiplayerToken ? 0 : Number(attackerRoll),
+        multiplayerToken ? 0 : Number(defenderRoll),
+        multiplayerToken
+          ? undefined
+          : {
+              ...battleModifiers,
+              defenderAmbush: assistDefenderAmbushPromptRequired
+                ? assistDefenderAmbushChoice === true
+                : battleModifiers.defenderAmbush
+            },
+        serverGameID,
+        multiplayerToken
       );
       if (resolved.revision !== null) {
         setServerRevision(resolved.revision);
@@ -437,7 +758,8 @@ export default function App() {
         parsedState,
         resolved.action,
         serverGameID,
-        requestRevision
+        requestRevision,
+        multiplayerToken
       );
       if (revision !== null) {
         setServerRevision(revision);
@@ -453,12 +775,77 @@ export default function App() {
     }
   }
 
+  async function handleSubmitBattleResponse() {
+    if (!multiplayerToken || !multiplayerBattlePrompt?.gameID) {
+      setStatus("No multiplayer battle prompt is active.");
+      return;
+    }
+
+    const request = {
+      gameID: multiplayerBattlePrompt.gameID,
+      useAmbush: multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderAmbush : undefined,
+      useDefenderArmorers:
+        multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderUsesArmorers : undefined,
+      useSappers: multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderUsesSappers : undefined,
+      useCounterAmbush:
+        multiplayerBattlePrompt.stage === "attacker_response" ? battleModifiers.attackerCounterAmbush : undefined,
+      useAttackerArmorers:
+        multiplayerBattlePrompt.stage === "attacker_response" ? battleModifiers.attackerUsesArmorers : undefined,
+      useBrutalTactics:
+        multiplayerBattlePrompt.stage === "attacker_response" ? battleModifiers.attackerUsesBrutalTactics : undefined
+    };
+
+    try {
+      setMultiplayerSubmitting(true);
+      setStatus("Submitting battle response...");
+      const response = await submitBattleResponse(request, multiplayerToken);
+      if (response.revision !== null) {
+        setServerRevision(response.revision);
+      }
+      setMultiplayerBattlePrompt(response.prompt);
+      if (response.prompt?.stage === "ready_to_resolve") {
+        setStatus("Battle choices locked in. Resolve when ready.");
+      } else {
+        setStatus("Battle response submitted.");
+      }
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to submit battle response");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
   function openBattleForActionIndex(actionIndex: number) {
     setSelectedBattleIndex(actionIndex);
     setHoveredActionIndex(actionIndex);
     setBattleModifiers(emptyBattleModifiers);
     setAssistDefenderAmbushChoice(null);
     setActiveModal(null);
+    const action = actions[actionIndex];
+    if (multiplayerToken && serverGameID && action?.type === ACTION_TYPE.BATTLE) {
+      void (async () => {
+        try {
+          setMultiplayerSubmitting(true);
+          setStatus("Opening multiplayer battle flow...");
+          const response = await openBattle(parsedState, action, serverGameID, multiplayerToken);
+          if (response.revision !== null) {
+            setServerRevision(response.revision);
+          }
+          setMultiplayerBattlePrompt(response.prompt);
+          if (response.prompt?.stage === "ready_to_resolve") {
+            setStatus("Battle is ready to resolve.");
+            return;
+          }
+          setStatus("Battle selected. Follow the multiplayer response prompt in Battle Flow.");
+        } catch (err) {
+          setStatus(err instanceof Error ? err.message : "Failed to open multiplayer battle flow");
+        } finally {
+          setMultiplayerSubmitting(false);
+        }
+      })();
+      return;
+    }
+
     setStatus("Battle selected. Resolve it from Battle Flow in the sidebar.");
   }
 
@@ -469,7 +856,7 @@ export default function App() {
     }
 
     const loaded = savedSession.gameID
-      ? await loadGame(savedSession.gameID)
+      ? await loadGame(savedSession.gameID, multiplayerToken)
       : { state: savedSession.state, gameID: null, revision: savedSession.revision };
     setSavedSessionInfo({
       state: loaded.state,
@@ -501,6 +888,150 @@ export default function App() {
     }
   }
 
+  async function handleCreateLobby(request: {
+    displayName: string;
+    factions: number[];
+    eyrieLeader: number;
+    vagabondCharacter: number;
+  }) {
+    try {
+      setMultiplayerSubmitting(true);
+      setStatus("Creating multiplayer lobby...");
+      const result = await createLobby(request);
+      setMultiplayerSession({
+        playerToken: result.playerToken,
+        displayName: request.displayName,
+        joinCode: result.lobby.joinCode,
+        gameID: result.lobby.gameID ?? null
+      });
+      setMultiplayerLobby(result.lobby);
+      setMultiplayerSelf(result.self);
+      setServerGameID(null);
+      setServerRevision(null);
+      setShowSetup(true);
+      setSetupScreen("wizard");
+      setStatus(`Lobby ${result.lobby.joinCode} created.`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to create lobby");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
+  async function handleJoinLobby(request: { displayName: string; joinCode: string }) {
+    try {
+      setMultiplayerSubmitting(true);
+      setStatus(`Joining lobby ${request.joinCode}...`);
+      const result = await joinLobby(request);
+      setMultiplayerSession({
+        playerToken: result.playerToken,
+        displayName: request.displayName,
+        joinCode: result.lobby.joinCode,
+        gameID: result.lobby.gameID ?? null
+      });
+      setMultiplayerLobby(result.lobby);
+      setMultiplayerSelf(result.self);
+      setServerGameID(result.lobby.gameID ?? null);
+      setShowSetup(true);
+      setSetupScreen("wizard");
+      setStatus(`Joined lobby ${result.lobby.joinCode}.`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to join lobby");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
+  async function handleClaimLobby(nextFaction: number | null) {
+    if (!multiplayerToken) {
+      setStatus("No multiplayer session is active.");
+      return;
+    }
+
+    try {
+      setMultiplayerSubmitting(true);
+      const result = await claimLobbyFaction(multiplayerToken, nextFaction);
+      setMultiplayerLobby(result.lobby);
+      setMultiplayerSelf(result.self);
+      setStatus(nextFaction === null ? "Released faction claim." : "Faction claim updated.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to claim faction");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
+  async function handleSetLobbyReady(isReady: boolean) {
+    if (!multiplayerToken) {
+      setStatus("No multiplayer session is active.");
+      return;
+    }
+
+    try {
+      setMultiplayerSubmitting(true);
+      const result = await setLobbyReady(multiplayerToken, isReady);
+      setMultiplayerLobby(result.lobby);
+      setMultiplayerSelf(result.self);
+      setStatus(isReady ? "Marked ready." : "Marked not ready.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to update ready state");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
+  async function handleStartLobby() {
+    if (!multiplayerToken) {
+      setStatus("No multiplayer session is active.");
+      return;
+    }
+
+    try {
+      setMultiplayerSubmitting(true);
+      setStatus("Starting multiplayer game...");
+      const result = await startLobby(multiplayerToken);
+      setMultiplayerLobby(result.lobby);
+      setMultiplayerSelf(result.self);
+      setMultiplayerSession((current) =>
+        current
+          ? {
+              ...current,
+              joinCode: result.lobby.joinCode,
+              gameID: result.gameID
+            }
+          : current
+      );
+      enterLoadedGame(result.state, result.gameID, result.revision, "Multiplayer game started.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to start lobby");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
+  async function handleLeaveLobby() {
+    if (!multiplayerToken) {
+      clearMultiplayerState();
+      resetToSetup({ status: "Choose factions and create a new game." });
+      return;
+    }
+
+    try {
+      setMultiplayerSubmitting(true);
+      await leaveLobby(multiplayerToken);
+      clearMultiplayerState();
+      setServerGameID(null);
+      setServerRevision(null);
+      setSetupScreen("wizard");
+      setShowSetup(true);
+      setStatus("Left multiplayer lobby.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Cannot leave this multiplayer session right now.");
+    } finally {
+      setMultiplayerSubmitting(false);
+    }
+  }
+
   const selectedClearing =
     parsedState.map.clearings.find((clearing) => clearing.id === selectedClearingID) ??
     parsedState.map.clearings[0];
@@ -513,16 +1044,18 @@ export default function App() {
     selectedBattleIndex !== null && actions[selectedBattleIndex]?.type === ACTION_TYPE.BATTLE
       ? actions[selectedBattleIndex]
       : null;
-  const attackerFaction = selectedBattleAction?.battle?.faction ?? -1;
-  const defenderFaction = selectedBattleAction?.battle?.targetFaction ?? -1;
-  const attackerHasScoutingParty = battleContext?.attackerHasScoutingParty ?? false;
-  const canDefenderAmbush = battleContext?.canDefenderAmbush ?? false;
-  const assistDefenderAmbushPromptRequired = battleContext?.assistDefenderAmbushPromptRequired ?? false;
-  const canAttackerCounterAmbush = battleContext?.canAttackerCounterAmbush ?? false;
-  const canAttackerArmorers = battleContext?.canAttackerArmorers ?? false;
-  const canDefenderArmorers = battleContext?.canDefenderArmorers ?? false;
-  const canAttackerBrutalTactics = battleContext?.canAttackerBrutalTactics ?? false;
-  const canDefenderSappers = battleContext?.canDefenderSappers ?? false;
+  const activeBattleAction = multiplayerBattlePrompt?.action ?? selectedBattleAction;
+  const activeBattleContext = multiplayerBattlePrompt?.battleContext ?? battleContext;
+  const attackerFaction = activeBattleAction?.battle?.faction ?? -1;
+  const defenderFaction = activeBattleAction?.battle?.targetFaction ?? -1;
+  const attackerHasScoutingParty = activeBattleContext?.attackerHasScoutingParty ?? false;
+  const canDefenderAmbush = activeBattleContext?.canDefenderAmbush ?? false;
+  const assistDefenderAmbushPromptRequired = activeBattleContext?.assistDefenderAmbushPromptRequired ?? false;
+  const canAttackerCounterAmbush = activeBattleContext?.canAttackerCounterAmbush ?? false;
+  const canAttackerArmorers = activeBattleContext?.canAttackerArmorers ?? false;
+  const canDefenderArmorers = activeBattleContext?.canDefenderArmorers ?? false;
+  const canAttackerBrutalTactics = activeBattleContext?.canAttackerBrutalTactics ?? false;
+  const canDefenderSappers = activeBattleContext?.canDefenderSappers ?? false;
   const marquiseSetupActions = actions.filter((action) => action.type === ACTION_TYPE.MARQUISE_SETUP);
   const eyrieSetupActions = actions.filter((action) => action.type === ACTION_TYPE.EYRIE_SETUP);
   const vagabondSetupActions = actions.filter((action) => action.type === ACTION_TYPE.VAGABOND_SETUP);
@@ -597,19 +1130,39 @@ export default function App() {
     }
 
     setAssistDefenderAmbushChoice(false);
-  }, [assistDefenderAmbushPromptRequired, selectedBattleIndex]);
+  }, [assistDefenderAmbushPromptRequired, activeBattleAction, multiplayerBattlePrompt]);
+
+  useEffect(() => {
+    if (!multiplayerBattlePrompt) {
+      return;
+    }
+
+    setBattleModifiers({
+      ...emptyBattleModifiers,
+      defenderAmbush: multiplayerBattlePrompt.defenderAmbush ?? false,
+      defenderUsesArmorers: multiplayerBattlePrompt.defenderUsedArmorers ?? false,
+      defenderUsesSappers: multiplayerBattlePrompt.defenderUsedSappers ?? false,
+      attackerCounterAmbush: multiplayerBattlePrompt.attackerCounterAmbush ?? false,
+      attackerUsesArmorers: multiplayerBattlePrompt.attackerUsedArmorers ?? false,
+      attackerUsesBrutalTactics: multiplayerBattlePrompt.attackerUsedBrutalTactics ?? false
+    });
+  }, [multiplayerBattlePrompt]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadBattleContext() {
+      if (multiplayerBattlePrompt?.battleContext) {
+        setBattleContext(multiplayerBattlePrompt.battleContext);
+        return;
+      }
       if (!selectedBattleAction?.battle) {
         setBattleContext(null);
         return;
       }
 
       try {
-        const nextContext = await fetchBattleContext(parsedState, selectedBattleAction, serverGameID);
+        const nextContext = await fetchBattleContext(parsedState, selectedBattleAction, serverGameID, multiplayerToken);
         if (!cancelled) {
           if (nextContext.revision !== null) {
             setServerRevision(nextContext.revision);
@@ -628,11 +1181,15 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [parsedState, selectedBattleAction, serverGameID]);
+  }, [multiplayerBattlePrompt, multiplayerToken, parsedState, selectedBattleAction, serverGameID]);
 
   async function handleSetupClearingClick(clearingID: number) {
     if (parsedState.gamePhase !== 0) {
       setSelectedClearingID(clearingID);
+      if (multiplayerToken) {
+        setStatus("Board editing is disabled in multiplayer.");
+        return;
+      }
       setShowBoardEditor(true);
       setStatus(`Selected clearing ${clearingID} for board editing.`);
       return;
@@ -695,19 +1252,45 @@ export default function App() {
   }
 
   if (showSetup) {
+    if (multiplayerLobby) {
+      return (
+        <LobbyScreen
+          lobby={multiplayerLobby}
+          self={multiplayerSelf}
+          connectionStatus={multiplayerConnectionStatus}
+          status={status}
+          submitting={multiplayerSubmitting}
+          onClaimFaction={handleClaimLobby}
+          onReady={handleSetLobbyReady}
+          onStart={handleStartLobby}
+          onLeave={handleLeaveLobby}
+        />
+      );
+    }
+
+    if (setupScreen === "create-lobby" || setupScreen === "join-lobby") {
+      return (
+        <JoinScreen
+          mode={setupScreen === "create-lobby" ? "create" : "join"}
+          submitting={multiplayerSubmitting}
+          status={status}
+          onBack={() => {
+            setSetupScreen("wizard");
+            setStatus("Choose how you want to play.");
+          }}
+          onCreateLobby={handleCreateLobby}
+          onJoinLobby={handleJoinLobby}
+        />
+      );
+    }
+
     return (
       <SetupWizard
         canResume={hasSavedSession}
         savedSessionInfo={savedSessionInfo}
         onStart={async (state, gameID, revision) => {
-          syncState(state);
-          setServerGameID(gameID);
-          setServerRevision(revision);
-          setShowSetup(false);
-          setShowBoardEditor(false);
-          setStatus(state.gamePhase === 0 ? "Setup started." : "Game created.");
-          setActiveModal(null);
-          setShowGuideHelp(false);
+          clearMultiplayerState();
+          enterLoadedGame(state, gameID, revision, state.gamePhase === 0 ? "Setup started." : "Game created.");
           if (state.gamePhase === 0) {
             try {
               await loadActionsForState(state, { successStatus: "Choose a highlighted setup target." });
@@ -718,6 +1301,7 @@ export default function App() {
           }
         }}
         onUseSample={() => {
+          clearMultiplayerState();
           syncState(initialState);
           setServerGameID(null);
           setServerRevision(null);
@@ -725,6 +1309,14 @@ export default function App() {
           setShowBoardEditor(false);
           setStatus("Loaded sample state.");
           setShowGuideHelp(true);
+        }}
+        onOpenCreateLobby={() => {
+          setSetupScreen("create-lobby");
+          setStatus("Enter your display name to create a lobby.");
+        }}
+        onOpenJoinLobby={() => {
+          setSetupScreen("join-lobby");
+          setStatus("Enter your display name and join code.");
         }}
         onClearSavedSession={() => {
           clearSavedSession();
@@ -768,12 +1360,25 @@ export default function App() {
         <section className="panel sidebar-panel">
           <p className="eyebrow">RootBuddy</p>
           <div className="status-block">
-            <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
-            <span>
-              {parsedState.gamePhase === 0
-                ? setupStageLabels[parsedState.setupStage] ?? "Setup"
-                : `${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`}
-            </span>
+            <div className="status-block-main">
+              <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
+              <span>
+                {parsedState.gamePhase === 0
+                  ? setupStageLabels[parsedState.setupStage] ?? "Setup"
+                  : `${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`}
+              </span>
+            </div>
+            {multiplayerToken ? (
+              <span className={`connection-pill compact ${multiplayerConnectionStatus}`}>
+                {multiplayerConnectionStatus === "connected"
+                  ? "Live"
+                  : multiplayerConnectionStatus === "reconnecting"
+                    ? "Reconnecting"
+                    : multiplayerConnectionStatus === "connecting"
+                      ? "Connecting"
+                      : "Offline"}
+              </span>
+            ) : null}
           </div>
           <span className={error ? "message error" : "message"}>{error || status}</span>
         </section>
@@ -810,6 +1415,9 @@ export default function App() {
         <BattleFlowPanel
           selectedBattleIndex={selectedBattleIndex}
           selectedBattleAction={selectedBattleAction}
+          multiplayerBattlePrompt={multiplayerBattlePrompt}
+          multiplayerPerspectiveFaction={parsedState.playerFaction}
+          multiplayerSubmitting={multiplayerSubmitting}
           attackerFaction={attackerFaction}
           defenderFaction={defenderFaction}
           attackerRoll={attackerRoll}
@@ -821,11 +1429,13 @@ export default function App() {
           onSetDefenderRoll={setDefenderRoll}
           onSetBattleModifiers={(updater) => setBattleModifiers((current) => updater(current))}
           onSetAssistDefenderAmbushChoice={setAssistDefenderAmbushChoice}
+          onSubmitMultiplayerResponse={handleSubmitBattleResponse}
           onResolveAndApply={handleResolveAndApply}
           onClearSelection={() => {
             setSelectedBattleIndex(null);
             setHoveredActionIndex(null);
             setBattleContext(null);
+            setMultiplayerBattlePrompt(null);
             setBattleModifiers(emptyBattleModifiers);
             setAssistDefenderAmbushChoice(null);
             setStatus("Cleared selected battle.");
@@ -835,15 +1445,33 @@ export default function App() {
           state={parsedState}
           hasSavedSession={hasSavedSession}
           serverGameID={serverGameID}
-          onNewGame={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}
-          onReturnToSetup={() => resetToSetup({ status: "Returned to setup. Resume is still available until you clear it." })}
+          onNewGame={() => {
+            if (multiplayerToken) {
+              setStatus("Starting a new game from the in-game multiplayer workspace is not supported.");
+              return;
+            }
+            resetToSetup({ clearSaved: true, status: "Start a new game." });
+          }}
+          onReturnToSetup={() => {
+            if (multiplayerToken) {
+              setStatus("Return to setup is disabled while a multiplayer session is active.");
+              return;
+            }
+            resetToSetup({ status: "Returned to setup. Resume is still available until you clear it." });
+          }}
           onClearSavedSession={() => {
             clearSavedSession();
             setHasSavedSession(false);
             setSavedSessionInfo(null);
             setStatus("Cleared the saved endgame result.");
           }}
-          onOpenDebug={() => setActiveModal("json")}
+          onOpenDebug={() => {
+            if (multiplayerToken) {
+              setStatus("Debug JSON is disabled in multiplayer.");
+              return;
+            }
+            setActiveModal("json");
+          }}
         />
         <AssistWorkflowPanel
           state={parsedState}
@@ -853,7 +1481,7 @@ export default function App() {
           onOpenTurnState={() => setShowAdvancedTurnPanel(true)}
           onOpenBattle={openBattleForActionIndex}
         />
-        {parsedState.gamePhase === 1 ? (
+        {parsedState.gamePhase === 1 && !multiplayerToken ? (
           <details
             className="panel sidebar-panel board-editor-drawer"
             open={showBoardEditor}
@@ -908,6 +1536,9 @@ export default function App() {
               hasSavedSession={hasSavedSession}
               serverGameID={serverGameID}
               savedSessionInfo={savedSessionInfo}
+              multiplayerSession={multiplayerSession}
+              multiplayerConnectionStatus={multiplayerConnectionStatus}
+              multiplayerBattlePrompt={multiplayerBattlePrompt}
             />
           </div>
         </details>
@@ -929,56 +1560,62 @@ export default function App() {
             <button
               type="button"
               className="secondary"
-              onClick={() =>
+              onClick={() => {
+                if (multiplayerToken) {
+                  setStatus("Return to setup is disabled while a multiplayer session is active.");
+                  return;
+                }
                 resetToSetup({
                   clearSaved: parsedState.gamePhase !== 2,
                   status: parsedState.gamePhase === 2 ? "Returned to setup. Resume is still available until you clear it." : "Start a new game."
-                })
-              }
+                });
+              }}
             >
               {parsedState.gamePhase === 2 ? "Return to Setup" : "Setup"}
             </button>
           </div>
-          <details className="advanced-tools" style={{ marginTop: "0.9rem" }}>
-            <summary className="panel-summary">
-              <span className="summary-label">Advanced Tools</span>
-              <span className="summary-line">Use these only for manual correction or recovery.</span>
-            </summary>
-            {parsedState.gamePhase !== 2 ? (
-              <div style={{ marginTop: "0.9rem" }}>
-                <TurnFlowPanel
-                  state={parsedState}
-                  onApply={handleApply}
-                  onGenerateActions={refreshActions}
-                  onOpenAdvanced={() => setShowAdvancedTurnPanel(true)}
-                  onUpdateState={updateState}
-                />
-              </div>
-            ) : null}
-            <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
+          {!multiplayerToken ? (
+            <details className="advanced-tools" style={{ marginTop: "0.9rem" }}>
+              <summary className="panel-summary">
+                <span className="summary-label">Advanced Tools</span>
+                <span className="summary-line">Use these only for manual correction or recovery.</span>
+              </summary>
               {parsedState.gamePhase !== 2 ? (
-                <button type="button" className="secondary" onClick={() => setShowAdvancedTurnPanel((current) => !current)}>
-                  {showAdvancedTurnPanel ? "Hide Advanced Turn" : "Advanced Turn"}
-                </button>
+                <div style={{ marginTop: "0.9rem" }}>
+                  <TurnFlowPanel
+                    state={parsedState}
+                    onApply={handleApply}
+                    onGenerateActions={refreshActions}
+                    onOpenAdvanced={() => setShowAdvancedTurnPanel(true)}
+                    onUpdateState={updateState}
+                  />
+                </div>
               ) : null}
-              <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
-                Debug JSON
-              </button>
-            </div>
-            {showAdvancedTurnPanel && parsedState.gamePhase !== 2 ? (
-              <div style={{ marginTop: "0.9rem" }}>
-                <TurnStatePanel
-                  state={parsedState}
-                  onUpdateState={updateState}
-                  title="Advanced Turn"
-                  showCloseButton={false}
-                  onClose={() => setShowAdvancedTurnPanel(false)}
-                />
+              <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
+                {parsedState.gamePhase !== 2 ? (
+                  <button type="button" className="secondary" onClick={() => setShowAdvancedTurnPanel((current) => !current)}>
+                    {showAdvancedTurnPanel ? "Hide Advanced Turn" : "Advanced Turn"}
+                  </button>
+                ) : null}
+                <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
+                  Debug JSON
+                </button>
               </div>
-            ) : null}
-          </details>
+              {showAdvancedTurnPanel && parsedState.gamePhase !== 2 ? (
+                <div style={{ marginTop: "0.9rem" }}>
+                  <TurnStatePanel
+                    state={parsedState}
+                    onUpdateState={updateState}
+                    title="Advanced Turn"
+                    showCloseButton={false}
+                    onClose={() => setShowAdvancedTurnPanel(false)}
+                  />
+                </div>
+              ) : null}
+            </details>
+          ) : null}
           <div className="sidebar-actions footer">
-            {parsedState.gamePhase !== 2 ? (
+            {!multiplayerToken && parsedState.gamePhase !== 2 ? (
               <button
                 type="button"
                 className="secondary"

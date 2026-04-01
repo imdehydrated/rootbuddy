@@ -1,9 +1,12 @@
 import { factionLabels } from "../labels";
-import type { Action, BattleContext, BattleModifiers } from "../types";
+import type { Action, BattleContext, BattleModifiers, BattlePrompt } from "../types";
 
 type BattleFlowPanelProps = {
   selectedBattleIndex: number | null;
   selectedBattleAction: Action | null;
+  multiplayerBattlePrompt: BattlePrompt | null;
+  multiplayerPerspectiveFaction: number | null;
+  multiplayerSubmitting: boolean;
   attackerFaction: number;
   defenderFaction: number;
   attackerRoll: string;
@@ -15,6 +18,7 @@ type BattleFlowPanelProps = {
   onSetDefenderRoll: (value: string) => void;
   onSetBattleModifiers: (updater: (current: BattleModifiers) => BattleModifiers) => void;
   onSetAssistDefenderAmbushChoice: (value: boolean | null) => void;
+  onSubmitMultiplayerResponse: () => Promise<void>;
   onResolveAndApply: () => Promise<void>;
   onClearSelection: () => void;
 };
@@ -22,6 +26,9 @@ type BattleFlowPanelProps = {
 export function BattleFlowPanel({
   selectedBattleIndex,
   selectedBattleAction,
+  multiplayerBattlePrompt,
+  multiplayerPerspectiveFaction,
+  multiplayerSubmitting,
   attackerFaction,
   defenderFaction,
   attackerRoll,
@@ -33,21 +40,42 @@ export function BattleFlowPanel({
   onSetDefenderRoll,
   onSetBattleModifiers,
   onSetAssistDefenderAmbushChoice,
+  onSubmitMultiplayerResponse,
   onResolveAndApply,
   onClearSelection
 }: BattleFlowPanelProps) {
-  if (!selectedBattleAction?.battle) {
+  const battleAction = multiplayerBattlePrompt?.action ?? selectedBattleAction;
+  const effectiveContext = multiplayerBattlePrompt?.battleContext ?? battleContext;
+  if (!battleAction?.battle) {
     return null;
   }
 
-  const attackerHasScoutingParty = battleContext?.attackerHasScoutingParty ?? false;
-  const canDefenderAmbush = battleContext?.canDefenderAmbush ?? false;
-  const assistDefenderAmbushPromptRequired = battleContext?.assistDefenderAmbushPromptRequired ?? false;
-  const canAttackerCounterAmbush = battleContext?.canAttackerCounterAmbush ?? false;
-  const canAttackerArmorers = battleContext?.canAttackerArmorers ?? false;
-  const canDefenderArmorers = battleContext?.canDefenderArmorers ?? false;
-  const canAttackerBrutalTactics = battleContext?.canAttackerBrutalTactics ?? false;
-  const canDefenderSappers = battleContext?.canDefenderSappers ?? false;
+  const attackerHasScoutingParty = effectiveContext?.attackerHasScoutingParty ?? false;
+  const canDefenderAmbush = effectiveContext?.canDefenderAmbush ?? false;
+  const assistDefenderAmbushPromptRequired = effectiveContext?.assistDefenderAmbushPromptRequired ?? false;
+  const canAttackerCounterAmbush = effectiveContext?.canAttackerCounterAmbush ?? false;
+  const canAttackerArmorers = effectiveContext?.canAttackerArmorers ?? false;
+  const canDefenderArmorers = effectiveContext?.canDefenderArmorers ?? false;
+  const canAttackerBrutalTactics = effectiveContext?.canAttackerBrutalTactics ?? false;
+  const canDefenderSappers = effectiveContext?.canDefenderSappers ?? false;
+  const defenderCanAmbush = multiplayerBattlePrompt?.canUseAmbush ?? canDefenderAmbush;
+  const defenderCanArmorers = multiplayerBattlePrompt?.canUseDefenderArmorers ?? canDefenderArmorers;
+  const defenderCanSappers = multiplayerBattlePrompt?.canUseSappers ?? canDefenderSappers;
+  const attackerCanCounterAmbush = multiplayerBattlePrompt?.canUseCounterAmbush ?? canAttackerCounterAmbush;
+  const attackerCanArmorers = multiplayerBattlePrompt?.canUseAttackerArmorers ?? canAttackerArmorers;
+  const attackerCanBrutalTactics = multiplayerBattlePrompt?.canUseBrutalTactics ?? canAttackerBrutalTactics;
+  const multiplayerStage = multiplayerBattlePrompt?.stage ?? null;
+  const multiplayerWaitingLabel = multiplayerBattlePrompt
+    ? factionLabels[multiplayerBattlePrompt.waitingOnFaction] ?? "another player"
+    : "";
+  const isDefenderPrompt = multiplayerStage === "defender_response";
+  const isAttackerPrompt = multiplayerStage === "attacker_response";
+  const isReadyPrompt = multiplayerStage === "ready_to_resolve";
+  const isWaitingPrompt = multiplayerStage === "waiting_defender" || multiplayerStage === "waiting_attacker";
+  const localPlayerOwnsPrompt =
+    multiplayerBattlePrompt !== null && multiplayerBattlePrompt.waitingOnFaction === multiplayerPerspectiveFaction;
+  const localPlayerCanResolve =
+    multiplayerBattlePrompt !== null && isReadyPrompt && multiplayerPerspectiveFaction === attackerFaction;
 
   return (
     <section className="panel sidebar-panel">
@@ -57,22 +85,44 @@ export function BattleFlowPanel({
           {factionLabels[attackerFaction] ?? "Unknown"} vs {factionLabels[defenderFaction] ?? "Unknown"}
         </span>
         <span className="summary-line">
-          Clearing {selectedBattleAction.battle.clearingID} {selectedBattleIndex !== null ? `- Action ${selectedBattleIndex + 1}` : ""}
+          Clearing {battleAction.battle.clearingID} {selectedBattleIndex !== null ? `- Action ${selectedBattleIndex + 1}` : ""}
         </span>
       </div>
 
-      <div className="resolve-grid" style={{ marginTop: "0.9rem" }}>
-        <label>
-          <span>Attacker Roll</span>
-          <input type="number" min="0" max="3" value={attackerRoll} onChange={(event) => onSetAttackerRoll(event.target.value)} />
-        </label>
-        <label>
-          <span>Defender Roll</span>
-          <input type="number" min="0" max="3" value={defenderRoll} onChange={(event) => onSetDefenderRoll(event.target.value)} />
-        </label>
-      </div>
+      {multiplayerBattlePrompt ? (
+        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+          <span className="summary-label">Multiplayer Prompt</span>
+          {isWaitingPrompt ? (
+            <span className="summary-line">Waiting on {multiplayerWaitingLabel} to respond.</span>
+          ) : null}
+          {isDefenderPrompt ? (
+            <span className="summary-line">Defender response required before battle resolution.</span>
+          ) : null}
+          {isAttackerPrompt ? (
+            <span className="summary-line">Attacker follow-up response required before battle resolution.</span>
+          ) : null}
+          {isReadyPrompt ? (
+            <span className="summary-line">
+              {localPlayerCanResolve
+                ? "Responses are complete. The server will roll battle dice during resolution."
+                : `Responses are complete. Waiting on ${factionLabels[attackerFaction] ?? "the attacker"} to resolve.`}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <div className="resolve-grid" style={{ marginTop: "0.9rem" }}>
+          <label>
+            <span>Attacker Roll</span>
+            <input type="number" min="0" max="3" value={attackerRoll} onChange={(event) => onSetAttackerRoll(event.target.value)} />
+          </label>
+          <label>
+            <span>Defender Roll</span>
+            <input type="number" min="0" max="3" value={defenderRoll} onChange={(event) => onSetDefenderRoll(event.target.value)} />
+          </label>
+        </div>
+      )}
 
-      {assistDefenderAmbushPromptRequired ? (
+      {assistDefenderAmbushPromptRequired && !multiplayerBattlePrompt ? (
         <div className="summary-stack" style={{ marginTop: "1rem" }}>
           <span className="summary-label">Assist Prompt</span>
           <span className="summary-line">Did {factionLabels[defenderFaction] ?? "the defender"} play an Ambush?</span>
@@ -106,12 +156,12 @@ export function BattleFlowPanel({
       ) : null}
 
       <div className="control-grid" style={{ marginTop: "1rem" }}>
-        {!assistDefenderAmbushPromptRequired ? (
+        {!assistDefenderAmbushPromptRequired && (!multiplayerBattlePrompt || isDefenderPrompt) ? (
           <label className="checkbox">
             <input
               type="checkbox"
               checked={battleModifiers.defenderAmbush}
-              disabled={!canDefenderAmbush}
+              disabled={!defenderCanAmbush || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
               onChange={(event) =>
                 onSetBattleModifiers((current) => ({
                   ...current,
@@ -128,8 +178,9 @@ export function BattleFlowPanel({
             type="checkbox"
             checked={battleModifiers.attackerCounterAmbush}
             disabled={
+              (multiplayerBattlePrompt !== null && !isAttackerPrompt) ||
               !(assistDefenderAmbushPromptRequired ? assistDefenderAmbushChoice === true : battleModifiers.defenderAmbush) ||
-              !canAttackerCounterAmbush
+              !attackerCanCounterAmbush
             }
             onChange={(event) =>
               onSetBattleModifiers((current) => ({
@@ -141,10 +192,10 @@ export function BattleFlowPanel({
           Attacker Counter-Ambush
         </label>
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={battleModifiers.attackerUsesArmorers}
-            disabled={!canAttackerArmorers}
+            <input
+              type="checkbox"
+              checked={battleModifiers.attackerUsesArmorers}
+            disabled={!attackerCanArmorers || (!!multiplayerBattlePrompt && !isAttackerPrompt)}
             onChange={(event) =>
               onSetBattleModifiers((current) => ({
                 ...current,
@@ -155,10 +206,10 @@ export function BattleFlowPanel({
           Attacker Armorers
         </label>
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={battleModifiers.defenderUsesArmorers}
-            disabled={!canDefenderArmorers}
+            <input
+              type="checkbox"
+              checked={battleModifiers.defenderUsesArmorers}
+            disabled={!defenderCanArmorers || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
             onChange={(event) =>
               onSetBattleModifiers((current) => ({
                 ...current,
@@ -169,10 +220,10 @@ export function BattleFlowPanel({
           Defender Armorers
         </label>
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={battleModifiers.attackerUsesBrutalTactics}
-            disabled={!canAttackerBrutalTactics}
+            <input
+              type="checkbox"
+              checked={battleModifiers.attackerUsesBrutalTactics}
+            disabled={!attackerCanBrutalTactics || (!!multiplayerBattlePrompt && !isAttackerPrompt)}
             onChange={(event) =>
               onSetBattleModifiers((current) => ({
                 ...current,
@@ -183,10 +234,10 @@ export function BattleFlowPanel({
           Attacker Brutal Tactics
         </label>
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={battleModifiers.defenderUsesSappers}
-            disabled={!canDefenderSappers}
+            <input
+              type="checkbox"
+              checked={battleModifiers.defenderUsesSappers}
+            disabled={!defenderCanSappers || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
             onChange={(event) =>
               onSetBattleModifiers((current) => ({
                 ...current,
@@ -205,12 +256,32 @@ export function BattleFlowPanel({
       ) : null}
 
       <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
-        <button type="button" onClick={() => void onResolveAndApply()}>
-          Resolve and Apply
-        </button>
-        <button type="button" className="secondary" onClick={onClearSelection}>
-          Clear
-        </button>
+        {multiplayerBattlePrompt ? (
+          <>
+            {(isDefenderPrompt || isAttackerPrompt) && localPlayerOwnsPrompt ? (
+              <button type="button" onClick={() => void onSubmitMultiplayerResponse()} disabled={multiplayerSubmitting}>
+                Submit Response
+              </button>
+            ) : null}
+            {localPlayerCanResolve ? (
+              <button type="button" onClick={() => void onResolveAndApply()} disabled={multiplayerSubmitting}>
+                Resolve and Apply
+              </button>
+            ) : null}
+            <button type="button" className="secondary" onClick={onClearSelection} disabled>
+              Active Prompt
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => void onResolveAndApply()}>
+              Resolve and Apply
+            </button>
+            <button type="button" className="secondary" onClick={onClearSelection}>
+              Clear
+            </button>
+          </>
+        )}
       </div>
     </section>
   );

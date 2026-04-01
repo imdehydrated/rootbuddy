@@ -77,6 +77,67 @@ button.secondary {
   align-items: stretch;
 }
 
+.entry-shell {
+  min-height: 100vh;
+  height: auto;
+  overflow: auto;
+  display: block;
+}
+
+.entry-panel {
+  width: min(100%, 820px);
+  margin: 2rem auto;
+}
+
+.landing-hero {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.2rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(189, 107, 47, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(39, 72, 60, 0.11), rgba(39, 72, 60, 0.04));
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.landing-title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1.04;
+  color: var(--accent-strong);
+}
+
+.landing-copy {
+  margin: 0;
+  max-width: 38rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.landing-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mode-choice-card {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 11rem;
+  padding: 1.2rem;
+  border-radius: 24px;
+  text-align: left;
+  align-content: start;
+}
+
+.mode-choice-card strong {
+  font-size: 1.28rem;
+}
+
+.mode-choice-card span:last-child {
+  line-height: 1.5;
+}
+
 .board-stage {
   position: relative;
   min-width: 0;
@@ -748,7 +809,16 @@ textarea {
 }
 
 .status-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   min-height: 1.5rem;
+}
+
+.status-block-main {
+  display: grid;
+  gap: 0.18rem;
 }
 
 .empty-state {
@@ -1028,6 +1098,106 @@ textarea {
   margin: 0;
 }
 
+.multiplayer-screen {
+  display: grid;
+  gap: 1rem;
+}
+
+.lobby-hero {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 1rem;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.multiplayer-choice-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.multiplayer-choice {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: start;
+  min-height: 5.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: 22px;
+  text-align: left;
+}
+
+.multiplayer-choice.selected {
+  background: var(--accent-strong);
+}
+
+.multiplayer-choice.secondary {
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.multiplayer-choice.secondary:hover {
+  background: rgba(255, 249, 240, 0.96);
+}
+
+.lobby-player-list {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lobby-player-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 22px;
+  background: rgba(255, 249, 240, 0.72);
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.connection-pill,
+.presence-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.connection-pill.compact {
+  min-height: 1.8rem;
+  padding: 0.28rem 0.62rem;
+  font-size: 0.72rem;
+}
+
+.connection-pill.connected,
+.presence-pill.connected {
+  background: rgba(39, 72, 60, 0.14);
+  color: var(--accent-strong);
+}
+
+.connection-pill.connecting {
+  background: rgba(189, 107, 47, 0.16);
+  color: #7b451b;
+}
+
+.connection-pill.reconnecting {
+  background: rgba(189, 107, 47, 0.16);
+  color: #7b451b;
+}
+
+.connection-pill.disconnected,
+.presence-pill.disconnected {
+  background: rgba(138, 53, 53, 0.14);
+  color: var(--warn);
+}
+
 @media (max-width: 780px) {
   .app-shell {
     width: 100%;
@@ -1035,6 +1205,11 @@ textarea {
     min-height: 100vh;
     overflow: auto;
     padding: 0.75rem;
+  }
+
+  .entry-panel {
+    width: 100%;
+    margin: 0 auto;
   }
 
   body {
@@ -1100,7 +1275,11 @@ textarea {
   }
 
   .observed-panel-grid,
-  .observed-form-grid {
+  .observed-form-grid,
+  .lobby-player-list,
+  .multiplayer-choice-grid,
+  .lobby-hero,
+  .landing-grid {
     grid-template-columns: 1fr;
   }
 }

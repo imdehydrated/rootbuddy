@@ -93,6 +93,7 @@ func TestHandleApplyActionClosesLobbyWhenGameEnds(t *testing.T) {
 		state.VictoryPoints = map[game.Faction]int{
 			game.Eyrie: 29,
 		}
+		state.Eyrie.RoostsPlaced = 2
 	})
 
 	visible := redactStateForPlayer(record.State, game.Eyrie)

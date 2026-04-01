@@ -227,3 +227,96 @@ func TestLobbyLeaveTransfersHost(t *testing.T) {
 		t.Fatalf("expected remaining player to become host, got %+v", remaining.Players)
 	}
 }
+
+func TestLobbyStartUsesServerOwnedRandomSeed(t *testing.T) {
+	previousStore := store
+	previousLobbies := lobbies
+	previousRandomSeedSource := multiplayerRandomSeedSource
+	store = newOnlineStateStore(t.TempDir())
+	lobbies = newLobbyStore()
+	multiplayerRandomSeedSource = func() (int64, error) { return 4242, nil }
+	defer func() {
+		store = previousStore
+		lobbies = previousLobbies
+		multiplayerRandomSeedSource = previousRandomSeedSource
+	}()
+
+	server := NewServer()
+
+	createBody, _ := json.Marshal(CreateLobbyRequest{
+		DisplayName: "Host",
+		Factions:    []game.Faction{game.Marquise, game.Eyrie},
+	})
+	createReq := httptest.NewRequest(http.MethodPost, "/api/lobby/create", bytes.NewReader(createBody))
+	createRec := httptest.NewRecorder()
+	server.ServeHTTP(createRec, createReq)
+
+	var createResp CreateLobbyResponse
+	if err := json.Unmarshal(createRec.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("failed to decode create response: %v", err)
+	}
+
+	joinBody, _ := json.Marshal(JoinLobbyRequest{
+		JoinCode:    createResp.Lobby.JoinCode,
+		DisplayName: "Bird",
+	})
+	joinReq := httptest.NewRequest(http.MethodPost, "/api/lobby/join", bytes.NewReader(joinBody))
+	joinRec := httptest.NewRecorder()
+	server.ServeHTTP(joinRec, joinReq)
+
+	var joinResp JoinLobbyResponse
+	if err := json.Unmarshal(joinRec.Body.Bytes(), &joinResp); err != nil {
+		t.Fatalf("failed to decode join response: %v", err)
+	}
+
+	marquise := game.Marquise
+	hostClaimBody, _ := json.Marshal(ClaimFactionRequest{Faction: &marquise})
+	hostClaimReq := httptest.NewRequest(http.MethodPost, "/api/lobby/claim-faction", bytes.NewReader(hostClaimBody))
+	hostClaimReq.Header.Set("X-Player-Token", createResp.PlayerToken)
+	hostClaimRec := httptest.NewRecorder()
+	server.ServeHTTP(hostClaimRec, hostClaimReq)
+
+	eyrie := game.Eyrie
+	joinClaimBody, _ := json.Marshal(ClaimFactionRequest{Faction: &eyrie})
+	joinClaimReq := httptest.NewRequest(http.MethodPost, "/api/lobby/claim-faction", bytes.NewReader(joinClaimBody))
+	joinClaimReq.Header.Set("X-Player-Token", joinResp.PlayerToken)
+	joinClaimRec := httptest.NewRecorder()
+	server.ServeHTTP(joinClaimRec, joinClaimReq)
+
+	ready := true
+	for _, token := range []string{createResp.PlayerToken, joinResp.PlayerToken} {
+		readyBody, _ := json.Marshal(ReadyLobbyRequest{IsReady: &ready})
+		readyReq := httptest.NewRequest(http.MethodPost, "/api/lobby/ready", bytes.NewReader(readyBody))
+		readyReq.Header.Set("X-Player-Token", token)
+		readyRec := httptest.NewRecorder()
+		server.ServeHTTP(readyRec, readyReq)
+	}
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/lobby/start", bytes.NewBufferString(`{}`))
+	startReq.Header.Set("X-Player-Token", createResp.PlayerToken)
+	startRec := httptest.NewRecorder()
+	server.ServeHTTP(startRec, startReq)
+
+	if startRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from start lobby, got %d body=%s", startRec.Code, startRec.Body.String())
+	}
+
+	var startResp StartLobbyResponse
+	if err := json.Unmarshal(startRec.Body.Bytes(), &startResp); err != nil {
+		t.Fatalf("failed to decode start response: %v", err)
+	}
+	if startResp.State.RandomSeed != 4242 {
+		t.Fatalf("expected start response random seed 4242, got %d", startResp.State.RandomSeed)
+	}
+
+	record, ok, err := store.load(startResp.GameID)
+	if err != nil {
+		t.Fatalf("failed to load authoritative record: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected authoritative record for %s", startResp.GameID)
+	}
+	if record.State.RandomSeed != 4242 {
+		t.Fatalf("expected authoritative random seed 4242, got %d", record.State.RandomSeed)
+	}
+}

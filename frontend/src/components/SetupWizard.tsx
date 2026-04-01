@@ -9,6 +9,8 @@ type SetupWizardProps = {
   onUseSample: () => void;
   onResume: () => Promise<void>;
   onClearSavedSession: () => void;
+  onOpenCreateLobby: () => void;
+  onOpenJoinLobby: () => void;
   canResume: boolean;
   savedSessionInfo: SavedSession | null;
 };
@@ -88,10 +90,12 @@ export function SetupWizard({
   onUseSample,
   onResume,
   onClearSavedSession,
+  onOpenCreateLobby,
+  onOpenJoinLobby,
   canResume,
   savedSessionInfo
 }: SetupWizardProps) {
-  const [gameMode, setGameMode] = useState(0);
+  const [selectedMode, setSelectedMode] = useState<0 | 1 | null>(null);
   const [playerFaction, setPlayerFaction] = useState(0);
   const [factions, setFactions] = useState<number[]>([0, 2, 1, 3]);
   const [vagabondCharacter, setVagabondCharacter] = useState(0);
@@ -121,6 +125,10 @@ export function SetupWizard({
   }
 
   async function handleStart() {
+    if (selectedMode === null) {
+      setStatus("Choose Online Play or Assist Mode first.");
+      return;
+    }
     if (!factions.includes(playerFaction)) {
       setStatus("Your faction must be included in the game.");
       return;
@@ -134,7 +142,7 @@ export function SetupWizard({
       setSubmitting(true);
       setStatus("Creating game...");
       const result = await setupGame({
-        gameMode,
+        gameMode: selectedMode,
         playerFaction,
         factions,
         mapID: "autumn",
@@ -163,126 +171,178 @@ export function SetupWizard({
     }
   }
 
+  const modeLabel = selectedMode === 1 ? "Assist Mode" : "Online Play";
+  const modeDescription =
+    selectedMode === 1
+      ? "Use the companion flow for shared-table play, adjudication, and guided resolution."
+      : "Start a standard online state or branch into a multiplayer lobby.";
+
   return (
-    <main className="app-shell workspace-shell">
-      <section className="panel modal-panel" style={{ maxWidth: 720, margin: "3rem auto" }}>
-        <div className="panel-header">
-          <h2>{savedFinishedResult ? "Review or Start New Game" : "Setup Game"}</h2>
-        </div>
+    <main className="app-shell entry-shell">
+      <section className="panel modal-panel entry-panel" style={{ maxWidth: 720 }}>
+        {selectedMode === null ? (
+          <>
+            <div className="landing-hero">
+              <p className="eyebrow">RootBuddy</p>
+              <h1 className="landing-title">Root board state, multiplayer lobbies, and assist flow in one workspace.</h1>
+              <p className="landing-copy">Choose how you want to begin. Online Play leads to standard online setup or multiplayer lobbies. Assist Mode keeps the adjudication companion flow.</p>
+            </div>
 
-        {canResume && savedSessionInfo ? (
-          <div className="saved-session-card">
-            <span className="summary-label">{savedSessionTitle(savedSessionInfo)}</span>
-            {savedSessionDetail(savedSessionInfo).map((line) => (
-              <span key={line} className="summary-line">
-                {line}
-              </span>
-            ))}
-            {savedFinishedResult ? (
-              <span className="summary-line">Use review to inspect the finished board, or start fresh to replace it.</span>
+            <div className="landing-grid">
+              <button type="button" className="mode-choice-card" onClick={() => setSelectedMode(0)} disabled={submitting}>
+                <span className="summary-label">Mode One</span>
+                <strong>Online Play</strong>
+                <span>Start a local online game, or branch into create/join lobby from the next step.</span>
+              </button>
+              <button type="button" className="mode-choice-card secondary" onClick={() => setSelectedMode(1)} disabled={submitting}>
+                <span className="summary-label">Mode Two</span>
+                <strong>Assist Mode</strong>
+                <span>Use guided Root adjudication for in-person or shared-reference play.</span>
+              </button>
+            </div>
+
+            {canResume && savedSessionInfo ? (
+              <div className="saved-session-card">
+                <span className="summary-label">{savedSessionTitle(savedSessionInfo)}</span>
+                {savedSessionDetail(savedSessionInfo).map((line) => (
+                  <span key={line} className="summary-line">
+                    {line}
+                  </span>
+                ))}
+                {savedFinishedResult ? (
+                  <span className="summary-line">Use review to inspect the finished board, or start fresh to replace it.</span>
+                ) : null}
+                <div className="sidebar-actions footer">
+                  <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
+                    {resumeButtonLabel(savedSessionInfo)}
+                  </button>
+                  <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
+                    Clear Saved Game
+                  </button>
+                </div>
+              </div>
             ) : null}
-          </div>
-        ) : null}
 
-        <div className="summary-stack">
-          <span className="summary-label">Mode</span>
-          <label>
-            <input
-              type="radio"
-              checked={gameMode === 0}
-              onChange={() => setGameMode(0)}
-            />
-            <span> Online</span>
-          </label>
-          <label>
-            <input
-              type="radio"
-              checked={gameMode === 1}
-              onChange={() => setGameMode(1)}
-            />
-            <span> Assist</span>
-          </label>
-        </div>
+            <div className="sidebar-actions footer">
+              <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
+                Use Sample State
+              </button>
+            </div>
+            <span className="message">{status || "Choose Online Play or Assist Mode to continue."}</span>
+          </>
+        ) : (
+          <>
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Setup</p>
+                <h2>{savedFinishedResult ? "Review or Start New Game" : modeLabel}</h2>
+              </div>
+              <button type="button" className="secondary" onClick={() => setSelectedMode(null)} disabled={submitting}>
+                Back
+              </button>
+            </div>
 
-        <div className="summary-stack">
-          <span className="summary-label">Factions In Game</span>
-          {allFactions.map((faction) => (
-            <label key={faction}>
-              <input
-                type="checkbox"
-                checked={factions.includes(faction)}
-                onChange={() => toggleFaction(faction)}
-              />
-              <span> {factionLabels[faction]}</span>
-            </label>
-          ))}
-        </div>
+            <div className="flow-guide-hero">
+              <span className="summary-label">Selected Mode</span>
+              <span className="summary-line">{modeDescription}</span>
+            </div>
 
-        <div className="summary-stack">
-          <span className="summary-label">My Faction</span>
-          <select
-            value={playerFaction}
-            onChange={(event) => setPlayerFaction(Number(event.target.value))}
-          >
-            {factions.map((faction) => (
-              <option key={faction} value={faction}>
-                {factionLabels[faction]}
-              </option>
-            ))}
-          </select>
-        </div>
+            {selectedMode === 0 ? (
+              <div className="summary-stack">
+                <span className="summary-label">Multiplayer Lobby</span>
+                <div className="sidebar-actions">
+                  <button type="button" className="secondary" onClick={onOpenCreateLobby} disabled={submitting}>
+                    Create Lobby
+                  </button>
+                  <button type="button" className="secondary" onClick={onOpenJoinLobby} disabled={submitting}>
+                    Join Lobby
+                  </button>
+                </div>
+                <span className="summary-line">Or continue below to start a standard online game in this browser.</span>
+              </div>
+            ) : null}
 
-        {factions.includes(2) ? (
-          <div className="summary-stack">
-            <span className="summary-label">Eyrie Leader</span>
-            <select
-              value={eyrieLeader}
-              onChange={(event) => setEyrieLeader(Number(event.target.value))}
-            >
-              {eyrieLeaderLabels.map((label, index) => (
-                <option key={label} value={index}>
-                  {label}
-                </option>
+            <div className="summary-stack">
+              <span className="summary-label">Factions In Game</span>
+              {allFactions.map((faction) => (
+                <label key={faction}>
+                  <input
+                    type="checkbox"
+                    checked={factions.includes(faction)}
+                    onChange={() => toggleFaction(faction)}
+                  />
+                  <span> {factionLabels[faction]}</span>
+                </label>
               ))}
-            </select>
-          </div>
-        ) : null}
+            </div>
 
-        {factions.includes(3) ? (
-          <div className="summary-stack">
-            <span className="summary-label">Vagabond Character</span>
-            <select
-              value={vagabondCharacter}
-              onChange={(event) => setVagabondCharacter(Number(event.target.value))}
-            >
-              {vagabondCharacterLabels.map((label, index) => (
-                <option key={label} value={index}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
+            <div className="summary-stack">
+              <span className="summary-label">My Faction</span>
+              <select
+                value={playerFaction}
+                onChange={(event) => setPlayerFaction(Number(event.target.value))}
+              >
+                {factions.map((faction) => (
+                  <option key={faction} value={faction}>
+                    {factionLabels[faction]}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="sidebar-actions footer">
-          {canResume ? (
-            <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
-              {resumeButtonLabel(savedSessionInfo)}
-            </button>
-          ) : null}
-          {canResume ? (
-            <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
-              Clear Saved Game
-            </button>
-          ) : null}
-          <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
-            Use Sample State
-          </button>
-          <button type="button" onClick={handleStart} disabled={submitting}>
-            Start Game
-          </button>
-        </div>
-        <span className="message">{status || "Choose factions and create a new game."}</span>
+            {factions.includes(2) ? (
+              <div className="summary-stack">
+                <span className="summary-label">Eyrie Leader</span>
+                <select
+                  value={eyrieLeader}
+                  onChange={(event) => setEyrieLeader(Number(event.target.value))}
+                >
+                  {eyrieLeaderLabels.map((label, index) => (
+                    <option key={label} value={index}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {factions.includes(3) ? (
+              <div className="summary-stack">
+                <span className="summary-label">Vagabond Character</span>
+                <select
+                  value={vagabondCharacter}
+                  onChange={(event) => setVagabondCharacter(Number(event.target.value))}
+                >
+                  {vagabondCharacterLabels.map((label, index) => (
+                    <option key={label} value={index}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="sidebar-actions footer">
+              {canResume ? (
+                <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
+                  {resumeButtonLabel(savedSessionInfo)}
+                </button>
+              ) : null}
+              {canResume ? (
+                <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
+                  Clear Saved Game
+                </button>
+              ) : null}
+              <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
+                Use Sample State
+              </button>
+              <button type="button" onClick={handleStart} disabled={submitting}>
+                {selectedMode === 1 ? "Start Assist Game" : "Start Online Game"}
+              </button>
+            </div>
+            <span className="message">{status || "Choose factions and continue."}</span>
+          </>
+        )}
       </section>
     </main>
   );

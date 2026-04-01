@@ -165,6 +165,100 @@ func TestHandleApplyActionBroadcastsGameStateToConnectedLobbyPlayers(t *testing.
 	}
 }
 
+func TestHandleApplyActionStandAndDeliverBroadcastsAuthoritativeHiddenOutcome(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, birdToken, _, _ := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GameMode = game.GameModeOnline
+		state.TrackAllHands = true
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.RandomSeed = 7
+		state.PersistentEffects = map[game.Faction][]game.CardID{
+			game.Marquise: {41},
+		}
+		state.Marquise.CardsInHand = nil
+		state.Eyrie.CardsInHand = []game.Card{
+			{ID: 8, Name: "Birdy Bindle"},
+			{ID: 12, Name: "Ambush! (Fox)", Suit: game.Fox, Kind: game.AmbushCard},
+		}
+		state.OtherHandCounts = map[game.Faction]int{
+			game.Eyrie: 2,
+		}
+	})
+	visible := redactStateForPlayer(record.State, game.Marquise)
+
+	testServer := httptest.NewServer(NewServer())
+	defer testServer.Close()
+
+	hostConn := dialWebSocket(t, testServer.URL, hostToken)
+	defer hostConn.Close()
+	waitForGameState(t, hostConn, func(msg GameStateMessage) bool {
+		return msg.GameID == gameID && msg.Revision == record.Revision
+	})
+
+	birdConn := dialWebSocket(t, testServer.URL, birdToken)
+	defer birdConn.Close()
+	waitForGameState(t, birdConn, func(msg GameStateMessage) bool {
+		return msg.GameID == gameID && msg.Revision == record.Revision
+	})
+
+	var applyResp ApplyActionResponse
+	postJSON(t, testServer.URL, "/api/actions/apply", ApplyActionRequest{
+		GameID:         gameID,
+		State:          visible,
+		ClientRevision: record.Revision,
+		Action: game.Action{
+			Type: game.ActionUsePersistentEffect,
+			UsePersistentEffect: &game.UsePersistentEffectAction{
+				Faction:       game.Marquise,
+				EffectID:      "stand_and_deliver",
+				TargetFaction: game.Eyrie,
+			},
+		},
+	}, hostToken, &applyResp)
+
+	if applyResp.EffectResult == nil || len(applyResp.EffectResult.Cards) != 1 {
+		t.Fatalf("expected stand and deliver effect result with transferred card, got %+v", applyResp.EffectResult)
+	}
+	transferredCardID := applyResp.EffectResult.Cards[0].ID
+	if len(applyResp.State.Marquise.CardsInHand) != 1 || applyResp.State.Marquise.CardsInHand[0].ID != transferredCardID {
+		t.Fatalf("expected acting player state to include transferred card %d, got %+v", transferredCardID, applyResp.State.Marquise.CardsInHand)
+	}
+
+	hostUpdate := waitForGameState(t, hostConn, func(msg GameStateMessage) bool {
+		return msg.GameID == gameID && msg.Revision == applyResp.Revision
+	})
+	if len(hostUpdate.State.Marquise.CardsInHand) != 1 || hostUpdate.State.Marquise.CardsInHand[0].ID != transferredCardID {
+		t.Fatalf("expected host websocket state to include transferred card %d, got %+v", transferredCardID, hostUpdate.State.Marquise.CardsInHand)
+	}
+	if len(hostUpdate.ActionLog) != 1 || hostUpdate.ActionLog[0].ActionType != game.ActionUsePersistentEffect {
+		t.Fatalf("expected host websocket action log entry for stand and deliver, got %+v", hostUpdate.ActionLog)
+	}
+
+	birdUpdate := waitForGameState(t, birdConn, func(msg GameStateMessage) bool {
+		return msg.GameID == gameID && msg.Revision == applyResp.Revision
+	})
+	if len(birdUpdate.State.Eyrie.CardsInHand) != 1 {
+		t.Fatalf("expected target player to see one remaining card, got %+v", birdUpdate.State.Eyrie.CardsInHand)
+	}
+	if birdUpdate.State.Eyrie.CardsInHand[0].ID == transferredCardID {
+		t.Fatalf("expected target player hand to exclude transferred card %d, got %+v", transferredCardID, birdUpdate.State.Eyrie.CardsInHand)
+	}
+	if birdUpdate.State.OtherHandCounts[game.Marquise] != 1 {
+		t.Fatalf("expected target player to see marquise hidden hand count increase, got %+v", birdUpdate.State.OtherHandCounts)
+	}
+	if len(birdUpdate.ActionLog) != 1 || birdUpdate.ActionLog[0].ActionType != game.ActionUsePersistentEffect {
+		t.Fatalf("expected target websocket action log entry for stand and deliver, got %+v", birdUpdate.ActionLog)
+	}
+}
+
 func resetRealtimeTestState(t *testing.T) func() {
 	t.Helper()
 
@@ -173,12 +267,16 @@ func resetRealtimeTestState(t *testing.T) func() {
 	previousHub := globalHub
 	previousActionLogs := actionLogs
 	previousBattleSessions := battleSessions
+	previousBattleRoller := battleRoller
+	previousRandomSeedSource := multiplayerRandomSeedSource
 
 	store = newOnlineStateStore(t.TempDir())
 	lobbies = newLobbyStore()
 	globalHub = newHub()
 	actionLogs = newActionLogStore()
 	battleSessions = newBattleSessionStore()
+	battleRoller = func() (int, int, error) { return 1, 0, nil }
+	multiplayerRandomSeedSource = defaultMultiplayerRandomSeed
 
 	return func() {
 		store = previousStore
@@ -186,6 +284,8 @@ func resetRealtimeTestState(t *testing.T) func() {
 		globalHub = previousHub
 		actionLogs = previousActionLogs
 		battleSessions = previousBattleSessions
+		battleRoller = previousBattleRoller
+		multiplayerRandomSeedSource = previousRandomSeedSource
 	}
 }
 

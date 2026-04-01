@@ -72,6 +72,14 @@ func (l Lobby) claimedFaction(token string) (game.Faction, bool) {
 	return l.Players[index].Faction, true
 }
 
+func (l Lobby) playerSlot(token string) (PlayerSlot, bool) {
+	index := l.playerIndex(token)
+	if index == -1 {
+		return PlayerSlot{}, false
+	}
+	return l.Players[index], true
+}
+
 func (l Lobby) claimedFactions() []game.Faction {
 	claimed := make([]game.Faction, 0, len(l.Players))
 	for _, faction := range l.Factions {

@@ -273,6 +273,10 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, err
 	if !ok {
 		return Lobby{}, game.GameState{}, 0, errLobbyNotReady
 	}
+	randomSeed, err := multiplayerRandomSeedSource()
+	if err != nil {
+		return Lobby{}, game.GameState{}, 0, err
+	}
 
 	authoritative, err := engine.SetupGame(engine.SetupRequest{
 		GameMode:          game.GameModeOnline,
@@ -281,6 +285,7 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, err
 		MapID:             lobby.MapID,
 		VagabondCharacter: lobby.VagabondCharacter,
 		EyrieLeader:       lobby.EyrieLeader,
+		RandomSeed:        randomSeed,
 	})
 	if err != nil {
 		return Lobby{}, game.GameState{}, 0, err

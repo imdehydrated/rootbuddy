@@ -106,8 +106,14 @@ func sendInitialSocketState(client *wsClient, lobby Lobby) {
 	payload := marshalSocketMessage(LobbyUpdateMessage{
 		Type:  socketMessageLobbyUpdate,
 		Lobby: lobby,
+		Self:  selfForLobbyToken(lobby, client.playerToken),
 	})
 	if payload != nil {
 		client.hub.enqueue(client, payload)
 	}
+}
+
+func selfForLobbyToken(lobby Lobby, token string) PlayerSlot {
+	self, _ := lobby.playerSlot(token)
+	return self
 }

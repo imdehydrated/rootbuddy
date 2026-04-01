@@ -128,18 +128,43 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
 		return
 	}
+	if req.GameID != "" && context.multiplayer {
+		switch req.Action.Type {
+		case game.ActionBattleResolution:
+			resolvedAction, err := battleSessions.resolvedActionForApply(req.GameID, context.record.Revision, req.Action)
+			if err != nil {
+				writeJSON(w, battleSessionErrorStatus(err), ErrorResponse{
+					Error:    err.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			effectiveReq.Action = resolvedAction
+		default:
+			if !actionMatchesValidAction(context.state, req.Action) {
+				writeError(w, http.StatusBadRequest, &ErrorResponse{
+					Error:    errInvalidActionForState.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+		}
+	}
 
-	next, effectResult := engine.ApplyActionDetailed(context.state, req.Action)
+	next, effectResult := engine.ApplyActionDetailed(context.state, effectiveReq.Action)
 	record, errResp, status := saveMutationResult(context, next, req.ClientRevision)
 	if errResp != nil {
 		writeError(w, status, errResp)
 		return
 	}
+	clearedBattlePrompt := false
 	if req.GameID != "" {
-		battleSessions.clear(req.GameID)
+		clearedBattlePrompt = battleSessions.clearIfPresent(req.GameID)
 	}
 	if req.GameID != "" && context.multiplayer {
-		actionLogs.append(req.GameID, newActionLogEntry(context.state.RoundNumber, context.perspective, req.Action))
+		actionLogs.append(req.GameID, newActionLogEntry(context.state.RoundNumber, context.perspective, effectiveReq.Action))
 	}
 	var lobby Lobby
 	hasLobby := false
@@ -151,6 +176,9 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if hasLobby {
+			if clearedBattlePrompt {
+				globalHub.broadcastBattlePrompt(lobby.JoinCode, nil)
+			}
 			globalHub.broadcastGameState(lobby.JoinCode, record.GameID, record.Revision, record.State)
 			if record.State.GamePhase == game.LifecycleGameOver {
 				globalHub.broadcastLobbyState(lobby.JoinCode, &lobby)
@@ -159,7 +187,7 @@ func HandleApplyAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.GameID != "" {
-		effectResult = redactEffectResultForPlayer(context.state, next, req.Action, effectResult)
+		effectResult = redactEffectResultForPlayer(context.state, next, effectiveReq.Action, effectResult)
 		next = redactStateForPlayer(record.State, context.perspective)
 	}
 	if req.GameID == "" {
@@ -210,22 +238,32 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
 		return
 	}
+	if context.multiplayer && !actionMatchesValidAction(context.state, req.Action) {
+		writeError(w, http.StatusBadRequest, &ErrorResponse{
+			Error:    errInvalidActionForState.Error(),
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
 
 	modifiers := req.Modifiers
+	attackerRoll := req.AttackerRoll
+	defenderRoll := req.DefenderRoll
+	var battleContext game.BattleContext
 	if context.multiplayer {
-		battleContext := engine.BattleContext(context.state, req.Action)
-		if requiresDefenderResponse(battleContext) {
+		battleContext = engine.BattleContext(context.state, req.Action)
+		if requiresDefenderResponse(battleContext) || requiresAttackerBaseResponse(battleContext) {
 			session, ok := battleSessions.get(req.GameID)
 			if !ok {
-				writeJSON(w, http.StatusConflict, ErrorResponse{
-					Error:    errBattleSessionPendingResponse.Error(),
-					GameID:   req.GameID,
-					Revision: context.record.Revision,
-				})
+				writeJSON(w, http.StatusConflict, pendingBattleSessionError(req.GameID, context.record.Revision, battleContext))
 				return
 			}
 			if session.Revision != context.record.Revision || !battleActionsMatch(session.Action, req.Action) {
 				battleSessions.clear(req.GameID)
+				if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+					globalHub.broadcastBattlePrompt(lobby.JoinCode, nil)
+				}
 				writeJSON(w, http.StatusConflict, ErrorResponse{
 					Error:    errBattleSessionStale.Error(),
 					GameID:   req.GameID,
@@ -233,22 +271,40 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			if !session.DefenderResponded {
-				writeJSON(w, http.StatusConflict, ErrorResponse{
+			if responder := currentBattleResponder(session); responder != 0 {
+				errResp := ErrorResponse{
 					Error:    errBattleSessionPendingResponse.Error(),
 					GameID:   req.GameID,
 					Revision: context.record.Revision,
-				})
+				}
+				if responder == session.AttackerFaction {
+					errResp.Error = errBattleSessionPendingAttacker.Error()
+				}
+				writeJSON(w, http.StatusConflict, errResp)
 				return
 			}
 			modifiers.DefenderAmbush = session.DefenderAmbush
 			modifiers.DefenderUsesArmorers = session.DefenderUsedArmorers
 			modifiers.DefenderUsesSappers = session.DefenderUsedSappers
+			modifiers.AttackerCounterAmbush = session.AttackerCounterAmbush
+			modifiers.AttackerUsesArmorers = session.AttackerUsedArmorers
+			modifiers.AttackerUsesBrutalTactics = session.AttackerUsedBrutalTactics
 		}
+		rolledAttacker, rolledDefender, err := battleRoller()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, &ErrorResponse{
+				Error:    "failed to roll battle dice",
+				GameID:   req.GameID,
+				Revision: context.record.Revision,
+			})
+			return
+		}
+		attackerRoll = rolledAttacker
+		defenderRoll = rolledDefender
 	}
 
 	useModifiers := req.UseModifiers
-	if context.multiplayer && (modifiers.DefenderAmbush || modifiers.DefenderUsesArmorers || modifiers.DefenderUsesSappers) {
+	if context.multiplayer && (modifiers.DefenderAmbush || modifiers.DefenderUsesArmorers || modifiers.DefenderUsesSappers || modifiers.AttackerCounterAmbush || modifiers.AttackerUsesArmorers || modifiers.AttackerUsesBrutalTactics) {
 		useModifiers = true
 	}
 
@@ -257,17 +313,27 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		action = engine.ResolveBattleWithModifiers(
 			context.state,
 			req.Action,
-			req.AttackerRoll,
-			req.DefenderRoll,
+			attackerRoll,
+			defenderRoll,
 			modifiers,
 		)
 	} else {
 		action = engine.ResolveBattle(
 			context.state,
 			req.Action,
-			req.AttackerRoll,
-			req.DefenderRoll,
+			attackerRoll,
+			defenderRoll,
 		)
+	}
+	if context.multiplayer {
+		if _, err := battleSessions.recordResolution(req.GameID, context.record.Revision, req.Action, battleContext, action); err != nil {
+			writeJSON(w, battleSessionErrorStatus(err), ErrorResponse{
+				Error:    err.Error(),
+				GameID:   req.GameID,
+				Revision: context.record.Revision,
+			})
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, ResolveBattleResponse{
@@ -308,6 +374,14 @@ func HandleBattleContext(w http.ResponseWriter, r *http.Request) {
 	effectiveReq.State = context.state
 	if validationError := validateBattleContextRequest(effectiveReq); validationError != "" {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
+		return
+	}
+	if context.multiplayer && !actionMatchesValidAction(context.state, req.Action) {
+		writeError(w, http.StatusBadRequest, &ErrorResponse{
+			Error:    errInvalidActionForState.Error(),
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
 		return
 	}
 
@@ -353,9 +427,17 @@ func HandleOpenBattle(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: validationError})
 		return
 	}
+	if !actionMatchesValidAction(context.state, req.Action) {
+		writeError(w, http.StatusBadRequest, &ErrorResponse{
+			Error:    errInvalidActionForState.Error(),
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
 
 	battleContext := engine.BattleContext(context.state, req.Action)
-	if !requiresDefenderResponse(battleContext) {
+	if !requiresDefenderResponse(battleContext) && !requiresAttackerBaseResponse(battleContext) {
 		writeJSON(w, http.StatusOK, BattlePromptResponse{
 			Prompt: battlePromptView(battleSession{
 				GameID:          req.GameID,
@@ -410,6 +492,9 @@ func HandleBattleSession(w http.ResponseWriter, r *http.Request) {
 	if !ok || session.Revision != record.Revision {
 		if ok && session.Revision != record.Revision {
 			battleSessions.clear(gameID)
+			if lobby, lobbyOK := lobbies.getByGameID(gameID); lobbyOK {
+				globalHub.broadcastBattlePrompt(lobby.JoinCode, nil)
+			}
 		}
 		writeJSON(w, http.StatusOK, BattlePromptResponse{
 			GameID:   gameID,
@@ -457,7 +542,7 @@ func HandleBattleResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := battleSessions.applyDefenderResponse(req.GameID, record.Revision, perspective, req)
+	session, err := battleSessions.applyResponse(req.GameID, record.Revision, perspective, req)
 	if err != nil {
 		writeJSON(w, battleSessionErrorStatus(err), ErrorResponse{
 			Error:    err.Error(),

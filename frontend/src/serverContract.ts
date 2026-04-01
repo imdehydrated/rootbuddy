@@ -6,6 +6,8 @@ import type {
   BattleModifiers,
   EffectResult,
   GameState,
+  Lobby,
+  LobbyPlayer,
   SetupRequest
 } from "./types";
 
@@ -75,6 +77,16 @@ export type BattlePromptResponseDTO = {
   revision?: number;
 };
 
+export type BattleResponseRequestDTO = {
+  gameID: string;
+  useAmbush?: boolean;
+  useDefenderArmorers?: boolean;
+  useSappers?: boolean;
+  useCounterAmbush?: boolean;
+  useAttackerArmorers?: boolean;
+  useBrutalTactics?: boolean;
+};
+
 export type SetupRequestDTO = SetupRequest;
 
 export type SetupResponseDTO = {
@@ -99,10 +111,57 @@ export type GameLogResponseDTO = {
   revision?: number;
 };
 
+export type CreateLobbyRequestDTO = {
+  displayName: string;
+  factions?: number[];
+  mapID?: string;
+  vagabondCharacter?: number;
+  eyrieLeader?: number;
+};
+
+export type JoinLobbyRequestDTO = {
+  joinCode: string;
+  displayName: string;
+};
+
+export type ClaimFactionRequestDTO = {
+  faction: number | null;
+};
+
+export type ReadyLobbyRequestDTO = {
+  isReady: boolean;
+};
+
+export type LobbyResponseDTO = {
+  lobby: Lobby;
+  self: LobbyPlayer;
+};
+
+export type CreateLobbyResponseDTO = LobbyResponseDTO & {
+  playerToken: string;
+};
+
+export type JoinLobbyResponseDTO = LobbyResponseDTO & {
+  playerToken: string;
+};
+
+export type StartLobbyResponseDTO = LobbyResponseDTO & {
+  state: GameState;
+  gameID: string;
+  revision?: number;
+};
+
+export type LeaveLobbyResponseDTO = {
+  closed: boolean;
+  lobby?: Lobby;
+  self?: LobbyPlayer;
+};
+
 export type MultiplayerSocketMessage =
   | {
       type: "lobby.update";
-      lobby: Record<string, unknown>;
+      lobby: Lobby;
+      self: LobbyPlayer;
     }
   | {
       type: "game.start";

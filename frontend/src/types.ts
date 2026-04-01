@@ -75,6 +75,27 @@ export interface ActionLogEntry {
   timestamp: number;
 }
 
+export interface LobbyPlayer {
+  displayName: string;
+  faction: number;
+  hasFaction: boolean;
+  isHost: boolean;
+  isReady: boolean;
+  connected: boolean;
+}
+
+export interface Lobby {
+  joinCode: string;
+  gameID?: string;
+  state: number;
+  players: LobbyPlayer[];
+  factions: number[];
+  mapID: string;
+  vagabondCharacter: number;
+  eyrieLeader: number;
+  createdAt: string;
+}
+
 export interface Clearing {
   id: number;
   suit: number;
@@ -427,13 +448,24 @@ export interface BattlePrompt {
   gameID: string;
   revision: number;
   action: Action;
-  stage: "waiting_defender" | "defender_response" | "ready_to_resolve";
+  stage:
+    | "waiting_defender"
+    | "defender_response"
+    | "waiting_attacker"
+    | "attacker_response"
+    | "ready_to_resolve";
   waitingOnFaction: number;
   battleContext: BattleContext;
   canUseAmbush?: boolean;
-  canUseArmorers?: boolean;
+  canUseDefenderArmorers?: boolean;
   canUseSappers?: boolean;
+  canUseCounterAmbush?: boolean;
+  canUseAttackerArmorers?: boolean;
+  canUseBrutalTactics?: boolean;
   defenderAmbush?: boolean;
   defenderUsedArmorers?: boolean;
   defenderUsedSappers?: boolean;
+  attackerCounterAmbush?: boolean;
+  attackerUsedArmorers?: boolean;
+  attackerUsedBrutalTactics?: boolean;
 }

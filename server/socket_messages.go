@@ -12,8 +12,9 @@ const (
 )
 
 type LobbyUpdateMessage struct {
-	Type  string `json:"type"`
-	Lobby Lobby  `json:"lobby"`
+	Type  string     `json:"type"`
+	Lobby Lobby      `json:"lobby"`
+	Self  PlayerSlot `json:"self"`
 }
 
 type GameStartMessage struct {

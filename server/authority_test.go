@@ -433,6 +433,213 @@ func TestHandleApplyActionMultiplayerReturnsConflictForStaleRevision(t *testing.
 	}
 }
 
+func TestHandleApplyActionMultiplayerRejectsActionOutsideAuthoritativeValidActions(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, _, hostState, revision := startLobbyBackedGame(t)
+
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID: gameID,
+		State:  hostState,
+		Action: game.Action{
+			Type: game.ActionAddCardToHand,
+			AddCardToHand: &game.AddCardToHandAction{
+				Faction: game.Marquise,
+				CardID:  8,
+			},
+		},
+		ClientRevision: revision,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for out-of-band multiplayer action, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errInvalidActionForState.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != revision {
+		t.Fatalf("expected revision %d, got %d", revision, resp.Revision)
+	}
+}
+
+func TestHandleBattleContextMultiplayerRejectsBattleOutsideAuthoritativeValidActions(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, _, hostState, revision := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GameMode = game.GameModeOnline
+		state.TrackAllHands = true
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.Map = game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 1,
+					},
+				},
+			},
+		}
+	})
+
+	body, _ := json.Marshal(BattleContextRequest{
+		GameID: gameID,
+		State:  hostState,
+		Action: battleAction(game.Marquise, game.Eyrie),
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/battles/context", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid multiplayer battle context action, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errInvalidActionForState.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+	if resp.Revision != revision+1 {
+		t.Fatalf("expected revision %d after authoritative replacement, got %d", revision+1, resp.Revision)
+	}
+}
+
+func TestHandleResolveBattleMultiplayerRejectsBattleOutsideAuthoritativeValidActions(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, _, hostState, revision := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GameMode = game.GameModeOnline
+		state.TrackAllHands = true
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.Map = game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 1,
+					},
+				},
+			},
+		}
+	})
+
+	body, _ := json.Marshal(ResolveBattleRequest{
+		GameID:       gameID,
+		State:        hostState,
+		Action:       battleAction(game.Marquise, game.Eyrie),
+		AttackerRoll: 1,
+		DefenderRoll: 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/battles/resolve", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid multiplayer resolve battle action, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errInvalidActionForState.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+	if resp.Revision != revision+1 {
+		t.Fatalf("expected revision %d after authoritative replacement, got %d", revision+1, resp.Revision)
+	}
+}
+
+func TestHandleApplyActionMultiplayerRejectsObservedCardSelectionForStandAndDeliver(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, _, _, _ := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GameMode = game.GameModeOnline
+		state.TrackAllHands = true
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.PersistentEffects = map[game.Faction][]game.CardID{
+			game.Marquise: {41},
+		}
+		state.Marquise.CardsInHand = nil
+		state.Eyrie.CardsInHand = []game.Card{
+			{ID: 8, Name: "Birdy Bindle"},
+		}
+		state.OtherHandCounts = map[game.Faction]int{
+			game.Eyrie: 1,
+		}
+	})
+
+	visible := redactStateForPlayer(record.State, game.Marquise)
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID:         gameID,
+		State:          visible,
+		ClientRevision: record.Revision,
+		Action: game.Action{
+			Type: game.ActionUsePersistentEffect,
+			UsePersistentEffect: &game.UsePersistentEffectAction{
+				Faction:        game.Marquise,
+				EffectID:       "stand_and_deliver",
+				TargetFaction:  game.Eyrie,
+				ObservedCardID: 8,
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for client-selected stand and deliver card, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errInvalidActionForState.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+}
+
 func TestHandleLoadGameReturnsServerErrorForInvalidAuthoritativeState(t *testing.T) {
 	previousStore := store
 	store = newOnlineStateStore(t.TempDir())
