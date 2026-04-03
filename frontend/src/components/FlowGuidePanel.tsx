@@ -1,10 +1,14 @@
+import type { MultiplayerConnectionStatus } from "../multiplayer";
 import { factionLabels, phaseLabels, setupStageLabels } from "../labels";
-import type { Action, GameState } from "../types";
+import type { Action, BattlePrompt, GameState } from "../types";
 
 type FlowGuidePanelProps = {
   state: GameState;
   loadedActionCount: number;
   selectedBattleAction: Action | null;
+  isMultiplayer: boolean;
+  multiplayerConnectionStatus: MultiplayerConnectionStatus;
+  multiplayerBattlePrompt: BattlePrompt | null;
   onGenerateActions: () => Promise<void>;
   onOpenHelp: () => void;
 };
@@ -101,6 +105,94 @@ function battleGuide(selectedBattleAction: Action): GuideContent {
   };
 }
 
+function multiplayerGuide(
+  state: GameState,
+  loadedActionCount: number,
+  connectionStatus: MultiplayerConnectionStatus,
+  battlePrompt: BattlePrompt | null,
+  onGenerateActions: () => Promise<void>
+): GuideContent {
+  if (connectionStatus === "reconnecting" || connectionStatus === "disconnected") {
+    return {
+      eyebrow: "Flow Guide",
+      title: "Realtime Sync Interrupted",
+      detail: "The multiplayer session is reconnecting. Wait for the live connection to recover before expecting prompts or fresh actions.",
+      checklist: [
+        "Do not rely on stale action buttons while the connection is recovering.",
+        "The server remains authoritative and will push the latest state after reconnect.",
+        "If reconnect fails, return to the lobby or reload using the saved browser session."
+      ]
+    };
+  }
+
+  if (battlePrompt) {
+    if (battlePrompt.stage === "defender_response" || battlePrompt.stage === "attacker_response") {
+      return {
+        eyebrow: "Flow Guide",
+        title: battlePrompt.waitingOnFaction === state.playerFaction ? "Your Battle Response" : "Waiting On Battle Response",
+        detail:
+          battlePrompt.waitingOnFaction === state.playerFaction
+            ? "Use Battle Flow to submit the response owned by your faction before the turn can continue."
+            : `Waiting on ${factionLabels[battlePrompt.waitingOnFaction] ?? "another player"} to answer the current battle prompt.`,
+        checklist: [
+          "Battle Flow shows only the options the server exposed for your perspective.",
+          "Once all responses are in, the attacker will receive the resolve step.",
+          "The server owns the actual battle dice in multiplayer."
+        ]
+      };
+    }
+
+    if (battlePrompt.stage === "ready_to_resolve") {
+      const attackerFaction = battlePrompt.action.battle?.faction ?? -1;
+      return {
+        eyebrow: "Flow Guide",
+        title: attackerFaction === state.playerFaction ? "Resolve Battle" : "Waiting For Battle Resolution",
+        detail:
+          attackerFaction === state.playerFaction
+            ? "Battle responses are complete. Resolve the battle from Battle Flow to continue the turn."
+            : `Battle responses are complete. Waiting on ${factionLabels[attackerFaction] ?? "the attacker"} to resolve.`,
+        checklist: [
+          "Do not refresh or apply unrelated actions until the battle finishes.",
+          "The next legal action set will load automatically after the server advances the turn.",
+          "Battle resolution remains authoritative on the server."
+        ]
+      };
+    }
+  }
+
+  if (state.factionTurn === state.playerFaction) {
+    const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
+    return {
+      eyebrow: "Flow Guide",
+      title: `Your Turn: ${phaseLabel}`,
+      detail:
+        loadedActionCount > 0
+          ? "Apply one of the server-authoritative legal actions below. Battles still use Battle Flow."
+          : "Legal actions are loading automatically for your turn. You can still refresh manually if needed.",
+      checklist: [
+        "The server will reject stale or out-of-turn actions.",
+        "After each applied action, wait for the pushed state update before continuing.",
+        "Battle prompts interrupt normal action flow when another player must respond."
+      ],
+      primaryLabel: loadedActionCount > 0 ? "Refresh Actions" : "Refresh Actions",
+      primaryAction: () => void onGenerateActions()
+    };
+  }
+
+  const actingFaction = factionLabels[state.factionTurn] ?? "Unknown";
+  const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
+  return {
+    eyebrow: "Flow Guide",
+    title: `Waiting On ${actingFaction}`,
+    detail: `${actingFaction} is taking their ${phaseLabel.toLowerCase()}. Multiplayer clients are passive until the server gives your faction priority.`,
+    checklist: [
+      "Watch for a battle prompt if your faction must answer a reaction window.",
+      "Your legal actions will load automatically when the turn passes to you.",
+      "Use the session panel to confirm connection health while waiting."
+    ]
+  };
+}
+
 function reviewGuide(): GuideContent {
   return {
     eyebrow: "Flow Guide",
@@ -118,6 +210,9 @@ export function FlowGuidePanel({
   state,
   loadedActionCount,
   selectedBattleAction,
+  isMultiplayer,
+  multiplayerConnectionStatus,
+  multiplayerBattlePrompt,
   onGenerateActions,
   onOpenHelp
 }: FlowGuidePanelProps) {
@@ -128,6 +223,8 @@ export function FlowGuidePanel({
         ? reviewGuide()
         : selectedBattleAction?.battle
           ? battleGuide(selectedBattleAction)
+        : isMultiplayer
+          ? multiplayerGuide(state, loadedActionCount, multiplayerConnectionStatus, multiplayerBattlePrompt, onGenerateActions)
         : state.factionTurn === state.playerFaction
           ? playerTurnGuide(state, loadedActionCount, onGenerateActions)
           : observedTurnGuide(state, loadedActionCount, onGenerateActions);

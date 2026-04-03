@@ -5,17 +5,21 @@ import type { Action, GameState } from "../types";
 type PlayerActionsPanelProps = {
   state: GameState;
   actions: Action[];
+  isMultiplayer: boolean;
   onApply: (action: Action) => Promise<void>;
   onGenerateActions: () => Promise<void>;
   onOpenBattle: (actionIndex: number) => void;
+  onPreviewAction?: (actionIndex: number | null) => void;
 };
 
 export function PlayerActionsPanel({
   state,
   actions,
+  isMultiplayer,
   onApply,
   onGenerateActions,
-  onOpenBattle
+  onOpenBattle,
+  onPreviewAction
 }: PlayerActionsPanelProps) {
   const [showAllActions, setShowAllActions] = useState(false);
 
@@ -36,7 +40,11 @@ export function PlayerActionsPanel({
       <div className="summary-stack">
         <span className="summary-label">{phaseLabel}</span>
         <span className="summary-line">
-          {visibleActions.length > 0 ? `${visibleActions.length} loaded action(s) ready below.` : "No loaded actions yet."}
+          {visibleActions.length > 0
+            ? `${visibleActions.length} loaded action(s) ready below.`
+            : isMultiplayer
+              ? "Actions refresh automatically when the server hands you priority."
+              : "No loaded actions yet."}
         </span>
       </div>
 
@@ -49,7 +57,14 @@ export function PlayerActionsPanel({
       ) : (
         <div className="embedded-action-list" style={{ marginTop: "0.9rem" }}>
           {visibleActions.map((action, index) => (
-            <div key={`${action.type}-${index}`} className="embedded-action-card">
+            <div
+              key={`${action.type}-${index}`}
+              className="embedded-action-card"
+              onMouseEnter={() => onPreviewAction?.(index)}
+              onMouseLeave={() => onPreviewAction?.(null)}
+              onFocus={() => onPreviewAction?.(index)}
+              onBlur={() => onPreviewAction?.(null)}
+            >
               <span className="summary-line">{describeAction(action)}</span>
               {action.type === ACTION_TYPE.BATTLE ? (
                 <button type="button" className="secondary" onClick={() => onOpenBattle(index)}>

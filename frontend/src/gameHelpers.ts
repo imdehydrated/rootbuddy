@@ -4,6 +4,7 @@ import type { Action, Building, GameState, HighlightedClearing, Token } from "./
 const MARQUISE_FACTION = 0;
 const ALLIANCE_FACTION = 1;
 const EYRIE_FACTION = 2;
+const RULING_FACTIONS = [MARQUISE_FACTION, ALLIANCE_FACTION, EYRIE_FACTION] as const;
 const SAWMILL = 0;
 const WORKSHOP = 1;
 const RECRUITER = 2;
@@ -71,6 +72,38 @@ export function hasAnyIndicators(values: number[], extraPresence: boolean): bool
 
 export function countWarriors(warriors: Record<string, number>, faction: number): number {
   return warriors[String(faction)] ?? 0;
+}
+
+export function rulingPresence(clearing: GameState["map"]["clearings"][number], faction: number): number {
+  return countWarriors(clearing.warriors, faction) + countBuildings(clearing.buildings, faction);
+}
+
+export function rulerOfClearing(clearing: GameState["map"]["clearings"][number]): number | null {
+  let leadingFaction: number | null = null;
+  let leadingPresence = 0;
+  let tied = false;
+
+  for (const faction of RULING_FACTIONS) {
+    const presence = rulingPresence(clearing, faction);
+    if (presence === 0) {
+      continue;
+    }
+    if (presence > leadingPresence) {
+      leadingFaction = faction;
+      leadingPresence = presence;
+      tied = false;
+      continue;
+    }
+    if (presence === leadingPresence) {
+      tied = true;
+    }
+  }
+
+  if (leadingFaction === null || tied) {
+    return null;
+  }
+
+  return leadingFaction;
 }
 
 export function syncDerivedFactionStateFromBoard(state: GameState): void {
@@ -145,6 +178,9 @@ export function affectedClearings(action: Action): HighlightedClearing[] {
       add(action.battleResolution?.clearingID, "affected");
       break;
     case ACTION_TYPE.BUILD:
+      for (const source of action.build?.woodSources ?? []) {
+        add(source.clearingID, "source");
+      }
       add(action.build?.clearingID, "affected");
       break;
     case ACTION_TYPE.RECRUIT:
@@ -160,9 +196,52 @@ export function affectedClearings(action: Action): HighlightedClearing[] {
         add(clearingID, "affected");
       }
       break;
+    case ACTION_TYPE.SPREAD_SYMPATHY:
+      add(action.spreadSympathy?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.REVOLT:
+      add(action.revolt?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.ORGANIZE:
+      add(action.organize?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.EXPLORE:
+      add(action.explore?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.AID:
+      add(action.aid?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.STRIKE:
+      add(action.strike?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.SLIP:
+      add(action.slip?.from, "source");
+      add(action.slip?.to, "target");
+      break;
+    case ACTION_TYPE.BIRDSONG_WOOD:
+      for (const clearingID of action.birdsongWood?.clearingIDs ?? []) {
+        add(clearingID, "affected");
+      }
+      break;
+    case ACTION_TYPE.MARQUISE_SETUP:
+      add(action.marquiseSetup?.keepClearingID, "affected");
+      add(action.marquiseSetup?.sawmillClearingID, "affected");
+      add(action.marquiseSetup?.workshopClearingID, "affected");
+      add(action.marquiseSetup?.recruiterClearingID, "affected");
+      break;
+    case ACTION_TYPE.EYRIE_SETUP:
+      add(action.eyrieSetup?.clearingID, "affected");
+      break;
+    case ACTION_TYPE.USE_PERSISTENT_EFFECT:
+      add(action.usePersistentEffect?.clearingID, "affected");
+      break;
     default:
       break;
   }
 
   return Array.from(highlighted, ([clearingID, role]) => ({ clearingID, role }));
+}
+
+export function actionTouchesClearing(action: Action, clearingID: number): boolean {
+  return affectedClearings(action).some((highlight) => highlight.clearingID === clearingID);
 }

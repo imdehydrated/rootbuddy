@@ -51,6 +51,11 @@ import type { Action, BattleContext, BattleModifiers, BattlePrompt, Clearing, Ga
 import { RootBuddyWebSocketClient } from "./wsClient";
 
 type ActiveModal = "json" | null;
+type MultiplayerNotice = {
+  level: "warning" | "error";
+  title: string;
+  detail: string;
+} | null;
 
 type MarquiseSetupDraft = {
   keepClearingID: number | null;
@@ -250,6 +255,7 @@ export default function App() {
   const [battleModifiers, setBattleModifiers] = useState<BattleModifiers>(emptyBattleModifiers);
   const [battleContext, setBattleContext] = useState<BattleContext | null>(null);
   const [multiplayerBattlePrompt, setMultiplayerBattlePrompt] = useState<BattlePrompt | null>(null);
+  const [multiplayerNotice, setMultiplayerNotice] = useState<MultiplayerNotice>(null);
   const [assistDefenderAmbushChoice, setAssistDefenderAmbushChoice] = useState<boolean | null>(null);
   const [error, setError] = useState<string>("");
   const [status, setStatus] = useState<string>("Click a clearing to start setting the board.");
@@ -260,6 +266,7 @@ export default function App() {
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
   const multiplayerToken = multiplayerSession?.playerToken ?? null;
   const previousConnectionStatus = useRef<MultiplayerConnectionStatus>("disconnected");
+  const autoLoadedActionKey = useRef<string>("");
 
   useEffect(() => {
     try {
@@ -414,6 +421,7 @@ export default function App() {
       },
       onMessage: (message) => {
         if (message.type === "lobby.update") {
+          setMultiplayerNotice(null);
           setMultiplayerLobby(message.lobby);
           setMultiplayerSelf(message.self);
           setShowSetup(true);
@@ -455,14 +463,21 @@ export default function App() {
           setShowBoardEditor(false);
           setShowGuideHelp(false);
           if (message.type === "conflict") {
+            setMultiplayerNotice({
+              level: "warning",
+              title: "Server State Updated",
+              detail: message.error
+            });
             setStatus(message.error);
           } else {
+            setMultiplayerNotice(null);
             setStatus(message.type === "game.start" ? "Multiplayer game started." : "Received multiplayer update.");
           }
           return;
         }
 
         if (message.type === "battle.prompt") {
+          setMultiplayerNotice(null);
           setMultiplayerBattlePrompt(message.prompt ?? null);
           if (!message.prompt) {
             return;
@@ -482,6 +497,11 @@ export default function App() {
         }
 
         if (message.type === "session.error") {
+          setMultiplayerNotice({
+            level: "error",
+            title: "Session Error",
+            detail: message.error
+          });
           setStatus(message.error);
         }
       }
@@ -505,10 +525,16 @@ export default function App() {
       return;
     }
     if (multiplayerConnectionStatus === "reconnecting") {
+      setMultiplayerNotice({
+        level: "warning",
+        title: "Reconnecting",
+        detail: "Realtime connection lost. Waiting for the websocket session to recover."
+      });
       setStatus("Realtime connection lost. Reconnecting...");
       return;
     }
     if (multiplayerConnectionStatus === "connected" && (previous === "connecting" || previous === "reconnecting")) {
+      setMultiplayerNotice(null);
       setStatus("Realtime multiplayer connection active.");
     }
   }, [multiplayerConnectionStatus, multiplayerToken]);
@@ -545,6 +571,58 @@ export default function App() {
     };
   }, [multiplayerToken, serverGameID, showSetup]);
 
+  useEffect(() => {
+    if (!multiplayerToken || showSetup || parsedState.gamePhase !== 1) {
+      autoLoadedActionKey.current = "";
+      return;
+    }
+    if (multiplayerBattlePrompt || parsedState.factionTurn !== parsedState.playerFaction) {
+      autoLoadedActionKey.current = "";
+      return;
+    }
+
+    const loadKey = [
+      serverGameID ?? "",
+      serverRevision ?? "na",
+      parsedState.roundNumber,
+      parsedState.currentPhase,
+      parsedState.currentStep,
+      parsedState.factionTurn
+    ].join(":");
+    if (autoLoadedActionKey.current === loadKey) {
+      return;
+    }
+
+    autoLoadedActionKey.current = loadKey;
+    let cancelled = false;
+
+    async function loadTurnActions() {
+      try {
+        setStatus("Your turn. Loading legal actions...");
+        await loadActionsForState(parsedState);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        autoLoadedActionKey.current = "";
+        setStatus(err instanceof Error ? err.message : "Failed to refresh legal actions");
+      }
+    }
+
+    void loadTurnActions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    multiplayerBattlePrompt,
+    multiplayerToken,
+    parsedState,
+    serverGameID,
+    serverRevision,
+    showSetup
+  ]);
+
   function resetToSetup(options?: { clearSaved?: boolean; status?: string }) {
     if (options?.clearSaved) {
       clearSavedSession();
@@ -566,6 +644,7 @@ export default function App() {
     setMultiplayerLobby(null);
     setMultiplayerSelf(null);
     setMultiplayerBattlePrompt(null);
+    setMultiplayerNotice(null);
     setMultiplayerConnectionStatus("disconnected");
     setSetupScreen("wizard");
   }
@@ -575,6 +654,7 @@ export default function App() {
     setServerGameID(gameID);
     setServerRevision(revision);
     setMultiplayerBattlePrompt(null);
+    setMultiplayerNotice(null);
     setShowSetup(false);
     setShowBoardEditor(false);
     setActiveModal(null);
@@ -1346,6 +1426,8 @@ export default function App() {
           vagabondClearingID={parsedState.vagabond.clearingID}
           vagabondInForest={parsedState.vagabond.inForest}
           highlightedClearings={highlightedClearings}
+          actions={actions}
+          previewedAction={previewedAction}
           setupLegalClearingIDs={legalSetupClearingIDs}
           setupSelectedClearingIDs={selectedSetupClearingIDs}
           forestTargets={forestTargets}
@@ -1387,9 +1469,18 @@ export default function App() {
           state={parsedState}
           loadedActionCount={actions.length}
           selectedBattleAction={selectedBattleAction}
+          isMultiplayer={multiplayerToken !== null}
+          multiplayerConnectionStatus={multiplayerConnectionStatus}
+          multiplayerBattlePrompt={multiplayerBattlePrompt}
           onGenerateActions={refreshActions}
           onOpenHelp={() => setShowGuideHelp(true)}
         />
+        {multiplayerNotice ? (
+          <section className={`panel sidebar-panel notice-panel ${multiplayerNotice.level}`}>
+            <p className="eyebrow">{multiplayerNotice.title}</p>
+            <span className="summary-line">{multiplayerNotice.detail}</span>
+          </section>
+        ) : null}
         {showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
 
         {parsedState.gamePhase === 0 ? (
@@ -1408,9 +1499,11 @@ export default function App() {
         <PlayerActionsPanel
           state={parsedState}
           actions={actions}
+          isMultiplayer={multiplayerToken !== null}
           onApply={handleApply}
           onGenerateActions={refreshActions}
           onOpenBattle={openBattleForActionIndex}
+          onPreviewAction={setHoveredActionIndex}
         />
         <BattleFlowPanel
           selectedBattleIndex={selectedBattleIndex}

@@ -17,6 +17,8 @@ export class RootBuddyWebSocketClient {
   private reconnectTimer: number | null = null;
   private reconnectDelay = 1000;
   private closedManually = false;
+  private hasConnected = false;
+  private reconnectScheduled = false;
 
   constructor(options: WebSocketClientOptions) {
     this.token = options.token;
@@ -35,18 +37,24 @@ export class RootBuddyWebSocketClient {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.socket?.close();
+    this.reconnectScheduled = false;
+    if (!this.socket) {
+      this.onConnectionChange?.("disconnected");
+      return;
+    }
+    this.socket.close();
     this.socket = null;
-    this.onConnectionChange?.("disconnected");
   }
 
   private openSocket() {
     const wsURL = `${API_BASE.replace("http://", "ws://").replace("https://", "wss://")}/ws?token=${encodeURIComponent(this.token)}`;
     const socket = new WebSocket(wsURL);
     this.socket = socket;
-    this.onConnectionChange?.(this.reconnectTimer === null && this.reconnectDelay === 1000 ? "connecting" : "reconnecting");
+    this.onConnectionChange?.(this.hasConnected || this.reconnectScheduled ? "reconnecting" : "connecting");
 
     socket.onopen = () => {
+      this.hasConnected = true;
+      this.reconnectScheduled = false;
       this.reconnectDelay = 1000;
       this.onConnectionChange?.("connected");
     };
@@ -65,9 +73,11 @@ export class RootBuddyWebSocketClient {
 
     socket.onclose = () => {
       if (this.closedManually) {
+        this.reconnectScheduled = false;
         this.onConnectionChange?.("disconnected");
         return;
       }
+      this.reconnectScheduled = true;
       this.onConnectionChange?.("reconnecting");
       this.scheduleReconnect();
     };
@@ -78,10 +88,11 @@ export class RootBuddyWebSocketClient {
       return;
     }
 
+    const delay = this.reconnectDelay;
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 15000);
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.openSocket();
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 15000);
-    }, this.reconnectDelay);
+    }, delay);
   }
 }
