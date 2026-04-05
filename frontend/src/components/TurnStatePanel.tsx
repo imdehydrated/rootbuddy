@@ -1,13 +1,16 @@
 import {
   eyrieLeaderLabels,
   factionLabels,
+  itemTypeLabels,
   itemStatusLabels,
   phaseLabels,
   relationshipLabels,
   stepLabels,
+  suitLabels,
   vagabondCharacterLabels
 } from "../labels";
-import type { GameState } from "../types";
+import { describeKnownCardID } from "../cardCatalog";
+import type { Card, GameState } from "../types";
 
 type TurnStatePanelProps = {
   state: GameState;
@@ -28,6 +31,10 @@ function formatNumberList(values: number[]): string {
   return values.join(", ");
 }
 
+function describeVisibleCard(card: Card): string {
+  return `${card.name} (${suitLabels[card.suit] ?? "Unknown"})`;
+}
+
 export function TurnStatePanel({
   state,
   onUpdateState,
@@ -35,6 +42,15 @@ export function TurnStatePanel({
   showCloseButton = true,
   onClose
 }: TurnStatePanelProps) {
+  const decreePreviewGroups = [
+    { label: "Recruit", cardIDs: state.eyrie.decree.recruit },
+    { label: "Move", cardIDs: state.eyrie.decree.move },
+    { label: "Battle", cardIDs: state.eyrie.decree.battle },
+    { label: "Build", cardIDs: state.eyrie.decree.build }
+  ];
+  const allianceSupporterLabels = state.alliance.supporters.map(describeVisibleCard);
+  const resolvedDecreeLabels = state.turnProgress.resolvedDecreeCardIDs.map(describeKnownCardID);
+
   return (
     <section className="panel modal-panel">
       <div className="panel-header">
@@ -406,6 +422,70 @@ export function TurnStatePanel({
             Vagabond In Forest
           </label>
         </div>
+
+        <div className="summary-stack" style={{ marginTop: "1rem" }}>
+          <span className="summary-label">Card Readout</span>
+          <div className="observed-reference-grid">
+            {decreePreviewGroups.map((group) => (
+              <div key={group.label} className="observed-reference-card">
+                <span className="summary-label">Decree {group.label}</span>
+                {group.cardIDs.length === 0 ? (
+                  <span>None</span>
+                ) : (
+                  <div className="known-card-pill-list">
+                    {group.cardIDs.map((cardID, index) => (
+                      <span key={`${group.label}-${cardID}-${index}`} className="known-card-pill">
+                        {describeKnownCardID(cardID)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div className="observed-reference-card">
+              <span className="summary-label">Alliance Supporters</span>
+              {allianceSupporterLabels.length === 0 ? (
+                <span>None visible</span>
+              ) : (
+                <div className="known-card-pill-list">
+                  {allianceSupporterLabels.map((label, index) => (
+                    <span key={`${label}-${index}`} className="known-card-pill">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="observed-reference-card">
+              <span className="summary-label">Resolved Decree Cards</span>
+              {resolvedDecreeLabels.length === 0 ? (
+                <span>None</span>
+              ) : (
+                <div className="known-card-pill-list">
+                  {resolvedDecreeLabels.map((label, index) => (
+                    <span key={`${label}-${index}`} className="known-card-pill">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="observed-reference-card">
+              <span className="summary-label">Used Workshop Clearings</span>
+              {state.turnProgress.usedWorkshopClearings.length === 0 ? (
+                <span>None</span>
+              ) : (
+                <div className="known-card-pill-list">
+                  {state.turnProgress.usedWorkshopClearings.map((clearingID) => (
+                    <span key={clearingID} className="known-card-pill">
+                      Clearing {clearingID}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="summary-section">
@@ -418,7 +498,7 @@ export function TurnStatePanel({
             ) : (
               state.vagabond.items.map((item, index) => (
                 <span key={`${item.type}-${index}`}>
-                  {index + 1}. {itemStatusLabels[item.status] ?? "Unknown"} item {item.type}
+                  {index + 1}. {itemStatusLabels[item.status] ?? "Unknown"} {itemTypeLabels[item.type] ?? `Item ${item.type}`}
                 </span>
               ))
             )}

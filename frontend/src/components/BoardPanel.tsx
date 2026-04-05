@@ -1,7 +1,7 @@
 import { ClearingMarker } from "./ClearingMarker";
-import { actionTouchesClearing, countBuildings, countTokens, countWarriors, clearingPosition, rulerOfClearing, rulingPresence, suitClass } from "../gameHelpers";
-import { ACTION_TYPE, describeAction, factionLabels, suitLabels } from "../labels";
-import { useState } from "react";
+import { clearingPosition } from "../gameHelpers";
+import { ACTION_TYPE, describeAction, factionLabels } from "../labels";
+import { useState, type CSSProperties } from "react";
 import type { BoardLayout } from "../boardLayouts";
 import type { Action, Clearing, Forest, HighlightedClearing } from "../types";
 
@@ -14,7 +14,6 @@ type BoardPanelProps = {
   vagabondClearingID: number;
   vagabondInForest: boolean;
   highlightedClearings?: HighlightedClearing[];
-  actions?: Action[];
   previewedAction?: Action | null;
   setupLegalClearingIDs?: number[];
   setupSelectedClearingIDs?: number[];
@@ -37,7 +36,6 @@ export function BoardPanel({
   vagabondClearingID,
   vagabondInForest,
   highlightedClearings = [],
-  actions = [],
   previewedAction = null,
   setupLegalClearingIDs = [],
   setupSelectedClearingIDs = [],
@@ -47,6 +45,7 @@ export function BoardPanel({
   onSelectForest
 }: BoardPanelProps) {
   const [hoveredClearingID, setHoveredClearingID] = useState<number | null>(null);
+  const [zoomedClearingID, setZoomedClearingID] = useState<number | null>(null);
   const highlightByClearing = new Map(
     highlightedClearings.map((highlight) => [highlight.clearingID, highlight.role])
   );
@@ -108,57 +107,6 @@ export function BoardPanel({
       .filter((segment): segment is NonNullable<typeof segment> => segment !== null)
   );
 
-  const focusedClearingPresence =
-    focusedClearing === null
-      ? []
-      : [
-          {
-            key: "marquise",
-            label: factionLabels[0] ?? "Marquise",
-            total:
-              countWarriors(focusedClearing.warriors, 0) +
-              countBuildings(focusedClearing.buildings, 0) +
-              (focusedClearing.id === keepClearingID ? 1 : 0),
-            detail: `${countWarriors(focusedClearing.warriors, 0)} warriors, ${countBuildings(focusedClearing.buildings, 0)} buildings${focusedClearing.id === keepClearingID ? ", keep" : ""}`
-          },
-          {
-            key: "alliance",
-            label: factionLabels[1] ?? "Woodland Alliance",
-            total: countWarriors(focusedClearing.warriors, 1) + countBuildings(focusedClearing.buildings, 1) + countTokens(focusedClearing.tokens, 1),
-            detail: `${countWarriors(focusedClearing.warriors, 1)} warriors, ${countBuildings(focusedClearing.buildings, 1)} bases, ${countTokens(focusedClearing.tokens, 1)} tokens`
-          },
-          {
-            key: "eyrie",
-            label: factionLabels[2] ?? "Eyrie",
-            total: countWarriors(focusedClearing.warriors, 2) + countBuildings(focusedClearing.buildings, 2),
-            detail: `${countWarriors(focusedClearing.warriors, 2)} warriors, ${countBuildings(focusedClearing.buildings, 2)} roosts`
-          },
-          {
-            key: "vagabond",
-            label: factionLabels[3] ?? "Vagabond",
-            total: !vagabondInForest && focusedClearing.id === vagabondClearingID ? 1 : 0,
-            detail: !vagabondInForest && focusedClearing.id === vagabondClearingID ? "Present in clearing" : "Not present"
-          }
-        ].filter((entry) => entry.total > 0);
-  const focusedRuler = focusedClearing ? rulerOfClearing(focusedClearing) : null;
-  const adjacentClearings =
-    focusedClearing === null
-      ? []
-      : focusedClearing.adj
-          .map((adjacentID) => clearings.find((clearing) => clearing.id === adjacentID))
-          .filter((clearing): clearing is Clearing => clearing !== undefined);
-  const boardControlSummary = [
-    { key: "marquise", label: factionLabels[0] ?? "Marquise", count: clearings.filter((clearing) => rulerOfClearing(clearing) === 0).length },
-    { key: "alliance", label: factionLabels[1] ?? "Woodland Alliance", count: clearings.filter((clearing) => rulerOfClearing(clearing) === 1).length },
-    { key: "eyrie", label: factionLabels[2] ?? "Eyrie", count: clearings.filter((clearing) => rulerOfClearing(clearing) === 2).length },
-    { key: "contested", label: "Unruled", count: clearings.filter((clearing) => rulerOfClearing(clearing) === null).length }
-  ];
-  const focusedClearingActions =
-    focusedClearing === null
-      ? []
-      : actions
-          .map((action, index) => ({ action, index }))
-          .filter(({ action }) => actionTouchesClearing(action, focusedClearing.id));
   const previewedClearingIDs = new Set(highlightedClearings.map((highlight) => highlight.clearingID));
   const previewFootprint = highlightedClearings.reduce(
     (summary, highlight) => {
@@ -338,131 +286,136 @@ export function BoardPanel({
             };
           })
           .filter((annotation): annotation is NonNullable<typeof annotation> => annotation !== null);
+  const zoomTargetClearing = clearings.find((clearing) => clearing.id === zoomedClearingID) ?? null;
+  const zoomTargetPosition =
+    zoomTargetClearing === null
+      ? null
+      : boardLayout.clearingPositions[zoomTargetClearing.id] ?? clearingBoardPosition(zoomTargetClearing.id);
+  const boardCanvasStyle =
+    zoomTargetPosition === null
+      ? undefined
+      : ({
+          "--board-focus-x": `${zoomTargetPosition.left}%`,
+          "--board-focus-y": `${zoomTargetPosition.top}%`
+        } as CSSProperties);
 
   return (
     <section className="board-panel">
-      <div className={`board-canvas ${previewedAction ? "preview-active" : ""}`}>
-        <img
-          className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
-          src={boardLayout.imagePath}
-          alt={`${boardLayout.label} board`}
-        />
-        {focusedClearing ? (
-          <div className="board-chrome">
-            <div className="board-focus-card">
-              <p className="board-kicker">{boardLayout.label} Woodland</p>
-              <div className="board-focus-header">
-                <div>
-                  <h2>
-                    Clearing {focusedClearing.id}
-                    {hoveredClearingID !== null && hoveredClearingID !== selectedClearingID ? (
-                      <span className="board-focus-mode"> Preview</span>
-                    ) : null}
-                  </h2>
-                  <div className="board-focus-meta">
-                    <span className={`board-suit-pill ${suitClass(focusedClearing.suit)}`}>
-                      {suitLabels[focusedClearing.suit] ?? "Unknown"} Suit
-                    </span>
-                    <span>{focusedClearing.adj.length} paths</span>
-                    <span>
-                      {focusedRuler === null
-                        ? "No ruler"
-                        : `${factionLabels[focusedRuler] ?? "Unknown"} rule`}
-                    </span>
-                    <span>
-                      {focusedClearing.buildings.length}/{focusedClearing.buildSlots} build slots filled
-                    </span>
-                    {focusedClearing.wood > 0 ? <span>{focusedClearing.wood} wood</span> : null}
-                    {focusedClearing.ruins ? <span>Ruins</span> : null}
-                  </div>
-                </div>
-                <div className="board-focus-totals">
-                  <span>
-                    {Object.values(focusedClearing.warriors).reduce((sum, count) => sum + count, 0)} warriors
-                  </span>
-                  <span>{focusedClearing.tokens.length} tokens</span>
-                  {focusedRuler !== null ? (
-                    <span>
-                      {rulingPresence(focusedClearing, focusedRuler)} rule strength
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <div className="board-control-strip">
-                {boardControlSummary.map((entry) => (
-                  <div key={entry.key} className={`board-control-card ${entry.key}`}>
-                    <span>{entry.label}</span>
-                    <strong>{entry.count}</strong>
-                  </div>
+      <div
+        className={`board-canvas ${previewedAction ? "preview-active" : ""} ${zoomTargetPosition ? "zoomed" : ""}`}
+        style={boardCanvasStyle}
+        onClick={() => setZoomedClearingID(null)}
+      >
+        <div className="board-view">
+          <img
+            className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
+            src={boardLayout.imagePath}
+            alt={`${boardLayout.label} board`}
+          />
+          <div className="board-overlay">
+            {previewRoutes.length > 0 ? (
+              <svg className="board-preview-routes" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {previewRoutes.map((route) => (
+                  <line
+                    key={route.key}
+                    x1={route.x1}
+                    y1={route.y1}
+                    x2={route.x2}
+                    y2={route.y2}
+                    className={route.tone}
+                  />
                 ))}
+              </svg>
+            ) : null}
+            {!boardLayout.imagePath ? (
+              <svg className="board-paths" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {adjacencySegments.map((segment) => (
+                  <line
+                    key={segment.key}
+                    x1={segment.x1}
+                    y1={segment.y1}
+                    x2={segment.x2}
+                    y2={segment.y2}
+                    className={segment.connectedToFocused ? "connected-to-focus" : undefined}
+                  />
+                ))}
+              </svg>
+            ) : (
+              <svg className="board-paths board-paths-focus" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {adjacencySegments
+                  .filter((segment) => segment.connectedToFocused)
+                  .map((segment) => (
+                    <line
+                      key={segment.key}
+                      x1={segment.x1}
+                      y1={segment.y1}
+                      x2={segment.x2}
+                      y2={segment.y2}
+                      className="connected-to-focus"
+                    />
+                ))}
+              </svg>
+            )}
+            {previewAnnotations.map((annotation) => (
+              <div
+                key={annotation.key}
+                className={`board-preview-badge ${annotation.role}`}
+                style={{ left: `${annotation.left}%`, top: `${annotation.top}%` }}
+              >
+                <strong>{annotation.label}</strong>
+                <span>{annotation.detail}</span>
               </div>
-              <div className="board-presence-grid">
-                {focusedClearingPresence.length > 0 ? (
-                  focusedClearingPresence.map((presence) => (
-                    <div key={presence.key} className={`board-presence-card ${presence.key}`}>
-                      <span className="board-presence-label">{presence.label}</span>
-                      <strong>{presence.total}</strong>
-                      <span>{presence.detail}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="board-presence-empty">
-                    No faction presence here yet. Use this clearing for setup inspection or future action previews.
-                  </div>
-                )}
-              </div>
-              {adjacentClearings.length > 0 ? (
-                <div className="board-adjacency-panel">
-                  <span className="board-presence-label">Adjacent Clearings</span>
-                  <div className="board-adjacency-list">
-                    {adjacentClearings.map((clearing) => {
-                      const ruler = rulerOfClearing(clearing);
-                      return (
-                        <button
-                          key={clearing.id}
-                          type="button"
-                          className={`board-adjacency-chip ${clearing.id === selectedClearingID ? "selected" : ""}`}
-                          onClick={() => onSelectClearing(clearing.id)}
-                        >
-                          <span className={`board-adjacency-suit ${suitClass(clearing.suit)}`}>
-                            {suitLabels[clearing.suit] ?? "Unknown"}
-                          </span>
-                          <strong>{clearing.id}</strong>
-                          <span>{ruler === null ? "No ruler" : factionLabels[ruler] ?? "Unknown"}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-              <div className="board-action-panel">
-                <span className="board-presence-label">Loaded Actions Here</span>
-                {focusedClearingActions.length > 0 ? (
-                  <div className="board-action-list">
-                    {focusedClearingActions.slice(0, 4).map(({ action, index }) => (
-                      <div
-                        key={`${action.type}-${index}`}
-                        className={`board-action-chip ${previewedAction === action ? "previewed" : ""}`}
-                      >
-                        <strong>#{index + 1}</strong>
-                        <span>{describeAction(action)}</span>
-                      </div>
-                    ))}
-                    {focusedClearingActions.length > 4 ? (
-                      <div className="board-action-more">
-                        +{focusedClearingActions.length - 4} more loaded action(s) affect this clearing
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="board-action-empty">
-                    None of the currently loaded actions target this clearing.
-                  </div>
-                )}
-              </div>
-            </div>
+            ))}
+            {clearings.map((clearing, index) => (
+              <ClearingMarker
+                key={clearing.id}
+                clearing={clearing}
+                position={clearingPosition(clearing.id, index, boardLayout.clearingPositions)}
+                isSelected={clearing.id === selectedClearingID}
+                isFocused={clearing.id === focusedClearingID}
+                isAdjacentToFocus={focusedClearing ? focusedClearing.adj.includes(clearing.id) : false}
+                isDimmed={
+                  previewedAction !== null &&
+                  !previewedClearingIDs.has(clearing.id) &&
+                  clearing.id !== selectedClearingID &&
+                  clearing.id !== focusedClearingID
+                }
+                hasKeep={clearing.id === keepClearingID}
+                hasVagabond={!vagabondInForest && clearing.id === vagabondClearingID}
+                highlightRole={highlightByClearing.get(clearing.id)}
+                isSetupLegal={legalSetupClearings.has(clearing.id)}
+                isSetupChosen={selectedSetupClearings.has(clearing.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setZoomedClearingID(clearing.id);
+                  onSelectClearing(clearing.id);
+                }}
+                onHover={(hovered) => setHoveredClearingID(hovered ? clearing.id : null)}
+              />
+            ))}
+            {forestTargets.map((forest) => {
+              const position = forestPosition(forest.forestID);
+              if (!position) {
+                return null;
+              }
+
+              return (
+                <button
+                  key={forest.forestID}
+                  type="button"
+                  className={`forest-marker ${forest.legal ? "legal" : ""} ${forest.selected ? "selected" : ""}`}
+                  style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectForest?.(forest.forestID);
+                  }}
+                >
+                  <span className="forest-marker-label">{forest.label}</span>
+                </button>
+              );
+            })}
           </div>
-        ) : null}
+        </div>
         {previewedAction && previewOverlayTitle ? (
           <div className="board-preview-overlay">
             <div className="board-preview-card">
@@ -480,102 +433,6 @@ export function BoardPanel({
             </div>
           </div>
         ) : null}
-        <div className="board-overlay">
-          {previewRoutes.length > 0 ? (
-            <svg className="board-preview-routes" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {previewRoutes.map((route) => (
-                <line
-                  key={route.key}
-                  x1={route.x1}
-                  y1={route.y1}
-                  x2={route.x2}
-                  y2={route.y2}
-                  className={route.tone}
-                />
-              ))}
-            </svg>
-          ) : null}
-          {!boardLayout.imagePath ? (
-            <svg className="board-paths" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {adjacencySegments.map((segment) => (
-                <line
-                  key={segment.key}
-                  x1={segment.x1}
-                  y1={segment.y1}
-                  x2={segment.x2}
-                  y2={segment.y2}
-                  className={segment.connectedToFocused ? "connected-to-focus" : undefined}
-                />
-              ))}
-            </svg>
-          ) : (
-            <svg className="board-paths board-paths-focus" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {adjacencySegments
-                .filter((segment) => segment.connectedToFocused)
-                .map((segment) => (
-                  <line
-                    key={segment.key}
-                    x1={segment.x1}
-                    y1={segment.y1}
-                    x2={segment.x2}
-                    y2={segment.y2}
-                    className="connected-to-focus"
-                  />
-              ))}
-            </svg>
-          )}
-          {previewAnnotations.map((annotation) => (
-            <div
-              key={annotation.key}
-              className={`board-preview-badge ${annotation.role}`}
-              style={{ left: `${annotation.left}%`, top: `${annotation.top}%` }}
-            >
-              <strong>{annotation.label}</strong>
-              <span>{annotation.detail}</span>
-            </div>
-          ))}
-          {clearings.map((clearing, index) => (
-            <ClearingMarker
-              key={clearing.id}
-              clearing={clearing}
-              position={clearingPosition(clearing.id, index, boardLayout.clearingPositions)}
-              isSelected={clearing.id === selectedClearingID}
-              isFocused={clearing.id === focusedClearingID}
-              isAdjacentToFocus={focusedClearing ? focusedClearing.adj.includes(clearing.id) : false}
-              isDimmed={
-                previewedAction !== null &&
-                !previewedClearingIDs.has(clearing.id) &&
-                clearing.id !== selectedClearingID &&
-                clearing.id !== focusedClearingID
-              }
-              hasKeep={clearing.id === keepClearingID}
-              hasVagabond={!vagabondInForest && clearing.id === vagabondClearingID}
-              highlightRole={highlightByClearing.get(clearing.id)}
-              isSetupLegal={legalSetupClearings.has(clearing.id)}
-              isSetupChosen={selectedSetupClearings.has(clearing.id)}
-              onClick={() => onSelectClearing(clearing.id)}
-              onHover={(hovered) => setHoveredClearingID(hovered ? clearing.id : null)}
-            />
-          ))}
-          {forestTargets.map((forest) => {
-            const position = forestPosition(forest.forestID);
-            if (!position) {
-              return null;
-            }
-
-            return (
-              <button
-                key={forest.forestID}
-                type="button"
-                className={`forest-marker ${forest.legal ? "legal" : ""} ${forest.selected ? "selected" : ""}`}
-                style={{ left: `${position.left}%`, top: `${position.top}%` }}
-                onClick={() => onSelectForest?.(forest.forestID)}
-              >
-                <span className="forest-marker-label">{forest.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </section>
   );

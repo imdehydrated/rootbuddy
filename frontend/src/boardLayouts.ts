@@ -18,27 +18,27 @@ const autumnBoardLayout: BoardLayout = {
   label: "Autumn",
   imagePath: "/autumn-board.svg",
   clearingPositions: {
-    1: { left: 14, top: 18 },
-    5: { left: 56, top: 16 },
-    2: { left: 85, top: 28 },
-    9: { left: 15, top: 40 },
-    10: { left: 40, top: 31 },
-    11: { left: 63, top: 49 },
-    6: { left: 85, top: 49 },
-    4: { left: 14, top: 71 },
-    12: { left: 39, top: 58 },
-    7: { left: 60, top: 72 },
-    8: { left: 39, top: 84 },
-    3: { left: 84, top: 78 }
+    1: { left: 8.4, top: 18.2 },
+    5: { left: 50.2, top: 15.8 },
+    2: { left: 86.8, top: 28.2 },
+    9: { left: 9, top: 43 },
+    10: { left: 42.8, top: 32 },
+    11: { left: 64.5, top: 50 },
+    6: { left: 82.8, top: 42.8 },
+    4: { left: 12, top: 73 },
+    12: { left: 33.8, top: 60 },
+    7: { left: 61, top: 79 },
+    8: { left: 23.5, top: 90 },
+    3: { left: 85, top: 86 }
   },
   forestPositions: {
-    1: { left: 35, top: 11 },
-    2: { left: 71, top: 19 },
-    3: { left: 75, top: 39 },
-    4: { left: 72, top: 66 },
-    5: { left: 34, top: 78 },
-    6: { left: 11, top: 54 },
-    7: { left: 48, top: 43 }
+    1: { left: 30, top: 11 },
+    2: { left: 66, top: 22 },
+    3: { left: 79, top: 53 },
+    4: { left: 56, top: 84 },
+    5: { left: 30, top: 73 },
+    6: { left: 8, top: 57 },
+    7: { left: 54, top: 43 }
   }
 };
 

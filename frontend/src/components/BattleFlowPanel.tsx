@@ -23,6 +23,13 @@ type BattleFlowPanelProps = {
   onClearSelection: () => void;
 };
 
+type EffectOption = {
+  label: string;
+  owner: string;
+  available: boolean;
+  selected: boolean;
+};
+
 export function BattleFlowPanel({
   selectedBattleIndex,
   selectedBattleAction,
@@ -76,6 +83,51 @@ export function BattleFlowPanel({
     multiplayerBattlePrompt !== null && multiplayerBattlePrompt.waitingOnFaction === multiplayerPerspectiveFaction;
   const localPlayerCanResolve =
     multiplayerBattlePrompt !== null && isReadyPrompt && multiplayerPerspectiveFaction === attackerFaction;
+  const effectOptions: EffectOption[] = [
+    {
+      label: "Scouting Party",
+      owner: factionLabels[attackerFaction] ?? "Attacker",
+      available: attackerHasScoutingParty,
+      selected: attackerHasScoutingParty
+    },
+    {
+      label: "Ambush",
+      owner: factionLabels[defenderFaction] ?? "Defender",
+      available: defenderCanAmbush,
+      selected: battleModifiers.defenderAmbush
+    },
+    {
+      label: "Counter-Ambush",
+      owner: factionLabels[attackerFaction] ?? "Attacker",
+      available: attackerCanCounterAmbush,
+      selected: battleModifiers.attackerCounterAmbush
+    },
+    {
+      label: "Armorers",
+      owner: factionLabels[attackerFaction] ?? "Attacker",
+      available: attackerCanArmorers,
+      selected: battleModifiers.attackerUsesArmorers
+    },
+    {
+      label: "Armorers",
+      owner: factionLabels[defenderFaction] ?? "Defender",
+      available: defenderCanArmorers,
+      selected: battleModifiers.defenderUsesArmorers
+    },
+    {
+      label: "Brutal Tactics",
+      owner: factionLabels[attackerFaction] ?? "Attacker",
+      available: attackerCanBrutalTactics,
+      selected: battleModifiers.attackerUsesBrutalTactics
+    },
+    {
+      label: "Sappers",
+      owner: factionLabels[defenderFaction] ?? "Defender",
+      available: defenderCanSappers,
+      selected: battleModifiers.defenderUsesSappers
+    }
+  ].filter((effect) => effect.available || effect.selected);
+  const chosenEffects = effectOptions.filter((effect) => effect.selected);
 
   return (
     <section className="panel sidebar-panel">
@@ -88,6 +140,23 @@ export function BattleFlowPanel({
           Clearing {battleAction.battle.clearingID} {selectedBattleIndex !== null ? `- Action ${selectedBattleIndex + 1}` : ""}
         </span>
       </div>
+
+      {effectOptions.length > 0 ? (
+        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+          <span className="summary-label">Battle Effect Cards</span>
+          <div className="battle-effect-grid">
+            {effectOptions.map((effect) => (
+              <div key={`${effect.owner}-${effect.label}`} className={`battle-effect-card ${effect.selected ? "selected" : ""}`}>
+                <span className="summary-label">{effect.owner}</span>
+                <strong>{effect.label}</strong>
+                <span className="summary-line">
+                  {effect.selected ? "Selected for this battle" : "Available to use"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {multiplayerBattlePrompt ? (
         <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
@@ -107,6 +176,15 @@ export function BattleFlowPanel({
                 ? "Responses are complete. The server will roll battle dice during resolution."
                 : `Responses are complete. Waiting on ${factionLabels[attackerFaction] ?? "the attacker"} to resolve.`}
             </span>
+          ) : null}
+          {chosenEffects.length > 0 ? (
+            <div className="known-card-pill-list">
+              {chosenEffects.map((effect) => (
+                <span key={`chosen-${effect.owner}-${effect.label}`} className="known-card-pill">
+                  {effect.owner}: {effect.label}
+                </span>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : (

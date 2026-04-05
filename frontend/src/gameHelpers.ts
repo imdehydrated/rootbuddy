@@ -70,6 +70,14 @@ export function hasAnyIndicators(values: number[], extraPresence: boolean): bool
   return extraPresence || values.some((value) => value > 0);
 }
 
+export function usedBuildSlots(clearing: GameState["map"]["clearings"][number]): number {
+  return clearing.buildings.length + (clearing.ruins ? 1 : 0);
+}
+
+export function openBuildSlots(clearing: GameState["map"]["clearings"][number]): number {
+  return Math.max(0, clearing.buildSlots - usedBuildSlots(clearing));
+}
+
 export function countWarriors(warriors: Record<string, number>, faction: number): number {
   return warriors[String(faction)] ?? 0;
 }

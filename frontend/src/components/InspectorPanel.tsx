@@ -1,4 +1,4 @@
-import { countBuildings, countTokens, suitClass } from "../gameHelpers";
+import { countBuildings, countTokens, openBuildSlots, suitClass, usedBuildSlots } from "../gameHelpers";
 import { suitLabels } from "../labels";
 import type { Clearing } from "../types";
 
@@ -94,7 +94,7 @@ export function InspectorPanel({
 
       <div className="inspector-meta">
         <span>Adjacency: {clearing.adj.join(", ") || "None"}</span>
-        <span>Build Slots: {clearing.buildSlots}</span>
+        <span>Build Slots: {usedBuildSlots(clearing)}/{clearing.buildSlots} used, {openBuildSlots(clearing)} open</span>
       </div>
 
       <div className="inspector-summary">

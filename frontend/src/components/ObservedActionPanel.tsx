@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { describeKnownCardID } from "../cardCatalog";
 import { factionLabels, suitLabels } from "../labels";
 import type { Action, GameState } from "../types";
 
@@ -327,6 +328,10 @@ function templateHint(template: ObservedTemplateKey): string {
   }
 }
 
+function previewCardLabel(cardID: number): string {
+  return describeKnownCardID(cardID);
+}
+
 export function ObservedActionPanel({
   state,
   onApply,
@@ -397,6 +402,38 @@ export function ObservedActionPanel({
 
   const action = buildObservedAction(form);
   const actionPreview = JSON.stringify(action, null, 2);
+  const enteredCardID = parseNumber(form.cardID);
+  const enteredBattleDecreeCardID = parseNumber(form.decreeCardID);
+  const enteredDominanceCardID = parseNumber(form.dominanceCardID);
+  const enteredSpentCardID = parseNumber(form.spentCardID);
+  const enteredSupporterCardIDs = parseNumberList(form.supporterCardIDs);
+  const enteredDecreeCardIDs = parseNumberList(form.decreeCardIDs);
+  const enteredWorkshopClearings = parseNumberList(form.usedWorkshopClearings);
+  const enteredDecreeColumns = parseNumberList(form.decreeColumns);
+  const referenceGroups = [
+    enteredCardID > 0 ? { label: "Card", items: [previewCardLabel(enteredCardID)] } : null,
+    form.template === "battle_resolution" && enteredBattleDecreeCardID > 0
+      ? { label: "Battle Decree Card", items: [previewCardLabel(enteredBattleDecreeCardID)] }
+      : null,
+    enteredSupporterCardIDs.length > 0
+      ? { label: "Supporters", items: enteredSupporterCardIDs.map(previewCardLabel) }
+      : null,
+    enteredDecreeCardIDs.length > 0
+      ? { label: "Decree Cards", items: enteredDecreeCardIDs.map(previewCardLabel) }
+      : null,
+    (form.template === "activate_dominance" || form.template === "take_dominance") && enteredDominanceCardID > 0
+      ? { label: "Dominance Card", items: [previewCardLabel(enteredDominanceCardID)] }
+      : null,
+    form.template === "take_dominance" && enteredSpentCardID > 0
+      ? { label: "Spent Card", items: [previewCardLabel(enteredSpentCardID)] }
+      : null,
+    form.template === "craft" && enteredWorkshopClearings.length > 0
+      ? { label: "Workshops", items: enteredWorkshopClearings.map((clearingID) => `Clearing ${clearingID}`) }
+      : null,
+    form.template === "add_to_decree" && enteredDecreeColumns.length > 0
+      ? { label: "Columns", items: enteredDecreeColumns.map((column) => `Column ${column}`) }
+      : null
+  ].filter((group): group is { label: string; items: string[] } => group !== null);
 
   const updateForm = <K extends keyof ObservedFormState>(key: K, value: ObservedFormState[K]) => {
     setForm((current) => ({
@@ -650,6 +687,26 @@ export function ObservedActionPanel({
             />
             <span>Defender Used Sappers</span>
           </label>
+        </div>
+      ) : null}
+
+      {referenceGroups.length > 0 ? (
+        <div className="summary-stack" style={{ marginTop: "1rem" }}>
+          <span className="summary-label">Card References</span>
+          <div className="observed-reference-grid">
+            {referenceGroups.map((group) => (
+              <div key={group.label} className="observed-reference-card">
+                <span className="summary-label">{group.label}</span>
+                <div className="known-card-pill-list">
+                  {group.items.map((item) => (
+                    <span key={`${group.label}-${item}`} className="known-card-pill">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 

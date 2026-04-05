@@ -1,3 +1,4 @@
+import { describeKnownCardID } from "./cardCatalog";
 import type { Action } from "./types";
 
 export const suitLabels = ["Fox", "Rabbit", "Mouse", "Bird"];
@@ -11,6 +12,23 @@ export const vagabondCharacterLabels = ["Thief", "Tinker", "Ranger"];
 export const itemTypeLabels = ["Tea", "Coin", "Crossbow", "Hammer", "Sword", "Torch", "Boots", "Bag"];
 export const itemStatusLabels = ["Ready", "Exhausted", "Damaged"];
 export const relationshipLabels = ["Hostile", "Indifferent", "Friendly", "Allied"];
+
+function effectLabel(effectID: string): string {
+  switch (effectID) {
+    case "better_burrow_bank":
+      return "Better Burrow Bank";
+    case "codebreakers":
+      return "Codebreakers";
+    case "royal_claim":
+      return "Royal Claim";
+    case "stand_and_deliver":
+      return "Stand and Deliver!";
+    case "tax_collector":
+      return "Tax Collector";
+    default:
+      return effectID || "?";
+  }
+}
 
 export const ACTION_TYPE = {
   MOVEMENT: 0,
@@ -66,17 +84,17 @@ export function describeAction(action: Action): string {
     case ACTION_TYPE.OVERWORK:
       return `Overwork in clearing ${action.overwork?.clearingID ?? "?"}`;
     case ACTION_TYPE.CRAFT:
-      return `Craft card ${action.craft?.cardID ?? "?"}`;
+      return `Craft ${describeKnownCardID(action.craft?.cardID ?? 0)}`;
     case ACTION_TYPE.ADD_TO_DECREE:
-      return `Add decree cards ${(action.addToDecree?.cardIDs ?? []).join(", ")}`;
+      return `Add decree cards ${(action.addToDecree?.cardIDs ?? []).map((cardID) => describeKnownCardID(cardID)).join(", ")}`;
     case ACTION_TYPE.SPREAD_SYMPATHY:
       return `Spread sympathy to clearing ${action.spreadSympathy?.clearingID ?? "?"}`;
     case ACTION_TYPE.REVOLT:
       return `Revolt in clearing ${action.revolt?.clearingID ?? "?"}`;
     case ACTION_TYPE.MOBILIZE:
-      return `Mobilize card ${action.mobilize?.cardID ?? "?"}`;
+      return `Mobilize ${describeKnownCardID(action.mobilize?.cardID ?? 0)}`;
     case ACTION_TYPE.TRAIN:
-      return `Train with card ${action.train?.cardID ?? "?"}`;
+      return `Train with ${describeKnownCardID(action.train?.cardID ?? 0)}`;
     case ACTION_TYPE.ORGANIZE:
       return `Organize in clearing ${action.organize?.clearingID ?? "?"}`;
     case ACTION_TYPE.EXPLORE:
@@ -104,19 +122,19 @@ export function describeAction(action: Action): string {
     case ACTION_TYPE.PASS_PHASE:
       return "Pass phase";
     case ACTION_TYPE.ADD_CARD_TO_HAND:
-      return `Add card ${action.addCardToHand?.cardID ?? "?"} to hand`;
+      return `Add ${describeKnownCardID(action.addCardToHand?.cardID ?? 0)} to hand`;
     case ACTION_TYPE.REMOVE_CARD_FROM_HAND:
-      return `Remove card ${action.removeCardFromHand?.cardID ?? "?"} from hand`;
+      return `Remove ${describeKnownCardID(action.removeCardFromHand?.cardID ?? 0)} from hand`;
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
       return `Record ${factionLabels[action.otherPlayerDraw?.faction ?? 0] ?? "Unknown"} drawing ${action.otherPlayerDraw?.count ?? 0} card(s)`;
     case ACTION_TYPE.OTHER_PLAYER_PLAY:
-      return `Record ${factionLabels[action.otherPlayerPlay?.faction ?? 0] ?? "Unknown"} playing card ${action.otherPlayerPlay?.cardID ?? "?"}`;
+      return `Record ${factionLabels[action.otherPlayerPlay?.faction ?? 0] ?? "Unknown"} playing ${describeKnownCardID(action.otherPlayerPlay?.cardID ?? 0)}`;
     case ACTION_TYPE.DISCARD_EFFECT:
-      return `Discard effect card ${action.discardEffect?.cardID ?? "?"}`;
+      return `Discard effect ${describeKnownCardID(action.discardEffect?.cardID ?? 0)}`;
     case ACTION_TYPE.ACTIVATE_DOMINANCE:
-      return `Activate dominance card ${action.activateDominance?.cardID ?? "?"}`;
+      return `Activate dominance ${describeKnownCardID(action.activateDominance?.cardID ?? 0)}`;
     case ACTION_TYPE.TAKE_DOMINANCE:
-      return `Take dominance card ${action.takeDominance?.dominanceCardID ?? "?"}`;
+      return `Take dominance ${describeKnownCardID(action.takeDominance?.dominanceCardID ?? 0)}`;
     case ACTION_TYPE.MARQUISE_SETUP:
       return `Marquise setup: keep ${action.marquiseSetup?.keepClearingID ?? "?"}, sawmill ${action.marquiseSetup?.sawmillClearingID ?? "?"}, workshop ${action.marquiseSetup?.workshopClearingID ?? "?"}, recruiter ${action.marquiseSetup?.recruiterClearingID ?? "?"}`;
     case ACTION_TYPE.EYRIE_SETUP:
@@ -137,7 +155,7 @@ export function describeAction(action: Action): string {
         case "tax_collector":
           return `Use Tax Collector in clearing ${action.usePersistentEffect?.clearingID ?? "?"}`;
         default:
-          return `Use persistent effect ${effectID || "?"}`;
+          return `Use persistent effect ${effectLabel(effectID)}`;
       }
     }
     default:

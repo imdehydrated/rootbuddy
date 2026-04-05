@@ -1,3 +1,4 @@
+import { describeKnownCardID } from "../cardCatalog";
 import { ACTION_TYPE, describeAction, factionLabels, phaseLabels, stepLabels } from "../labels";
 import type { Action, GameState } from "../types";
 import { ObservedActionPanel, type ObservedTemplateKey } from "./ObservedActionPanel";
@@ -64,6 +65,87 @@ function suggestedShortcuts(state: GameState): Shortcut[] {
       ];
     default:
       return [{ label: "Advance", action: { type: 24, passPhase: { faction: state.factionTurn } } }];
+  }
+}
+
+function actionHeadline(action: Action): string {
+  switch (action.type) {
+    case ACTION_TYPE.CRAFT:
+      return "Craft";
+    case ACTION_TYPE.ADD_TO_DECREE:
+      return "Add To Decree";
+    case ACTION_TYPE.SPREAD_SYMPATHY:
+      return "Spread Sympathy";
+    case ACTION_TYPE.REVOLT:
+      return "Revolt";
+    case ACTION_TYPE.TRAIN:
+      return "Train";
+    case ACTION_TYPE.MOBILIZE:
+      return "Mobilize";
+    case ACTION_TYPE.OVERWORK:
+      return "Overwork";
+    case ACTION_TYPE.ACTIVATE_DOMINANCE:
+      return "Activate Dominance";
+    case ACTION_TYPE.TAKE_DOMINANCE:
+      return "Take Dominance";
+    case ACTION_TYPE.BATTLE:
+      return "Battle";
+    case ACTION_TYPE.OTHER_PLAYER_DRAW:
+      return "Draw";
+    case ACTION_TYPE.OTHER_PLAYER_PLAY:
+      return "Play";
+    default:
+      return "Action";
+  }
+}
+
+function relatedCardIDs(action: Action): number[] {
+  switch (action.type) {
+    case ACTION_TYPE.CRAFT:
+      return action.craft?.cardID ? [action.craft.cardID] : [];
+    case ACTION_TYPE.OVERWORK:
+      return action.overwork?.cardID ? [action.overwork.cardID] : [];
+    case ACTION_TYPE.ADD_TO_DECREE:
+      return action.addToDecree?.cardIDs ?? [];
+    case ACTION_TYPE.SPREAD_SYMPATHY:
+      return action.spreadSympathy?.supporterCardIDs ?? [];
+    case ACTION_TYPE.REVOLT:
+      return action.revolt?.supporterCardIDs ?? [];
+    case ACTION_TYPE.MOBILIZE:
+      return action.mobilize?.cardID ? [action.mobilize.cardID] : [];
+    case ACTION_TYPE.TRAIN:
+      return action.train?.cardID ? [action.train.cardID] : [];
+    case ACTION_TYPE.ACTIVATE_DOMINANCE:
+      return action.activateDominance?.cardID ? [action.activateDominance.cardID] : [];
+    case ACTION_TYPE.TAKE_DOMINANCE:
+      return [action.takeDominance?.dominanceCardID, action.takeDominance?.spentCardID].filter(
+        (cardID): cardID is number => typeof cardID === "number" && cardID !== 0
+      );
+    case ACTION_TYPE.OTHER_PLAYER_PLAY:
+      return action.otherPlayerPlay?.cardID ? [action.otherPlayerPlay.cardID] : [];
+    default:
+      return [];
+  }
+}
+
+function actionContextTags(action: Action): string[] {
+  switch (action.type) {
+    case ACTION_TYPE.BATTLE:
+      return [`Clearing ${action.battle?.clearingID ?? "?"}`];
+    case ACTION_TYPE.CRAFT:
+      return (action.craft?.usedWorkshopClearings ?? []).map((clearingID) => `Workshop ${clearingID}`);
+    case ACTION_TYPE.SPREAD_SYMPATHY:
+      return [`Clearing ${action.spreadSympathy?.clearingID ?? "?"}`];
+    case ACTION_TYPE.REVOLT:
+      return [`Clearing ${action.revolt?.clearingID ?? "?"}`];
+    case ACTION_TYPE.ADD_TO_DECREE:
+      return (action.addToDecree?.columns ?? []).map((column) => `Column ${column}`);
+    case ACTION_TYPE.AID:
+      return [`Clearing ${action.aid?.clearingID ?? "?"}`, `Target ${factionLabels[action.aid?.targetFaction ?? -1] ?? "?"}`];
+    case ACTION_TYPE.OTHER_PLAYER_DRAW:
+      return [`Count ${action.otherPlayerDraw?.count ?? 0}`];
+    default:
+      return [];
   }
 }
 
@@ -151,7 +233,32 @@ export function AssistWorkflowPanel({ state, actions, onApply, onGenerateActions
             <div className="embedded-action-list">
               {observedGeneratedActions.map((action, index) => (
                 <div key={`${action.type}-${index}`} className="embedded-action-card">
+                  <div className="player-action-card-header">
+                    <strong>{actionHeadline(action)}</strong>
+                    <span className="player-action-index">#{index + 1}</span>
+                  </div>
                   <span className="summary-line">{describeAction(action)}</span>
+                  {actionContextTags(action).length > 0 ? (
+                    <div className="player-action-chip-row">
+                      {actionContextTags(action).map((tag) => (
+                        <span key={`${index}-${tag}`} className="player-action-chip">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {relatedCardIDs(action).length > 0 ? (
+                    <div className="player-action-card-links">
+                      <span className="summary-label">Cards</span>
+                      <div className="known-card-pill-list">
+                        {relatedCardIDs(action).map((cardID) => (
+                          <span key={`${index}-card-${cardID}`} className="known-card-pill">
+                            {describeKnownCardID(cardID)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {action.type === ACTION_TYPE.BATTLE ? (
                     <button type="button" className="secondary" onClick={() => onOpenBattle(index)}>
                       Resolve

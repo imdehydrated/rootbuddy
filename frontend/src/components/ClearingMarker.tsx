@@ -1,5 +1,6 @@
-import { countBuildings, countTokens, hasAnyIndicators, suitClass } from "../gameHelpers";
+import { countBuildings, countTokens, hasAnyIndicators, suitClass, usedBuildSlots } from "../gameHelpers";
 import { suitLabels } from "../labels";
+import type { MouseEvent } from "react";
 import type { Clearing, HighlightedClearing } from "../types";
 
 type ClearingMarkerProps = {
@@ -14,7 +15,7 @@ type ClearingMarkerProps = {
   highlightRole?: HighlightedClearing["role"];
   isSetupLegal?: boolean;
   isSetupChosen?: boolean;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onHover?: (hovered: boolean) => void;
 };
 
@@ -39,10 +40,28 @@ type TokenChipProps = {
 
 type TokenChipDatum = TokenChipProps;
 
-function TokenChip({ kind, count, label }: TokenChipProps) {
+const tokenGlyphLabels: Record<TokenChipProps["kind"], string> = {
+  marquise: "M",
+  alliance: "A",
+  eyrie: "E",
+  vagabond: "V",
+  wood: "Wd",
+  sawmill: "Sa",
+  workshop: "Ws",
+  recruiter: "Rc",
+  roost: "Ro",
+  base: "Ba",
+  sympathy: "Sy",
+  keep: "Ke",
+  ruins: "Ru"
+};
+
+export function TokenChip({ kind, count, label }: TokenChipProps) {
   return (
     <span className={`token-chip ${kind}`} aria-label={label} title={label}>
-      <span className={`token-glyph ${kind}`} aria-hidden="true" />
+      <span className={`token-glyph ${kind}`} aria-hidden="true">
+        {tokenGlyphLabels[kind]}
+      </span>
       {count && count > 1 ? <span className="token-count">{count}</span> : null}
     </span>
   );
@@ -90,6 +109,7 @@ export function ClearingMarker({
   onClick,
   onHover
 }: ClearingMarkerProps) {
+  const occupiedSlots = usedBuildSlots(clearing);
   const marquiseWarriors = clearing.warriors["0"] ?? 0;
   const allianceWarriors = clearing.warriors["1"] ?? 0;
   const eyrieWarriors = clearing.warriors["2"] ?? 0;
@@ -175,7 +195,7 @@ export function ClearingMarker({
       </span>
       <span className="marker-footer">
         <span>{clearing.adj.length} paths</span>
-        <span>{clearing.buildings.length}/{clearing.buildSlots} slots</span>
+        <span>{occupiedSlots}/{clearing.buildSlots} slots</span>
       </span>
     </button>
   );

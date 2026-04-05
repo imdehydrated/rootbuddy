@@ -1,7 +1,8 @@
-import { describeKnownCardIDs } from "../cardCatalog";
+import { describeKnownCardID } from "../cardCatalog";
 import {
   eyrieLeaderLabels,
   factionLabels,
+  itemTypeLabels,
   itemStatusLabels,
   phaseLabels,
   relationshipLabels,
@@ -20,30 +21,123 @@ function formatTurnOrder(turnOrder: number[]): string {
   return turnOrder.map((faction) => factionLabels[faction] ?? `Faction ${faction}`).join(" -> ");
 }
 
-function currentFactionLines(state: GameState): string[] {
-  const hiddenCount = (faction: number, zone: string) =>
-    state.hiddenCards.filter((card) => card.ownerFaction === faction && card.zone === zone).length;
+function hiddenCount(state: GameState, faction: number, zone: string): number {
+  return state.hiddenCards.filter((card) => card.ownerFaction === faction && card.zone === zone).length;
+}
 
+function formatQuestItems(itemTypes: number[]): string {
+  if (itemTypes.length === 0) {
+    return "None";
+  }
+
+  return itemTypes.map((itemType) => itemTypeLabels[itemType] ?? `Item ${itemType}`).join(", ");
+}
+
+function renderCurrentFactionState(state: GameState) {
   switch (state.factionTurn) {
     case 0:
-      return [
-        `Supply ${state.marquise.warriorSupply}`,
-        `Buildings ${state.marquise.sawmillsPlaced}/${state.marquise.workshopsPlaced}/${state.marquise.recruitersPlaced}`,
-        state.marquise.keepClearingID > 0 ? `Keep ${state.marquise.keepClearingID}` : "Keep unset"
+      return (
+        <div className="faction-state-grid">
+          <div className="faction-state-card">
+            <span className="summary-label">Supply</span>
+            <strong>{state.marquise.warriorSupply}</strong>
+            <span className="summary-line">Warriors in reserve</span>
+          </div>
+          <div className="faction-state-card">
+            <span className="summary-label">Buildings</span>
+            <strong>{state.marquise.sawmillsPlaced}/{state.marquise.workshopsPlaced}/{state.marquise.recruitersPlaced}</strong>
+            <span className="summary-line">Sawmill / Workshop / Recruiter</span>
+          </div>
+          <div className="faction-state-card">
+            <span className="summary-label">Keep</span>
+            <strong>{state.marquise.keepClearingID > 0 ? state.marquise.keepClearingID : "Unset"}</strong>
+            <span className="summary-line">Home clearing</span>
+          </div>
+        </div>
+      );
+    case 1: {
+      const visibleSupporters = state.playerFaction === 1 ? state.alliance.supporters : [];
+      const supporterCount = visibleSupporters.length || hiddenCount(state, 1, "supporters");
+      const baseLabels = [
+        state.alliance.foxBasePlaced ? "Fox" : "",
+        state.alliance.rabbitBasePlaced ? "Rabbit" : "",
+        state.alliance.mouseBasePlaced ? "Mouse" : ""
+      ].filter(Boolean);
+
+      return (
+        <div className="summary-stack">
+          <div className="faction-state-grid">
+            <div className="faction-state-card">
+              <span className="summary-label">Officers</span>
+              <strong>{state.alliance.officers}</strong>
+              <span className="summary-line">Command actions</span>
+            </div>
+            <div className="faction-state-card">
+              <span className="summary-label">Supporters</span>
+              <strong>{supporterCount}</strong>
+              <span className="summary-line">{visibleSupporters.length > 0 ? "Visible to Alliance" : "Hidden count"}</span>
+            </div>
+            <div className="faction-state-card">
+              <span className="summary-label">Sympathy</span>
+              <strong>{state.alliance.sympathyPlaced}</strong>
+              <span className="summary-line">Tokens on map</span>
+            </div>
+          </div>
+          <span className="summary-line">Bases: {baseLabels.join(", ") || "None"}</span>
+          {visibleSupporters.length > 0 ? (
+            <div className="known-card-pill-list">
+              {visibleSupporters.map((card) => (
+                <span key={`supporter-${card.id}`} className="known-card-pill">
+                  {card.name} ({suitLabels[card.suit] ?? "Unknown"})
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    case 2: {
+      const decreeColumns = [
+        { label: "Recruit", cards: state.eyrie.decree.recruit },
+        { label: "Move", cards: state.eyrie.decree.move },
+        { label: "Battle", cards: state.eyrie.decree.battle },
+        { label: "Build", cards: state.eyrie.decree.build }
       ];
-    case 1:
-      return [
-        `Officers ${state.alliance.officers}`,
-        `Supporters ${state.alliance.supporters.length || hiddenCount(1, "supporters")}`,
-        `Sympathy ${state.alliance.sympathyPlaced}`,
-        `Bases ${[state.alliance.foxBasePlaced ? "Fox" : "", state.alliance.rabbitBasePlaced ? "Rabbit" : "", state.alliance.mouseBasePlaced ? "Mouse" : ""].filter(Boolean).join(", ") || "None"}`
-      ];
-    case 2:
-      return [
-        `Leader ${eyrieLeaderLabels[state.eyrie.leader] ?? "Unknown"}`,
-        `Roosts ${state.eyrie.roostsPlaced}`,
-        `Decree ${state.eyrie.decree.recruit.length}/${state.eyrie.decree.move.length}/${state.eyrie.decree.battle.length}/${state.eyrie.decree.build.length}`
-      ];
+      return (
+        <div className="summary-stack">
+          <div className="faction-state-grid">
+            <div className="faction-state-card">
+              <span className="summary-label">Leader</span>
+              <strong>{eyrieLeaderLabels[state.eyrie.leader] ?? "Unknown"}</strong>
+              <span className="summary-line">Current leader</span>
+            </div>
+            <div className="faction-state-card">
+              <span className="summary-label">Roosts</span>
+              <strong>{state.eyrie.roostsPlaced}</strong>
+              <span className="summary-line">Placed on map</span>
+            </div>
+          </div>
+          <div className="decree-grid">
+            {decreeColumns.map((column) => (
+              <div key={column.label} className="decree-column-card">
+                <span className="summary-label">{column.label}</span>
+                {column.cards.length > 0 ? (
+                  <div className="known-card-pill-list">
+                    {column.cards.map((cardID, index) => (
+                      <span key={`${column.label}-${cardID}-${index}`} className="known-card-pill">
+                        {describeKnownCardID(cardID)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="summary-line">No cards</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     case 3: {
       const itemSummary = [0, 1, 2]
         .map((status) => `${itemStatusLabels[status]} ${state.vagabond.items.filter((item) => item.status === status).length}`)
@@ -52,23 +146,35 @@ function currentFactionLines(state: GameState): string[] {
         .map(([faction, level]) => `${factionLabels[Number(faction)]}: ${relationshipLabels[level] ?? "Unknown"}`)
         .join("; ");
 
-      return [
-        `Character ${vagabondCharacterLabels[state.vagabond.character] ?? "Unknown"}`,
-        state.vagabond.inForest ? `Forest ${state.vagabond.forestID || "?"}` : `Clearing ${state.vagabond.clearingID || "?"}`,
-        itemSummary,
-        relationshipSummary || "Relationships unset"
-      ];
+      return (
+        <div className="summary-stack">
+          <div className="faction-state-grid">
+            <div className="faction-state-card">
+              <span className="summary-label">Character</span>
+              <strong>{vagabondCharacterLabels[state.vagabond.character] ?? "Unknown"}</strong>
+              <span className="summary-line">Vagabond role</span>
+            </div>
+            <div className="faction-state-card">
+              <span className="summary-label">Location</span>
+              <strong>{state.vagabond.inForest ? `Forest ${state.vagabond.forestID || "?"}` : `Clearing ${state.vagabond.clearingID || "?"}`}</strong>
+              <span className="summary-line">{state.vagabond.inForest ? "In forest" : "On map"}</span>
+            </div>
+          </div>
+          <span className="summary-line">{itemSummary}</span>
+          <span className="summary-line">{relationshipSummary || "Relationships unset"}</span>
+        </div>
+      );
     }
     default:
-      return [];
+      return null;
   }
 }
 
 export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
-  const activeDominanceLines = Object.entries(state.activeDominance).map(([faction, cardID]) => {
-    const factionLabel = factionLabels[Number(faction)] ?? `Faction ${faction}`;
-    return `${factionLabel}: Card ${cardID}`;
-  });
+  const activeDominanceEntries = Object.entries(state.activeDominance).map(([faction, cardID]) => ({
+    factionLabel: factionLabels[Number(faction)] ?? `Faction ${faction}`,
+    cardLabel: describeKnownCardID(Number(cardID))
+  }));
   const coalitionLabel =
     state.coalitionActive && state.winningCoalition.length > 0
       ? state.winningCoalition.map((faction) => factionLabels[faction] ?? `Faction ${faction}`).join(" + ")
@@ -105,23 +211,28 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
 
       <div className="summary-stack">
         <span className="summary-label">Current Faction State</span>
-        {currentFactionLines(state).map((line) => (
-          <span key={line} className="summary-line">
-            {line}
-          </span>
-        ))}
+        {renderCurrentFactionState(state)}
       </div>
 
-      {activeDominanceLines.length > 0 || state.availableDominance.length > 0 || state.coalitionActive ? (
+      {activeDominanceEntries.length > 0 || state.availableDominance.length > 0 || state.coalitionActive ? (
         <div className="summary-stack">
           <span className="summary-label">Dominance</span>
-          {activeDominanceLines.map((line) => (
-            <span key={line} className="summary-line">
-              Active {line}
-            </span>
+          {activeDominanceEntries.map(({ factionLabel, cardLabel }) => (
+            <div key={`${factionLabel}-${cardLabel}`} className="card-zone-row">
+              <span className="summary-line card-zone-row-label">Active {factionLabel}</span>
+              <div className="known-card-pill-list">
+                <span className="known-card-pill">{cardLabel}</span>
+              </div>
+            </div>
           ))}
           {state.availableDominance.length > 0 ? (
-            <span className="summary-line">Available cards: {describeKnownCardIDs(state.availableDominance)}</span>
+            <div className="known-card-pill-list">
+              {state.availableDominance.map((cardID) => (
+                <span key={`turn-dominance-${cardID}`} className="known-card-pill">
+                  {describeKnownCardID(cardID)}
+                </span>
+              ))}
+            </div>
           ) : null}
           {state.coalitionActive ? <span className="summary-line">Coalition: {coalitionLabel}</span> : null}
         </div>
@@ -130,11 +241,15 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
       {state.factionTurn === 3 && state.vagabond.questsAvailable.length > 0 ? (
         <div className="summary-stack">
           <span className="summary-label">Available Quests</span>
-          {state.vagabond.questsAvailable.map((quest) => (
-            <span key={quest.id} className="summary-line">
-              {quest.name} ({suitLabels[quest.suit] ?? "Unknown"})
-            </span>
-          ))}
+          <div className="quest-summary-grid">
+            {state.vagabond.questsAvailable.map((quest) => (
+              <article key={quest.id} className={`quest-summary-card ${suitLabels[quest.suit]?.toLowerCase() ?? "bird"}`}>
+                <span className="summary-label">{suitLabels[quest.suit] ?? "Unknown"}</span>
+                <strong>{quest.name}</strong>
+                <span className="summary-line">Items: {formatQuestItems(quest.requiredItems)}</span>
+              </article>
+            ))}
+          </div>
         </div>
       ) : null}
     </section>

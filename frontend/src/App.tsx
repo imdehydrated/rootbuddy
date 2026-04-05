@@ -34,8 +34,8 @@ import { TurnFlowPanel } from "./components/TurnFlowPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
-import { affectedClearings, syncDerivedFactionStateFromBoard } from "./gameHelpers";
-import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels } from "./labels";
+import { affectedClearings, rulerOfClearing, syncDerivedFactionStateFromBoard, usedBuildSlots } from "./gameHelpers";
+import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels, suitLabels } from "./labels";
 import {
   clearSavedMultiplayerSession,
   clearSavedSession,
@@ -1115,6 +1115,7 @@ export default function App() {
   const selectedClearing =
     parsedState.map.clearings.find((clearing) => clearing.id === selectedClearingID) ??
     parsedState.map.clearings[0];
+  const selectedClearingRuler = selectedClearing ? rulerOfClearing(selectedClearing) : null;
   const boardLayout = boardLayoutForState(parsedState);
   const boardIsEmpty = isBoardEmpty(parsedState);
   const previewedAction =
@@ -1426,7 +1427,6 @@ export default function App() {
           vagabondClearingID={parsedState.vagabond.clearingID}
           vagabondInForest={parsedState.vagabond.inForest}
           highlightedClearings={highlightedClearings}
-          actions={actions}
           previewedAction={previewedAction}
           setupLegalClearingIDs={legalSetupClearingIDs}
           setupSelectedClearingIDs={selectedSetupClearingIDs}
@@ -1646,6 +1646,17 @@ export default function App() {
             <div className="summary-stack" style={{ marginBottom: "0.9rem" }}>
               <span className="summary-label">Board</span>
               <span className="summary-line">Selected clearing: {selectedClearing?.id ?? "None"}</span>
+              {selectedClearing ? (
+                <>
+                  <span className="summary-line">Suit: {suitLabels[selectedClearing.suit] ?? "Unknown"}</span>
+                  <span className="summary-line">
+                    Ruler: {selectedClearingRuler === null ? "None" : factionLabels[selectedClearingRuler] ?? "Unknown"}
+                  </span>
+                  <span className="summary-line">
+                    Paths / slots: {selectedClearing.adj.length} / {usedBuildSlots(selectedClearing)}/{selectedClearing.buildSlots}
+                  </span>
+                </>
+              ) : null}
               <span className="summary-line">Use these controls for board inspection, setup transitions, and recovery tools.</span>
             </div>
           )}
