@@ -12,6 +12,7 @@ import {
   vagabondCharacterLabels
 } from "../labels";
 import type { GameState } from "../types";
+import { KnownCardPillList } from "./CardUi";
 
 type TurnSummaryPanelProps = {
   state: GameState;
@@ -85,13 +86,12 @@ function renderCurrentFactionState(state: GameState) {
           </div>
           <span className="summary-line">Bases: {baseLabels.join(", ") || "None"}</span>
           {visibleSupporters.length > 0 ? (
-            <div className="known-card-pill-list">
-              {visibleSupporters.map((card) => (
-                <span key={`supporter-${card.id}`} className="known-card-pill">
-                  {card.name} ({suitLabels[card.suit] ?? "Unknown"})
-                </span>
-              ))}
-            </div>
+            <KnownCardPillList
+              items={visibleSupporters.map((card) => ({
+                key: `supporter-${card.id}`,
+                label: `Supporter: ${card.name} (${suitLabels[card.suit] ?? "Unknown"})`
+              }))}
+            />
           ) : null}
         </div>
       );
@@ -122,13 +122,12 @@ function renderCurrentFactionState(state: GameState) {
               <div key={column.label} className="decree-column-card">
                 <span className="summary-label">{column.label}</span>
                 {column.cards.length > 0 ? (
-                  <div className="known-card-pill-list">
-                    {column.cards.map((cardID, index) => (
-                      <span key={`${column.label}-${cardID}-${index}`} className="known-card-pill">
-                        {describeKnownCardID(cardID)}
-                      </span>
-                    ))}
-                  </div>
+                  <KnownCardPillList
+                    items={column.cards.map((cardID, index) => ({
+                      key: `${column.label}-${cardID}-${index}`,
+                      label: describeKnownCardID(cardID)
+                    }))}
+                  />
                 ) : (
                   <span className="summary-line">No cards</span>
                 )}
@@ -139,12 +138,14 @@ function renderCurrentFactionState(state: GameState) {
       );
     }
     case 3: {
-      const itemSummary = [0, 1, 2]
-        .map((status) => `${itemStatusLabels[status]} ${state.vagabond.items.filter((item) => item.status === status).length}`)
-        .join(", ");
-      const relationshipSummary = Object.entries(state.vagabond.relationships)
-        .map(([faction, level]) => `${factionLabels[Number(faction)]}: ${relationshipLabels[level] ?? "Unknown"}`)
-        .join("; ");
+      const itemSummary = [0, 1, 2].map((status) => ({
+        key: `item-status-${status}`,
+        label: `${itemStatusLabels[status]} ${state.vagabond.items.filter((item) => item.status === status).length}`
+      }));
+      const relationshipSummary = Object.entries(state.vagabond.relationships).map(([faction, level]) => ({
+        key: `relationship-${faction}`,
+        label: `${factionLabels[Number(faction)]}: ${relationshipLabels[level] ?? "Unknown"}`
+      }));
 
       return (
         <div className="summary-stack">
@@ -160,8 +161,8 @@ function renderCurrentFactionState(state: GameState) {
               <span className="summary-line">{state.vagabond.inForest ? "In forest" : "On map"}</span>
             </div>
           </div>
-          <span className="summary-line">{itemSummary}</span>
-          <span className="summary-line">{relationshipSummary || "Relationships unset"}</span>
+          <KnownCardPillList items={itemSummary} />
+          <KnownCardPillList items={relationshipSummary} emptyLabel="Relationships unset" />
         </div>
       );
     }
@@ -220,19 +221,16 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
           {activeDominanceEntries.map(({ factionLabel, cardLabel }) => (
             <div key={`${factionLabel}-${cardLabel}`} className="card-zone-row">
               <span className="summary-line card-zone-row-label">Active {factionLabel}</span>
-              <div className="known-card-pill-list">
-                <span className="known-card-pill">{cardLabel}</span>
-              </div>
+              <KnownCardPillList items={[{ key: `${factionLabel}-${cardLabel}`, label: cardLabel }]} />
             </div>
           ))}
           {state.availableDominance.length > 0 ? (
-            <div className="known-card-pill-list">
-              {state.availableDominance.map((cardID) => (
-                <span key={`turn-dominance-${cardID}`} className="known-card-pill">
-                  {describeKnownCardID(cardID)}
-                </span>
-              ))}
-            </div>
+            <KnownCardPillList
+              items={state.availableDominance.map((cardID) => ({
+                key: `turn-dominance-${cardID}`,
+                label: describeKnownCardID(cardID)
+              }))}
+            />
           ) : null}
           {state.coalitionActive ? <span className="summary-line">Coalition: {coalitionLabel}</span> : null}
         </div>

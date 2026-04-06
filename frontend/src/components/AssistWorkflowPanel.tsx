@@ -1,5 +1,5 @@
-import { describeKnownCardID } from "../cardCatalog";
-import { ACTION_TYPE, describeAction, factionLabels, phaseLabels, stepLabels } from "../labels";
+import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels } from "../labels";
+import { actionCardReferences, actionContextTags, actionHeadline, createVisibleCardLookup, describeAction, formatCardReferenceLabel } from "../actionPresentation";
 import type { Action, GameState } from "../types";
 import { ObservedActionPanel, type ObservedTemplateKey } from "./ObservedActionPanel";
 import { useEffect, useState } from "react";
@@ -68,87 +68,6 @@ function suggestedShortcuts(state: GameState): Shortcut[] {
   }
 }
 
-function actionHeadline(action: Action): string {
-  switch (action.type) {
-    case ACTION_TYPE.CRAFT:
-      return "Craft";
-    case ACTION_TYPE.ADD_TO_DECREE:
-      return "Add To Decree";
-    case ACTION_TYPE.SPREAD_SYMPATHY:
-      return "Spread Sympathy";
-    case ACTION_TYPE.REVOLT:
-      return "Revolt";
-    case ACTION_TYPE.TRAIN:
-      return "Train";
-    case ACTION_TYPE.MOBILIZE:
-      return "Mobilize";
-    case ACTION_TYPE.OVERWORK:
-      return "Overwork";
-    case ACTION_TYPE.ACTIVATE_DOMINANCE:
-      return "Activate Dominance";
-    case ACTION_TYPE.TAKE_DOMINANCE:
-      return "Take Dominance";
-    case ACTION_TYPE.BATTLE:
-      return "Battle";
-    case ACTION_TYPE.OTHER_PLAYER_DRAW:
-      return "Draw";
-    case ACTION_TYPE.OTHER_PLAYER_PLAY:
-      return "Play";
-    default:
-      return "Action";
-  }
-}
-
-function relatedCardIDs(action: Action): number[] {
-  switch (action.type) {
-    case ACTION_TYPE.CRAFT:
-      return action.craft?.cardID ? [action.craft.cardID] : [];
-    case ACTION_TYPE.OVERWORK:
-      return action.overwork?.cardID ? [action.overwork.cardID] : [];
-    case ACTION_TYPE.ADD_TO_DECREE:
-      return action.addToDecree?.cardIDs ?? [];
-    case ACTION_TYPE.SPREAD_SYMPATHY:
-      return action.spreadSympathy?.supporterCardIDs ?? [];
-    case ACTION_TYPE.REVOLT:
-      return action.revolt?.supporterCardIDs ?? [];
-    case ACTION_TYPE.MOBILIZE:
-      return action.mobilize?.cardID ? [action.mobilize.cardID] : [];
-    case ACTION_TYPE.TRAIN:
-      return action.train?.cardID ? [action.train.cardID] : [];
-    case ACTION_TYPE.ACTIVATE_DOMINANCE:
-      return action.activateDominance?.cardID ? [action.activateDominance.cardID] : [];
-    case ACTION_TYPE.TAKE_DOMINANCE:
-      return [action.takeDominance?.dominanceCardID, action.takeDominance?.spentCardID].filter(
-        (cardID): cardID is number => typeof cardID === "number" && cardID !== 0
-      );
-    case ACTION_TYPE.OTHER_PLAYER_PLAY:
-      return action.otherPlayerPlay?.cardID ? [action.otherPlayerPlay.cardID] : [];
-    default:
-      return [];
-  }
-}
-
-function actionContextTags(action: Action): string[] {
-  switch (action.type) {
-    case ACTION_TYPE.BATTLE:
-      return [`Clearing ${action.battle?.clearingID ?? "?"}`];
-    case ACTION_TYPE.CRAFT:
-      return (action.craft?.usedWorkshopClearings ?? []).map((clearingID) => `Workshop ${clearingID}`);
-    case ACTION_TYPE.SPREAD_SYMPATHY:
-      return [`Clearing ${action.spreadSympathy?.clearingID ?? "?"}`];
-    case ACTION_TYPE.REVOLT:
-      return [`Clearing ${action.revolt?.clearingID ?? "?"}`];
-    case ACTION_TYPE.ADD_TO_DECREE:
-      return (action.addToDecree?.columns ?? []).map((column) => `Column ${column}`);
-    case ACTION_TYPE.AID:
-      return [`Clearing ${action.aid?.clearingID ?? "?"}`, `Target ${factionLabels[action.aid?.targetFaction ?? -1] ?? "?"}`];
-    case ACTION_TYPE.OTHER_PLAYER_DRAW:
-      return [`Count ${action.otherPlayerDraw?.count ?? 0}`];
-    default:
-      return [];
-  }
-}
-
 export function AssistWorkflowPanel({ state, actions, onApply, onGenerateActions, onOpenTurnState, onOpenBattle }: AssistWorkflowPanelProps) {
   const [preferredTemplate, setPreferredTemplate] = useState<ObservedTemplateKey | null>(null);
   const [showAllGeneratedActions, setShowAllGeneratedActions] = useState(false);
@@ -164,65 +83,95 @@ export function AssistWorkflowPanel({ state, actions, onApply, onGenerateActions
 
   const shortcuts = suggestedShortcuts(state);
   const observedGeneratedActions = showAllGeneratedActions ? actions : actions.slice(0, 6);
+  const visibleCardLookup = createVisibleCardLookup(state);
+  const actorLabel = factionLabels[state.factionTurn] ?? "Unknown";
+  const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
+  const nextAssistSummary =
+    actions.length > 0
+      ? `Review ${actions.length} generated public action(s) first, then record the hidden or table-only events that are still missing.`
+      : "Load generated public actions first if the board is current, then use the observed form for anything hidden or not captured automatically.";
 
   return (
     <section className="panel sidebar-panel assist-workflow-panel">
       <p className="eyebrow">Observed Turn</p>
-      <div className="summary-stack">
+      <div className="flow-guide-hero">
         <span className="summary-label">
-          {factionLabels[state.factionTurn] ?? "Unknown"}: {phaseLabels[state.currentPhase] ?? "Unknown"} / {stepLabels[state.currentStep] ?? "Unknown"}
+          {actorLabel}: {phaseLabel} / {stepLabels[state.currentStep] ?? "Unknown"}
         </span>
-        <span className="summary-line">Use this panel to record public actions and hidden bookkeeping for the current non-player turn.</span>
+        <strong>Assist Workflow</strong>
+        <span className="summary-line">{nextAssistSummary}</span>
       </div>
 
-      <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
-        <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
-          Load Public Actions
-        </button>
-        <button type="button" className="secondary" onClick={onOpenTurnState}>
-          Advanced Turn
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          onClick={() =>
-            void onApply({
-              type: 24,
-              passPhase: {
-                faction: state.factionTurn
+      <div className="flow-step-list" style={{ marginTop: "0.9rem" }}>
+        <div className={`flow-step-card ${actions.length > 0 ? "done" : "active"}`}>
+          <strong>1. Generate the public action candidates</strong>
+          <span className="summary-line">
+            {actions.length > 0
+              ? `${actions.length} public action(s) are loaded for this observed turn.`
+              : "Pull the public action set from the current board state before filling anything manually."}
+          </span>
+          <div className="sidebar-actions" style={{ marginTop: "0.5rem" }}>
+            <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
+              {actions.length > 0 ? "Refresh Public Actions" : "Load Public Actions"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                void onApply({
+                  type: 24,
+                  passPhase: {
+                    faction: state.factionTurn
+                  }
+                })
               }
-            })
-          }
-        >
-          Advance
-        </button>
-      </div>
-
-      {shortcuts.length > 0 ? (
-        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
-          <span className="summary-label">Shortcuts</span>
-          <div className="shortcut-grid">
-            {shortcuts.map((shortcut) => (
-              <button
-                key={shortcut.label}
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  if (shortcut.action) {
-                    void onApply(shortcut.action);
-                    return;
-                  }
-                  if (shortcut.template) {
-                    setPreferredTemplate(shortcut.template);
-                  }
-                }}
-              >
-                {shortcut.label}
-              </button>
-            ))}
+            >
+              Advance
+            </button>
           </div>
         </div>
-      ) : null}
+
+        <div className={`flow-step-card ${actions.length > 0 ? "active" : "note"}`}>
+          <strong>2. Use shortcuts and generated actions</strong>
+          <span className="summary-line">
+            Apply the obvious public actions from shortcuts or the generated list before dropping into manual observation.
+          </span>
+          {shortcuts.length > 0 ? (
+            <div className="shortcut-grid" style={{ marginTop: "0.5rem" }}>
+              {shortcuts.map((shortcut) => (
+                <button
+                  key={shortcut.label}
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    if (shortcut.action) {
+                      void onApply(shortcut.action);
+                      return;
+                    }
+                    if (shortcut.template) {
+                      setPreferredTemplate(shortcut.template);
+                    }
+                  }}
+                >
+                  {shortcut.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flow-step-card waiting">
+          <strong>3. Record what the generated actions cannot know</strong>
+          <span className="summary-line">
+            Use the observed form for hidden draws, supporter spending, decree choices, or any public result that still needs manual capture.
+          </span>
+          <div className="sidebar-actions" style={{ marginTop: "0.5rem" }}>
+            <button type="button" className="secondary" onClick={onOpenTurnState}>
+              Advanced Turn
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
         <span className="summary-label">Generated Public Actions</span>
@@ -237,23 +186,23 @@ export function AssistWorkflowPanel({ state, actions, onApply, onGenerateActions
                     <strong>{actionHeadline(action)}</strong>
                     <span className="player-action-index">#{index + 1}</span>
                   </div>
-                  <span className="summary-line">{describeAction(action)}</span>
+                  <span className="summary-line">{describeAction(action, state)}</span>
                   {actionContextTags(action).length > 0 ? (
                     <div className="player-action-chip-row">
-                      {actionContextTags(action).map((tag) => (
-                        <span key={`${index}-${tag}`} className="player-action-chip">
+                      {actionContextTags(action).map((tag, tagIndex) => (
+                        <span key={`${index}-${tag}-${tagIndex}`} className="player-action-chip">
                           {tag}
                         </span>
                       ))}
                     </div>
                   ) : null}
-                  {relatedCardIDs(action).length > 0 ? (
+                  {actionCardReferences(action).length > 0 ? (
                     <div className="player-action-card-links">
                       <span className="summary-label">Cards</span>
                       <div className="known-card-pill-list">
-                        {relatedCardIDs(action).map((cardID) => (
-                          <span key={`${index}-card-${cardID}`} className="known-card-pill">
-                            {describeKnownCardID(cardID)}
+                        {actionCardReferences(action).map((reference, referenceIndex) => (
+                          <span key={`${index}-card-${reference.cardID}-${reference.zoneLabel}-${referenceIndex}`} className="known-card-pill">
+                            {formatCardReferenceLabel(reference, visibleCardLookup)}
                           </span>
                         ))}
                       </div>

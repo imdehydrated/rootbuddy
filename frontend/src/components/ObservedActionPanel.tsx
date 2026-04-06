@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { describeKnownCardID } from "../cardCatalog";
 import { factionLabels, suitLabels } from "../labels";
 import type { Action, GameState } from "../types";
+import { ReferenceCard } from "./CardUi";
+import { TokenListEditor } from "./TokenListEditor";
 
 type ObservedActionPanelProps = {
   state: GameState;
@@ -44,10 +46,10 @@ type ObservedFormState = {
   baseSuit: number;
   spentCardID: string;
   dominanceCardID: string;
-  usedWorkshopClearings: string;
-  supporterCardIDs: string;
-  decreeCardIDs: string;
-  decreeColumns: string;
+  usedWorkshopClearings: number[];
+  supporterCardIDs: number[];
+  decreeCardIDs: number[];
+  decreeColumns: number[];
   defenderAmbushed: boolean;
   attackerCounterAmbush: boolean;
   attackerUsedArmorers: boolean;
@@ -76,17 +78,6 @@ const templateLabels: Record<ObservedTemplateKey, string> = {
 function parseNumber(value: string, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function parseNumberList(value: string): number[] {
-  return value
-    .split(",")
-    .map((part) => Number(part.trim()))
-    .filter((entry) => Number.isFinite(entry) && entry > 0);
-}
-
-function formatNumberList(values: number[]): string {
-  return values.join(", ");
 }
 
 function templatesForFaction(faction: number): ObservedTemplateKey[] {
@@ -127,10 +118,10 @@ function initialFormState(state: GameState): ObservedFormState {
     baseSuit: 0,
     spentCardID: "24",
     dominanceCardID: "14",
-    usedWorkshopClearings: "",
-    supporterCardIDs: "24",
-    decreeCardIDs: "24",
-    decreeColumns: "1",
+    usedWorkshopClearings: [],
+    supporterCardIDs: [24],
+    decreeCardIDs: [24],
+    decreeColumns: [1],
     defenderAmbushed: false,
     attackerCounterAmbush: false,
     attackerUsedArmorers: false,
@@ -182,8 +173,8 @@ function buildObservedAction(form: ObservedFormState): Action {
         type: 7,
         addToDecree: {
           faction,
-          cardIDs: parseNumberList(form.decreeCardIDs),
-          columns: parseNumberList(form.decreeColumns)
+          cardIDs: form.decreeCardIDs,
+          columns: form.decreeColumns
         }
       };
     case "craft":
@@ -192,7 +183,7 @@ function buildObservedAction(form: ObservedFormState): Action {
         craft: {
           faction,
           cardID: parseNumber(form.cardID),
-          usedWorkshopClearings: parseNumberList(form.usedWorkshopClearings)
+          usedWorkshopClearings: form.usedWorkshopClearings
         }
       };
     case "overwork":
@@ -210,7 +201,7 @@ function buildObservedAction(form: ObservedFormState): Action {
         spreadSympathy: {
           faction,
           clearingID: parseNumber(form.clearingID),
-          supporterCardIDs: parseNumberList(form.supporterCardIDs)
+          supporterCardIDs: form.supporterCardIDs
         }
       };
     case "revolt":
@@ -220,7 +211,7 @@ function buildObservedAction(form: ObservedFormState): Action {
           faction,
           clearingID: parseNumber(form.clearingID),
           baseSuit: form.baseSuit,
-          supporterCardIDs: parseNumberList(form.supporterCardIDs)
+          supporterCardIDs: form.supporterCardIDs
         }
       };
     case "mobilize":
@@ -343,6 +334,7 @@ export function ObservedActionPanel({
   const [form, setForm] = useState<ObservedFormState>(() => initialFormState(state));
   const availableTemplates = templatesForFaction(form.actorFaction);
   const targetFactions = availableTargetFactions(form.actorFaction);
+  const validClearingIDs = new Set(state.map.clearings.map((clearing) => clearing.id));
 
   useEffect(() => {
     setForm(initialFormState(state));
@@ -406,10 +398,10 @@ export function ObservedActionPanel({
   const enteredBattleDecreeCardID = parseNumber(form.decreeCardID);
   const enteredDominanceCardID = parseNumber(form.dominanceCardID);
   const enteredSpentCardID = parseNumber(form.spentCardID);
-  const enteredSupporterCardIDs = parseNumberList(form.supporterCardIDs);
-  const enteredDecreeCardIDs = parseNumberList(form.decreeCardIDs);
-  const enteredWorkshopClearings = parseNumberList(form.usedWorkshopClearings);
-  const enteredDecreeColumns = parseNumberList(form.decreeColumns);
+  const enteredSupporterCardIDs = form.supporterCardIDs;
+  const enteredDecreeCardIDs = form.decreeCardIDs;
+  const enteredWorkshopClearings = form.usedWorkshopClearings;
+  const enteredDecreeColumns = form.decreeColumns;
   const referenceGroups = [
     enteredCardID > 0 ? { label: "Card", items: [previewCardLabel(enteredCardID)] } : null,
     form.template === "battle_resolution" && enteredBattleDecreeCardID > 0
@@ -496,7 +488,7 @@ export function ObservedActionPanel({
           form.template === "aid" ||
           form.template === "other_player_play") ? (
           <label>
-            <span>Card ID</span>
+            <span>Card</span>
             <input value={form.cardID} onChange={(event) => updateForm("cardID", event.target.value)} />
           </label>
         ) : null}
@@ -560,7 +552,7 @@ export function ObservedActionPanel({
               <input value={form.defenderRoll} onChange={(event) => updateForm("defenderRoll", event.target.value)} />
             </label>
             <label>
-              <span>Eyrie Decree Card ID</span>
+              <span>Eyrie Decree Card</span>
               <input value={form.decreeCardID} onChange={(event) => updateForm("decreeCardID", event.target.value)} />
             </label>
             <label>
@@ -587,41 +579,51 @@ export function ObservedActionPanel({
         ) : null}
 
         {(form.template === "spread_sympathy" || form.template === "revolt") ? (
-          <label>
-            <span>Supporter Card IDs</span>
-            <input
-              value={form.supporterCardIDs}
-              onChange={(event) => updateForm("supporterCardIDs", event.target.value)}
-            />
-          </label>
+          <TokenListEditor
+            label="Supporter Cards"
+            values={form.supporterCardIDs}
+            onChange={(values) => updateForm("supporterCardIDs", values)}
+            formatValue={previewCardLabel}
+            placeholder="Add supporter card IDs"
+          />
         ) : null}
 
         {form.template === "add_to_decree" ? (
           <>
-            <label>
-              <span>Decree Card IDs</span>
-              <input value={form.decreeCardIDs} onChange={(event) => updateForm("decreeCardIDs", event.target.value)} />
-            </label>
-            <label>
-              <span>Decree Columns</span>
-              <input value={form.decreeColumns} onChange={(event) => updateForm("decreeColumns", event.target.value)} />
-            </label>
+            <TokenListEditor
+              label="Decree Cards"
+              values={form.decreeCardIDs}
+              onChange={(values) => updateForm("decreeCardIDs", values)}
+              formatValue={previewCardLabel}
+              placeholder="Add decree card IDs"
+            />
+            <TokenListEditor
+              label="Decree Columns"
+              values={form.decreeColumns}
+              onChange={(values) => updateForm("decreeColumns", values)}
+              formatValue={(column) => `Column ${column}`}
+              placeholder="Add decree columns"
+              allowDuplicates
+              validateValue={(column) => column >= 1 && column <= 4}
+            />
           </>
         ) : null}
 
         {form.template === "craft" ? (
-          <label>
-            <span>Used Workshop Clearings</span>
-            <input
-              value={form.usedWorkshopClearings}
-              onChange={(event) => updateForm("usedWorkshopClearings", event.target.value)}
-            />
-          </label>
+          <TokenListEditor
+            label="Used Workshop Clearings"
+            values={form.usedWorkshopClearings}
+            onChange={(values) => updateForm("usedWorkshopClearings", values)}
+            formatValue={(clearingID) => `Clearing ${clearingID}`}
+            placeholder="Add workshop clearings"
+            allowDuplicates
+            validateValue={(clearingID) => validClearingIDs.has(clearingID)}
+          />
         ) : null}
 
         {(form.template === "activate_dominance" || form.template === "take_dominance") ? (
           <label>
-            <span>Dominance Card ID</span>
+            <span>Dominance Card</span>
             <input
               value={form.dominanceCardID}
               onChange={(event) => updateForm("dominanceCardID", event.target.value)}
@@ -631,7 +633,7 @@ export function ObservedActionPanel({
 
         {form.template === "take_dominance" ? (
           <label>
-            <span>Spent Card ID</span>
+            <span>Spent Card</span>
             <input value={form.spentCardID} onChange={(event) => updateForm("spentCardID", event.target.value)} />
           </label>
         ) : null}
@@ -695,16 +697,11 @@ export function ObservedActionPanel({
           <span className="summary-label">Card References</span>
           <div className="observed-reference-grid">
             {referenceGroups.map((group) => (
-              <div key={group.label} className="observed-reference-card">
-                <span className="summary-label">{group.label}</span>
-                <div className="known-card-pill-list">
-                  {group.items.map((item) => (
-                    <span key={`${group.label}-${item}`} className="known-card-pill">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <ReferenceCard
+                key={group.label}
+                label={group.label}
+                items={group.items.map((item, index) => ({ key: `${group.label}-${item}-${index}`, label: item }))}
+              />
             ))}
           </div>
         </div>

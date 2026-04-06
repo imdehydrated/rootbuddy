@@ -17,7 +17,11 @@ type GuideContent = {
   eyebrow: string;
   title: string;
   detail: string;
-  checklist: string[];
+  checklist: Array<{
+    title: string;
+    detail: string;
+    tone?: "active" | "waiting" | "note";
+  }>;
   primaryLabel?: string;
   primaryAction?: () => void;
 };
@@ -33,12 +37,45 @@ function setupGuide(state: GameState, loadedActionCount: number, onGenerateActio
         : "Load the legal setup choices, then follow the highlighted targets on the board.",
     checklist:
       state.setupStage === 1
-        ? ["Choose the keep corner, then place the sawmill, workshop, and recruiter.", "Apply the staged setup choices directly from the board."]
+        ? [
+            {
+              title: "Stage the Marquise corner",
+              detail: "Choose the keep corner first, then complete the sawmill, workshop, and recruiter placements.",
+              tone: "active"
+            },
+            {
+              title: "Use the board highlights",
+              detail: "Apply the staged setup choices directly from the board instead of editing state manually.",
+              tone: "note"
+            }
+          ]
         : state.setupStage === 2
-          ? ["Choose the Eyrie starting clearing from the highlighted corners.", "The game will advance to Vagabond setup automatically."]
-          : state.setupStage === 3
-            ? ["Choose the Vagabond starting forest from the highlighted forest markers.", "Opening hands are dealt after setup is complete."]
-            : ["Follow the highlighted setup targets in order."],
+          ? [
+              {
+                title: "Choose the Eyrie roost corner",
+                detail: "Pick the starting clearing from the highlighted corner options.",
+                tone: "active"
+              },
+              {
+                title: "Advance is automatic",
+                detail: "The game moves into Vagabond setup immediately after the Eyrie choice resolves.",
+                tone: "note"
+              }
+            ]
+        : state.setupStage === 3
+            ? [
+                {
+                  title: "Choose the starting forest",
+                  detail: "Select one of the highlighted forest markers on the board.",
+                  tone: "active"
+                },
+                {
+                  title: "Hands are dealt after setup",
+                  detail: "Once the forest is chosen, setup finishes and opening hands are assigned.",
+                  tone: "note"
+                }
+              ]
+            : [{ title: "Follow the highlighted targets", detail: "Apply each setup choice in order.", tone: "active" }],
     primaryLabel: loadedActionCount > 0 ? undefined : "Load Setup Choices",
     primaryAction: loadedActionCount > 0 ? undefined : () => void onGenerateActions()
   };
@@ -58,9 +95,21 @@ function playerTurnGuide(
         ? "Apply one of the loaded legal actions below. Battles still resolve through the battle flow."
         : "Generate legal actions for the current board and turn state, then apply them from the sidebar.",
     checklist: [
-      "Keep the board state current before refreshing actions.",
-      "Use Player Turn for routine play.",
-      "Click a clearing only when you need a board correction; editing lives outside the normal action flow."
+      {
+        title: "Use loaded legal actions",
+        detail: "Routine play should come from Player Turn instead of manual state edits.",
+        tone: "active"
+      },
+      {
+        title: "Refresh only from current board state",
+        detail: "If the board is stale, refresh after correcting it so the legal action set stays trustworthy.",
+        tone: "note"
+      },
+      {
+        title: "Keep edits exceptional",
+        detail: "Click a clearing only when you need a correction. Board editing stays outside the normal flow.",
+        tone: "waiting"
+      }
     ],
     primaryLabel: loadedActionCount > 0 ? "Refresh Actions" : "Load Actions",
     primaryAction: () => void onGenerateActions()
@@ -82,9 +131,21 @@ function observedTurnGuide(
         ? `Record ${actingFaction}'s ${phaseLabel.toLowerCase()} using the generated public actions or the observed-action form below.`
         : `Load generated public actions when the board is current, or record hidden/public events directly in the Observed Turn panel.`,
     checklist: [
-      "Use shortcuts for common public actions before filling the observed form manually.",
-      "Advance the phase only after the physical board and the app match.",
-      "Use Advanced Tools only when you need to correct turn state manually."
+      {
+        title: "Use shortcuts first",
+        detail: "Reach for common public actions before filling the observed-action form manually.",
+        tone: "active"
+      },
+      {
+        title: "Advance only when synced",
+        detail: "Move the phase forward only after the physical board and the app state match.",
+        tone: "note"
+      },
+      {
+        title: "Keep Advanced Tools as fallback",
+        detail: "Use the deeper editor only when the normal observed-turn path is not enough.",
+        tone: "waiting"
+      }
     ],
     primaryLabel: loadedActionCount > 0 ? "Refresh Public Actions" : "Load Public Actions",
     primaryAction: () => void onGenerateActions()
@@ -98,9 +159,21 @@ function battleGuide(selectedBattleAction: Action): GuideContent {
     title: "Resolve Selected Battle",
     detail: `${factionLabels[battle?.faction ?? -1] ?? "Attacker"} vs ${factionLabels[battle?.targetFaction ?? -1] ?? "Defender"} in clearing ${battle?.clearingID ?? "?"}. This is the blocking step before the turn can continue.`,
     checklist: [
-      "Enter the rolls and any visible effect choices in Battle Flow.",
-      "In Assist mode, answer the Ambush prompt before resolving.",
-      "Resolve and apply the battle before loading or applying more actions."
+      {
+        title: "Finish the battle first",
+        detail: "Battle resolution is the blocking step before the turn can continue.",
+        tone: "active"
+      },
+      {
+        title: "Enter rolls and visible effects",
+        detail: "Use Battle Flow for the current modifiers and outcome inputs.",
+        tone: "note"
+      },
+      {
+        title: "Handle assist prompts before resolve",
+        detail: "If Ambush or other prompts are pending, answer them before applying the battle.",
+        tone: "waiting"
+      }
     ]
   };
 }
@@ -118,9 +191,21 @@ function multiplayerGuide(
       title: "Realtime Sync Interrupted",
       detail: "The multiplayer session is reconnecting. Wait for the live connection to recover before expecting prompts or fresh actions.",
       checklist: [
-        "Do not rely on stale action buttons while the connection is recovering.",
-        "The server remains authoritative and will push the latest state after reconnect.",
-        "If reconnect fails, return to the lobby or reload using the saved browser session."
+        {
+          title: "Treat the current UI as stale",
+          detail: "Do not rely on the existing action buttons while the connection is recovering.",
+          tone: "waiting"
+        },
+        {
+          title: "Wait for the server push",
+          detail: "The server remains authoritative and will send the latest state after reconnect.",
+          tone: "active"
+        },
+        {
+          title: "Fallback if recovery fails",
+          detail: "Return to the lobby or reload using the saved browser session if reconnect does not recover.",
+          tone: "note"
+        }
       ]
     };
   }
@@ -135,9 +220,21 @@ function multiplayerGuide(
             ? "Use Battle Flow to submit the response owned by your faction before the turn can continue."
             : `Waiting on ${factionLabels[battlePrompt.waitingOnFaction] ?? "another player"} to answer the current battle prompt.`,
         checklist: [
-          "Battle Flow shows only the options the server exposed for your perspective.",
-          "Once all responses are in, the attacker will receive the resolve step.",
-          "The server owns the actual battle dice in multiplayer."
+          {
+            title: "Use the prompt the server exposed",
+            detail: "Battle Flow only shows the choices valid for your current perspective.",
+            tone: battlePrompt.waitingOnFaction === state.playerFaction ? "active" : "waiting"
+          },
+          {
+            title: "Resolution comes after responses",
+            detail: "Once all responses are in, the attacker receives the resolve step.",
+            tone: "note"
+          },
+          {
+            title: "Dice stay server-owned",
+            detail: "Multiplayer battle randomness remains authoritative on the server.",
+            tone: "note"
+          }
         ]
       };
     }
@@ -152,9 +249,21 @@ function multiplayerGuide(
             ? "Battle responses are complete. Resolve the battle from Battle Flow to continue the turn."
             : `Battle responses are complete. Waiting on ${factionLabels[attackerFaction] ?? "the attacker"} to resolve.`,
         checklist: [
-          "Do not refresh or apply unrelated actions until the battle finishes.",
-          "The next legal action set will load automatically after the server advances the turn.",
-          "Battle resolution remains authoritative on the server."
+          {
+            title: "Resolve before doing anything else",
+            detail: "Do not refresh or apply unrelated actions until the battle fully finishes.",
+            tone: attackerFaction === state.playerFaction ? "active" : "waiting"
+          },
+          {
+            title: "Next actions load after server advance",
+            detail: "The next legal action set appears automatically after the server updates turn state.",
+            tone: "note"
+          },
+          {
+            title: "Server authority still applies",
+            detail: "Battle resolution stays authoritative even after all player responses are collected.",
+            tone: "note"
+          }
         ]
       };
     }
@@ -170,9 +279,21 @@ function multiplayerGuide(
           ? "Apply one of the server-authoritative legal actions below. Battles still use Battle Flow."
           : "Legal actions are loading automatically for your turn. You can still refresh manually if needed.",
       checklist: [
-        "The server will reject stale or out-of-turn actions.",
-        "After each applied action, wait for the pushed state update before continuing.",
-        "Battle prompts interrupt normal action flow when another player must respond."
+        {
+          title: "Trust the server-authoritative action list",
+          detail: "The server rejects stale or out-of-turn actions, so keep the flow inside the loaded list.",
+          tone: "active"
+        },
+        {
+          title: "Wait for pushed state after each action",
+          detail: "Continue only after the websocket update lands and confirms the new authoritative state.",
+          tone: "note"
+        },
+        {
+          title: "Expect battle interruptions",
+          detail: "Battle prompts can interrupt normal action flow when another faction must respond.",
+          tone: "waiting"
+        }
       ],
       primaryLabel: loadedActionCount > 0 ? "Refresh Actions" : "Refresh Actions",
       primaryAction: () => void onGenerateActions()
@@ -186,9 +307,21 @@ function multiplayerGuide(
     title: `Waiting On ${actingFaction}`,
     detail: `${actingFaction} is taking their ${phaseLabel.toLowerCase()}. Multiplayer clients are passive until the server gives your faction priority.`,
     checklist: [
-      "Watch for a battle prompt if your faction must answer a reaction window.",
-      "Your legal actions will load automatically when the turn passes to you.",
-      "Use the session panel to confirm connection health while waiting."
+      {
+        title: "Watch for battle prompts",
+        detail: "Your faction may still need to answer a reaction window while another player is active.",
+        tone: "active"
+      },
+      {
+        title: "Actions will load on handoff",
+        detail: "Your legal actions should populate automatically when the turn passes to you.",
+        tone: "waiting"
+      },
+      {
+        title: "Use session status while idle",
+        detail: "Confirm connection health in the session panel if the game appears stuck.",
+        tone: "note"
+      }
     ]
   };
 }
@@ -199,9 +332,21 @@ function reviewGuide(): GuideContent {
     title: "Final Result Review",
     detail: "The match is over. Review the win, final standings, and saved-result options from the Game Over panel.",
     checklist: [
-      "Return to Setup keeps this result available for review.",
-      "Clear Saved Result removes the resumable copy.",
-      "New Game replaces the finished match with a fresh setup."
+      {
+        title: "Return to Setup keeps review available",
+        detail: "Use it when you want to leave the board but retain the final result for later inspection.",
+        tone: "note"
+      },
+      {
+        title: "Clear Saved Result removes the review copy",
+        detail: "This deletes the resumable local review state for the finished match.",
+        tone: "waiting"
+      },
+      {
+        title: "New Game replaces the result",
+        detail: "Start fresh only when you are done reviewing the finished state.",
+        tone: "active"
+      }
     ]
   };
 }
@@ -239,11 +384,14 @@ export function FlowGuidePanel({
 
       <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
         <span className="summary-label">Next</span>
-        {guide.checklist.map((item) => (
-          <span key={item} className="summary-line">
-            {item}
-          </span>
-        ))}
+        <div className="flow-step-list">
+          {guide.checklist.map((item) => (
+            <div key={`${item.title}-${item.detail}`} className={`flow-step-card ${item.tone ?? "note"}`}>
+              <strong>{item.title}</strong>
+              <span className="summary-line">{item.detail}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>

@@ -263,10 +263,14 @@ export default function App() {
   const [showGuideHelp, setShowGuideHelp] = useState(true);
   const [showAdvancedTurnPanel, setShowAdvancedTurnPanel] = useState(false);
   const [showBoardEditor, setShowBoardEditor] = useState(false);
+  const [showContextDrawer, setShowContextDrawer] = useState(false);
+  const [showWorkspaceTools, setShowWorkspaceTools] = useState(false);
+  const [showRecoveryTools, setShowRecoveryTools] = useState(false);
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
   const multiplayerToken = multiplayerSession?.playerToken ?? null;
   const previousConnectionStatus = useRef<MultiplayerConnectionStatus>("disconnected");
   const autoLoadedActionKey = useRef<string>("");
+  const previousGamePhase = useRef(initialState.gamePhase);
 
   useEffect(() => {
     try {
@@ -471,7 +475,15 @@ export default function App() {
             setStatus(message.error);
           } else {
             setMultiplayerNotice(null);
-            setStatus(message.type === "game.start" ? "Multiplayer game started." : "Received multiplayer update.");
+            if (message.state.gamePhase === 2) {
+              setStatus(gameOverStatusMessage(message.state));
+            } else if (message.state.gamePhase === 1 && message.state.factionTurn === message.state.playerFaction) {
+              setStatus("Your turn. Loading legal actions...");
+            } else if (message.state.gamePhase === 1) {
+              setStatus(`Waiting on ${factionLabels[message.state.factionTurn] ?? "another player"}.`);
+            } else {
+              setStatus(message.type === "game.start" ? "Multiplayer game started." : "Received multiplayer update.");
+            }
           }
           return;
         }
@@ -538,6 +550,39 @@ export default function App() {
       setStatus("Realtime multiplayer connection active.");
     }
   }, [multiplayerConnectionStatus, multiplayerToken]);
+
+  useEffect(() => {
+    const previousPhase = previousGamePhase.current;
+    previousGamePhase.current = parsedState.gamePhase;
+
+    if (parsedState.gamePhase === 2) {
+      setShowContextDrawer(true);
+      setShowWorkspaceTools(true);
+      setShowRecoveryTools(false);
+      setShowBoardEditor(false);
+      if (previousPhase !== 2) {
+        setShowGuideHelp(true);
+      }
+      return;
+    }
+
+    if (parsedState.gamePhase === 0) {
+      setShowContextDrawer(false);
+      setShowWorkspaceTools(true);
+      setShowRecoveryTools(false);
+      setShowBoardEditor(false);
+      return;
+    }
+
+    setShowContextDrawer(false);
+    setShowWorkspaceTools(false);
+    if (multiplayerToken) {
+      setShowRecoveryTools(false);
+    }
+    if (previousPhase === 2) {
+      setShowGuideHelp(false);
+    }
+  }, [multiplayerToken, parsedState.gamePhase]);
 
   useEffect(() => {
     if (!multiplayerToken || !serverGameID || showSetup) {
@@ -635,6 +680,9 @@ export default function App() {
     setActiveModal(null);
     setShowAdvancedTurnPanel(false);
     setShowBoardEditor(false);
+    setShowContextDrawer(false);
+    setShowWorkspaceTools(false);
+    setShowRecoveryTools(false);
     setShowGuideHelp(false);
     setStatus(options?.status ?? "Choose factions and create a new game.");
   }
@@ -657,6 +705,9 @@ export default function App() {
     setMultiplayerNotice(null);
     setShowSetup(false);
     setShowBoardEditor(false);
+    setShowContextDrawer(nextState.gamePhase === 2);
+    setShowWorkspaceTools(nextState.gamePhase !== 1);
+    setShowRecoveryTools(false);
     setActiveModal(null);
     setShowGuideHelp(false);
     setStatus(nextStatus);
@@ -844,10 +895,16 @@ export default function App() {
       if (revision !== null) {
         setServerRevision(revision);
       }
+      setMultiplayerBattlePrompt(null);
       syncState(nextState);
-      setStatus(
-        nextState.gamePhase === 2 ? gameOverStatusMessage(nextState) : effectResult?.message ?? "Battle resolved and applied."
-      );
+      if (!multiplayerToken && nextState.gamePhase === 1) {
+        await loadActionsForState(nextState, {
+          successStatus: effectResult?.message ?? "Battle resolved. Loaded the next legal actions."
+        });
+        setActiveModal(null);
+        return;
+      }
+      setStatus(nextState.gamePhase === 2 ? gameOverStatusMessage(nextState) : effectResult?.message ?? "Battle resolved and applied.");
       setActiveModal(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to resolve battle";
@@ -1140,6 +1197,84 @@ export default function App() {
   const marquiseSetupActions = actions.filter((action) => action.type === ACTION_TYPE.MARQUISE_SETUP);
   const eyrieSetupActions = actions.filter((action) => action.type === ACTION_TYPE.EYRIE_SETUP);
   const vagabondSetupActions = actions.filter((action) => action.type === ACTION_TYPE.VAGABOND_SETUP);
+  const isMultiplayerGame = multiplayerToken !== null;
+  const hasPrimaryBattleFlow = Boolean(activeBattleAction?.battle);
+  const showPrimarySetupFlow = parsedState.gamePhase === 0;
+  const showPrimaryReviewFlow = parsedState.gamePhase === 2;
+  const showPrimaryAssistFlow =
+    parsedState.gamePhase === 1 &&
+    parsedState.gameMode === 1 &&
+    parsedState.factionTurn !== parsedState.playerFaction &&
+    !hasPrimaryBattleFlow;
+  const showPrimaryPlayerFlow =
+    parsedState.gamePhase === 1 &&
+    parsedState.factionTurn === parsedState.playerFaction &&
+    !hasPrimaryBattleFlow;
+  const primaryFlowLabel = showPrimaryReviewFlow
+    ? "Review"
+    : hasPrimaryBattleFlow
+      ? "Battle"
+      : showPrimarySetupFlow
+        ? "Setup"
+        : showPrimaryAssistFlow
+          ? "Observed Turn"
+          : showPrimaryPlayerFlow
+            ? "Player Turn"
+            : isMultiplayerGame
+              ? "Waiting"
+              : "Flow";
+  const primaryFlowSummary = (() => {
+    if (showPrimaryReviewFlow) {
+      return "The match is complete. Review the result here before touching restart or recovery tools.";
+    }
+    if (hasPrimaryBattleFlow) {
+      if (multiplayerBattlePrompt) {
+        if (
+          (multiplayerBattlePrompt.stage === "defender_response" || multiplayerBattlePrompt.stage === "attacker_response") &&
+          multiplayerBattlePrompt.waitingOnFaction === parsedState.playerFaction
+        ) {
+          return "Your battle response is blocking the turn. Submit it here to continue.";
+        }
+        if (
+          (multiplayerBattlePrompt.stage === "defender_response" || multiplayerBattlePrompt.stage === "attacker_response") &&
+          multiplayerBattlePrompt.waitingOnFaction !== parsedState.playerFaction
+        ) {
+          return `Battle progress is waiting on ${factionLabels[multiplayerBattlePrompt.waitingOnFaction] ?? "another player"}.`;
+        }
+        if (multiplayerBattlePrompt.stage === "ready_to_resolve") {
+          return multiplayerBattlePrompt.action.battle?.faction === parsedState.playerFaction
+            ? "All battle responses are in. Resolve here to return to the turn flow."
+            : `All battle responses are in. Waiting on ${factionLabels[multiplayerBattlePrompt.action.battle?.faction ?? -1] ?? "the attacker"} to resolve.`;
+        }
+      }
+      return "Battle flow is blocking the turn. Finish it here before returning to other actions.";
+    }
+    if (showPrimarySetupFlow) {
+      return actions.length > 0
+        ? "Highlighted setup targets are ready on the board."
+        : "Load setup choices, then complete the staged board selections here.";
+    }
+    if (showPrimaryAssistFlow) {
+      return actions.length > 0
+        ? `${actions.length} public action(s) are loaded for the observed turn.`
+        : "Load public actions or record observed events manually here.";
+    }
+    if (showPrimaryPlayerFlow) {
+      if (actions.length > 0) {
+        return `${actions.length} legal action(s) are loaded and ready.`;
+      }
+      return isMultiplayerGame
+        ? "Your turn has priority. Legal actions will refresh automatically here."
+        : "Load legal actions here to continue the turn.";
+    }
+    if (isMultiplayerGame) {
+      if (multiplayerConnectionStatus === "reconnecting" || multiplayerConnectionStatus === "connecting") {
+        return "Realtime connection is recovering. Stay here while the server resynchronizes state.";
+      }
+      return `Waiting on ${factionLabels[parsedState.factionTurn] ?? "another player"} until the server hands your faction priority.`;
+    }
+    return "Use this area for the active workflow before opening any secondary tools.";
+  })();
 
   const legalSetupClearingIDs =
     parsedState.gamePhase !== 0
@@ -1419,6 +1554,7 @@ export default function App() {
           </div>
         ) : null}
         <BoardPanel
+          state={parsedState}
           clearings={parsedState.map.clearings}
           forests={parsedState.map.forests}
           boardLayout={boardLayout}
@@ -1465,115 +1601,136 @@ export default function App() {
           <span className={error ? "message error" : "message"}>{error || status}</span>
         </section>
 
-        <FlowGuidePanel
-          state={parsedState}
-          loadedActionCount={actions.length}
-          selectedBattleAction={selectedBattleAction}
-          isMultiplayer={multiplayerToken !== null}
-          multiplayerConnectionStatus={multiplayerConnectionStatus}
-          multiplayerBattlePrompt={multiplayerBattlePrompt}
-          onGenerateActions={refreshActions}
-          onOpenHelp={() => setShowGuideHelp(true)}
-        />
-        {multiplayerNotice ? (
-          <section className={`panel sidebar-panel notice-panel ${multiplayerNotice.level}`}>
-            <p className="eyebrow">{multiplayerNotice.title}</p>
-            <span className="summary-line">{multiplayerNotice.detail}</span>
+        <div className="primary-flow-stack">
+          <section className="panel sidebar-panel primary-flow-panel">
+            <p className="eyebrow">Primary Workflow</p>
+            <span className="summary-label">{primaryFlowLabel}</span>
+            <span className="summary-line">{primaryFlowSummary}</span>
           </section>
-        ) : null}
-        {showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
 
-        {parsedState.gamePhase === 0 ? (
-          <SetupFlowPanel
-            stage={parsedState.setupStage}
-            activeFaction={parsedState.factionTurn}
-            legalChoiceCount={parsedState.setupStage === 3 ? forestTargets.filter((target) => target.legal).length : legalSetupClearingIDs.length}
-            marquiseDraft={marquiseSetupDraft}
-            onResetMarquiseDraft={() => {
-              setMarquiseSetupDraft(emptyMarquiseSetupDraft);
-              setStatus("Marquise setup draft reset.");
-            }}
+          {multiplayerNotice ? (
+            <section className={`panel sidebar-panel notice-panel ${multiplayerNotice.level}`}>
+              <p className="eyebrow">{multiplayerNotice.title}</p>
+              <span className="summary-line">{multiplayerNotice.detail}</span>
+            </section>
+          ) : null}
+
+          <FlowGuidePanel
+            state={parsedState}
+            loadedActionCount={actions.length}
+            selectedBattleAction={selectedBattleAction}
+            isMultiplayer={isMultiplayerGame}
+            multiplayerConnectionStatus={multiplayerConnectionStatus}
+            multiplayerBattlePrompt={multiplayerBattlePrompt}
+            onGenerateActions={refreshActions}
+            onOpenHelp={() => setShowGuideHelp(true)}
           />
-        ) : null}
 
-        <PlayerActionsPanel
-          state={parsedState}
-          actions={actions}
-          isMultiplayer={multiplayerToken !== null}
-          onApply={handleApply}
-          onGenerateActions={refreshActions}
-          onOpenBattle={openBattleForActionIndex}
-          onPreviewAction={setHoveredActionIndex}
-        />
-        <BattleFlowPanel
-          selectedBattleIndex={selectedBattleIndex}
-          selectedBattleAction={selectedBattleAction}
-          multiplayerBattlePrompt={multiplayerBattlePrompt}
-          multiplayerPerspectiveFaction={parsedState.playerFaction}
-          multiplayerSubmitting={multiplayerSubmitting}
-          attackerFaction={attackerFaction}
-          defenderFaction={defenderFaction}
-          attackerRoll={attackerRoll}
-          defenderRoll={defenderRoll}
-          battleModifiers={battleModifiers}
-          battleContext={battleContext}
-          assistDefenderAmbushChoice={assistDefenderAmbushChoice}
-          onSetAttackerRoll={setAttackerRoll}
-          onSetDefenderRoll={setDefenderRoll}
-          onSetBattleModifiers={(updater) => setBattleModifiers((current) => updater(current))}
-          onSetAssistDefenderAmbushChoice={setAssistDefenderAmbushChoice}
-          onSubmitMultiplayerResponse={handleSubmitBattleResponse}
-          onResolveAndApply={handleResolveAndApply}
-          onClearSelection={() => {
-            setSelectedBattleIndex(null);
-            setHoveredActionIndex(null);
-            setBattleContext(null);
-            setMultiplayerBattlePrompt(null);
-            setBattleModifiers(emptyBattleModifiers);
-            setAssistDefenderAmbushChoice(null);
-            setStatus("Cleared selected battle.");
-          }}
-        />
-        <EndgamePanel
-          state={parsedState}
-          hasSavedSession={hasSavedSession}
-          serverGameID={serverGameID}
-          onNewGame={() => {
-            if (multiplayerToken) {
-              setStatus("Starting a new game from the in-game multiplayer workspace is not supported.");
-              return;
-            }
-            resetToSetup({ clearSaved: true, status: "Start a new game." });
-          }}
-          onReturnToSetup={() => {
-            if (multiplayerToken) {
-              setStatus("Return to setup is disabled while a multiplayer session is active.");
-              return;
-            }
-            resetToSetup({ status: "Returned to setup. Resume is still available until you clear it." });
-          }}
-          onClearSavedSession={() => {
-            clearSavedSession();
-            setHasSavedSession(false);
-            setSavedSessionInfo(null);
-            setStatus("Cleared the saved endgame result.");
-          }}
-          onOpenDebug={() => {
-            if (multiplayerToken) {
-              setStatus("Debug JSON is disabled in multiplayer.");
-              return;
-            }
-            setActiveModal("json");
-          }}
-        />
-        <AssistWorkflowPanel
-          state={parsedState}
-          actions={actions}
-          onApply={handleApply}
-          onGenerateActions={refreshActions}
-          onOpenTurnState={() => setShowAdvancedTurnPanel(true)}
-          onOpenBattle={openBattleForActionIndex}
-        />
+          {showPrimarySetupFlow ? (
+            <SetupFlowPanel
+              stage={parsedState.setupStage}
+              activeFaction={parsedState.factionTurn}
+              legalChoiceCount={parsedState.setupStage === 3 ? forestTargets.filter((target) => target.legal).length : legalSetupClearingIDs.length}
+              marquiseDraft={marquiseSetupDraft}
+              onResetMarquiseDraft={() => {
+                setMarquiseSetupDraft(emptyMarquiseSetupDraft);
+                setStatus("Marquise setup draft reset.");
+              }}
+            />
+          ) : null}
+
+          {hasPrimaryBattleFlow ? (
+            <BattleFlowPanel
+              selectedBattleIndex={selectedBattleIndex}
+              selectedBattleAction={selectedBattleAction}
+              multiplayerBattlePrompt={multiplayerBattlePrompt}
+              multiplayerPerspectiveFaction={parsedState.playerFaction}
+              multiplayerSubmitting={multiplayerSubmitting}
+              attackerFaction={attackerFaction}
+              defenderFaction={defenderFaction}
+              attackerRoll={attackerRoll}
+              defenderRoll={defenderRoll}
+              battleModifiers={battleModifiers}
+              battleContext={battleContext}
+              assistDefenderAmbushChoice={assistDefenderAmbushChoice}
+              onSetAttackerRoll={setAttackerRoll}
+              onSetDefenderRoll={setDefenderRoll}
+              onSetBattleModifiers={(updater) => setBattleModifiers((current) => updater(current))}
+              onSetAssistDefenderAmbushChoice={setAssistDefenderAmbushChoice}
+              onSubmitMultiplayerResponse={handleSubmitBattleResponse}
+              onResolveAndApply={handleResolveAndApply}
+              onClearSelection={() => {
+                setSelectedBattleIndex(null);
+                setHoveredActionIndex(null);
+                setBattleContext(null);
+                setMultiplayerBattlePrompt(null);
+                setBattleModifiers(emptyBattleModifiers);
+                setAssistDefenderAmbushChoice(null);
+                setStatus("Cleared selected battle.");
+              }}
+            />
+          ) : null}
+
+          {showPrimaryReviewFlow ? (
+            <EndgamePanel
+              state={parsedState}
+              hasSavedSession={hasSavedSession}
+              serverGameID={serverGameID}
+              onNewGame={() => {
+                if (multiplayerToken) {
+                  setStatus("Starting a new game from the in-game multiplayer workspace is not supported.");
+                  return;
+                }
+                resetToSetup({ clearSaved: true, status: "Start a new game." });
+              }}
+              onReturnToSetup={() => {
+                if (multiplayerToken) {
+                  setStatus("Return to setup is disabled while a multiplayer session is active.");
+                  return;
+                }
+                resetToSetup({ status: "Returned to setup. Resume is still available until you clear it." });
+              }}
+              onClearSavedSession={() => {
+                clearSavedSession();
+                setHasSavedSession(false);
+                setSavedSessionInfo(null);
+                setStatus("Cleared the saved endgame result.");
+              }}
+              onOpenDebug={() => {
+                if (multiplayerToken) {
+                  setStatus("Debug JSON is disabled in multiplayer.");
+                  return;
+                }
+                setActiveModal("json");
+              }}
+            />
+          ) : null}
+
+          {showPrimaryAssistFlow ? (
+            <AssistWorkflowPanel
+              state={parsedState}
+              actions={actions}
+              onApply={handleApply}
+              onGenerateActions={refreshActions}
+              onOpenTurnState={() => setShowAdvancedTurnPanel(true)}
+              onOpenBattle={openBattleForActionIndex}
+            />
+          ) : null}
+
+          {showPrimaryPlayerFlow ? (
+            <PlayerActionsPanel
+              state={parsedState}
+              actions={actions}
+              isMultiplayer={isMultiplayerGame}
+              onApply={handleApply}
+              onGenerateActions={refreshActions}
+              onOpenBattle={openBattleForActionIndex}
+              onPreviewAction={setHoveredActionIndex}
+            />
+          ) : null}
+        </div>
+
+        {showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
         {parsedState.gamePhase === 1 && !multiplayerToken ? (
           <details
             className="panel sidebar-panel board-editor-drawer"
@@ -1616,10 +1773,14 @@ export default function App() {
           </details>
         ) : null}
 
-        <details className="panel sidebar-panel context-drawer" open={parsedState.gamePhase !== 1}>
+        <details
+          className="panel sidebar-panel context-drawer secondary-drawer"
+          open={showContextDrawer}
+          onToggle={(event) => setShowContextDrawer(event.currentTarget.open)}
+        >
           <summary className="panel-summary">
-            <span className="summary-label">Game Context</span>
-            <span className="summary-line">Open this for turn summary, card visibility, and session details.</span>
+            <span className="summary-label">Context & Reference</span>
+            <span className="summary-line">Turn summary, card visibility, and session details live here as secondary reference.</span>
           </summary>
           <div className="context-drawer-body">
             <TurnSummaryPanel state={parsedState} />
@@ -1636,14 +1797,25 @@ export default function App() {
           </div>
         </details>
 
-        <section className="panel sidebar-panel sidebar-actions-panel">
-          <p className="eyebrow">{parsedState.gamePhase === 2 ? "Review Workspace" : "Workspace"}</p>
+        <details
+          className="panel sidebar-panel sidebar-actions-panel secondary-drawer"
+          open={showWorkspaceTools}
+          onToggle={(event) => setShowWorkspaceTools(event.currentTarget.open)}
+        >
+          <summary className="panel-summary">
+            <span className="summary-label">{parsedState.gamePhase === 2 ? "Review Workspace" : "Workspace Tools"}</span>
+            <span className="summary-line">
+              {parsedState.gamePhase === 2
+                ? "Restart and review controls live here after the match ends."
+                : "Board inspection and setup/recovery controls live here as secondary tools."}
+            </span>
+          </summary>
           {parsedState.gamePhase === 2 ? (
-            <div className="summary-stack" style={{ marginBottom: "0.9rem" }}>
+            <div className="summary-stack" style={{ margin: "0.9rem 0" }}>
               <span className="summary-line">The match is finished. Use these controls for review, restart, or recovery only.</span>
             </div>
           ) : (
-            <div className="summary-stack" style={{ marginBottom: "0.9rem" }}>
+            <div className="summary-stack" style={{ margin: "0.9rem 0" }}>
               <span className="summary-label">Board</span>
               <span className="summary-line">Selected clearing: {selectedClearing?.id ?? "None"}</span>
               {selectedClearing ? (
@@ -1657,7 +1829,6 @@ export default function App() {
                   </span>
                 </>
               ) : null}
-              <span className="summary-line">Use these controls for board inspection, setup transitions, and recovery tools.</span>
             </div>
           )}
           <div className="sidebar-actions">
@@ -1679,10 +1850,15 @@ export default function App() {
             </button>
           </div>
           {!multiplayerToken ? (
-            <details className="advanced-tools" style={{ marginTop: "0.9rem" }}>
+            <details
+              className="advanced-tools secondary-drawer"
+              style={{ marginTop: "0.9rem" }}
+              open={showRecoveryTools}
+              onToggle={(event) => setShowRecoveryTools(event.currentTarget.open)}
+            >
               <summary className="panel-summary">
-                <span className="summary-label">Advanced Tools</span>
-                <span className="summary-line">Use these only for manual correction or recovery.</span>
+                <span className="summary-label">Recovery Tools</span>
+                <span className="summary-line">Manual correction and recovery controls live here, away from the primary play flow.</span>
               </summary>
               {parsedState.gamePhase !== 2 ? (
                 <div style={{ marginTop: "0.9rem" }}>
@@ -1718,7 +1894,7 @@ export default function App() {
               ) : null}
             </details>
           ) : null}
-          <div className="sidebar-actions footer">
+          <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
             {!multiplayerToken && parsedState.gamePhase !== 2 ? (
               <button
                 type="button"
@@ -1741,7 +1917,7 @@ export default function App() {
               </button>
             ) : null}
           </div>
-        </section>
+        </details>
       </aside>
 
       {activeModal ? (

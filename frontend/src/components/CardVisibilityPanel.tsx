@@ -1,6 +1,7 @@
 import { describeKnownCardID } from "../cardCatalog";
 import { factionLabels, itemTypeLabels, suitLabels } from "../labels";
 import type { Card, GameState } from "../types";
+import { KnownCardPillList } from "./CardUi";
 
 type CardVisibilityPanelProps = {
   state: GameState;
@@ -145,13 +146,12 @@ export function CardVisibilityPanel({ state }: CardVisibilityPanelProps) {
           <span className="summary-label">Discard Pile</span>
           <strong>{state.discardPile.length}</strong>
           {state.discardPile.length > 0 ? (
-            <div className="known-card-pill-list">
-              {state.discardPile.map((cardID) => (
-                <span key={`discard-${cardID}`} className="known-card-pill">
-                  {describeKnownCardID(cardID)}
-                </span>
-              ))}
-            </div>
+            <KnownCardPillList
+              items={state.discardPile.map((cardID) => ({
+                key: `discard-${cardID}`,
+                label: describeKnownCardID(cardID)
+              }))}
+            />
           ) : (
             <span>Empty</span>
           )}
@@ -166,25 +166,23 @@ export function CardVisibilityPanel({ state }: CardVisibilityPanelProps) {
               <span className="summary-line card-zone-row-label">
                 {factionLabels[faction] ?? `Faction ${faction}`} effects
               </span>
-              <div className="known-card-pill-list">
-                {cardIDs.map((cardID) => (
-                  <span key={`effect-${faction}-${cardID}`} className="known-card-pill">
-                    {describeKnownCardID(cardID)}
-                  </span>
-                ))}
-              </div>
+              <KnownCardPillList
+                items={cardIDs.map((cardID) => ({
+                  key: `effect-${faction}-${cardID}`,
+                  label: describeKnownCardID(cardID)
+                }))}
+              />
             </div>
           ))}
           {state.availableDominance.length > 0 ? (
             <div className="card-zone-row">
               <span className="summary-line card-zone-row-label">Available dominance</span>
-              <div className="known-card-pill-list">
-                {state.availableDominance.map((cardID) => (
-                  <span key={`dominance-${cardID}`} className="known-card-pill">
-                    {describeKnownCardID(cardID)}
-                  </span>
-                ))}
-              </div>
+              <KnownCardPillList
+                items={state.availableDominance.map((cardID) => ({
+                  key: `dominance-${cardID}`,
+                  label: describeKnownCardID(cardID)
+                }))}
+              />
             </div>
           ) : null}
         </div>

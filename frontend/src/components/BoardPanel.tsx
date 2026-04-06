@@ -1,11 +1,13 @@
 import { ClearingMarker } from "./ClearingMarker";
 import { clearingPosition } from "../gameHelpers";
-import { ACTION_TYPE, describeAction, factionLabels } from "../labels";
+import { ACTION_TYPE, factionLabels } from "../labels";
+import { describeAction } from "../actionPresentation";
 import { useState, type CSSProperties } from "react";
 import type { BoardLayout } from "../boardLayouts";
-import type { Action, Clearing, Forest, HighlightedClearing } from "../types";
+import type { Action, Clearing, Forest, GameState, HighlightedClearing } from "../types";
 
 type BoardPanelProps = {
+  state: GameState;
   clearings: Clearing[];
   forests: Forest[];
   boardLayout: BoardLayout;
@@ -28,6 +30,7 @@ type BoardPanelProps = {
 };
 
 export function BoardPanel({
+  state,
   clearings,
   forests,
   boardLayout,
@@ -183,7 +186,7 @@ export function BoardPanel({
       case ACTION_TYPE.RECRUIT:
         return `Recruit affects ${(previewedAction.recruit?.clearingIDs ?? []).length} clearing(s).`;
       default:
-        return describeAction(previewedAction);
+        return describeAction(previewedAction, state);
     }
   })();
 
@@ -420,7 +423,7 @@ export function BoardPanel({
           <div className="board-preview-overlay">
             <div className="board-preview-card">
               <p className="board-kicker">{previewOverlayTitle}</p>
-              <strong>{describeAction(previewedAction)}</strong>
+              <strong>{describeAction(previewedAction, state)}</strong>
               {previewOverlayDetail ? <span>{previewOverlayDetail}</span> : null}
               {previewFootprint.total > 0 ? (
                 <div className="board-preview-summary">

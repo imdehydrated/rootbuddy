@@ -161,6 +161,20 @@ button.secondary {
   margin-top: auto;
 }
 
+.primary-flow-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.primary-flow-panel {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.08), rgba(39, 72, 60, 0.03));
+}
+
+.secondary-drawer {
+  border-color: rgba(39, 72, 60, 0.16);
+}
+
 .sidebar-actions {
   display: grid;
   gap: 0.65rem;
@@ -199,6 +213,10 @@ button.secondary {
 
 .panel-summary::-webkit-details-marker {
   display: none;
+}
+
+.secondary-drawer .panel-summary {
+  min-height: 2.5rem;
 }
 
 .eyebrow {
@@ -1434,6 +1452,79 @@ textarea {
   border: 1px solid rgba(39, 72, 60, 0.14);
 }
 
+.flow-step-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.flow-step-card {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.flow-step-card strong {
+  font-size: 0.96rem;
+}
+
+.flow-step-card.active {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+}
+
+.flow-step-card.waiting {
+  border-color: rgba(185, 143, 41, 0.2);
+  background: linear-gradient(180deg, rgba(185, 143, 41, 0.1), rgba(185, 143, 41, 0.04));
+}
+
+.flow-step-card.done {
+  border-color: rgba(84, 114, 100, 0.18);
+  background: linear-gradient(180deg, rgba(84, 114, 100, 0.1), rgba(84, 114, 100, 0.04));
+}
+
+.flow-step-card.note {
+  border-color: rgba(97, 112, 141, 0.16);
+  background: linear-gradient(180deg, rgba(97, 112, 141, 0.08), rgba(97, 112, 141, 0.03));
+}
+
+.setup-stage-strip {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.9rem;
+}
+
+.setup-stage-pill {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.setup-stage-pill strong {
+  font-size: 0.84rem;
+}
+
+.setup-stage-pill.active {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+}
+
+.setup-stage-pill.done {
+  border-color: rgba(84, 114, 100, 0.18);
+  background: linear-gradient(180deg, rgba(84, 114, 100, 0.1), rgba(84, 114, 100, 0.04));
+}
+
+.setup-stage-pill.upcoming {
+  border-color: rgba(97, 112, 141, 0.16);
+  background: linear-gradient(180deg, rgba(97, 112, 141, 0.08), rgba(97, 112, 141, 0.03));
+}
+
 .notice-panel.warning {
   border-color: rgba(189, 107, 47, 0.28);
   background: linear-gradient(180deg, rgba(189, 107, 47, 0.1), rgba(189, 107, 47, 0.03));
@@ -1700,6 +1791,28 @@ textarea {
   background: rgba(255, 249, 240, 0.72);
 }
 
+.battle-effect-card.toggle {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+.battle-effect-card.toggle:hover,
+.battle-effect-card.toggle:focus-visible {
+  border-color: rgba(39, 72, 60, 0.28);
+  box-shadow: 0 10px 18px rgba(39, 72, 60, 0.08);
+  transform: translateY(-1px);
+}
+
+.battle-effect-card.disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .battle-effect-card.selected {
   border-color: rgba(39, 72, 60, 0.3);
   box-shadow: 0 10px 18px rgba(39, 72, 60, 0.08);
@@ -1730,6 +1843,27 @@ textarea {
 
 .observed-embedded .panel-header {
   margin-bottom: 0;
+}
+
+.token-list-editor {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.token-list-entry {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.token-list-pill {
+  cursor: pointer;
+}
+
+.token-list-remove {
+  margin-left: 0.35rem;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .card-grid {

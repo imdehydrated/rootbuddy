@@ -49,6 +49,14 @@ function stageInstruction(stage: number, draft: MarquiseSetupDraft): string {
   }
 }
 
+function setupStages() {
+  return [
+    { stage: 1, label: "Marquise" },
+    { stage: 2, label: "Eyrie" },
+    { stage: 3, label: "Vagabond" }
+  ];
+}
+
 export function SetupFlowPanel({
   stage,
   activeFaction,
@@ -66,12 +74,35 @@ export function SetupFlowPanel({
         <span className="summary-line">Legal choices: {legalChoiceCount}</span>
       </div>
 
+      <div className="setup-stage-strip">
+        {setupStages().map((entry) => {
+          const stateLabel = entry.stage < stage ? "done" : entry.stage === stage ? "active" : "upcoming";
+          return (
+            <div key={entry.stage} className={`setup-stage-pill ${stateLabel}`}>
+              <span>{entry.label}</span>
+              <strong>{entry.stage < stage ? "Done" : entry.stage === stage ? "Current" : "Pending"}</strong>
+            </div>
+          );
+        })}
+      </div>
+
       {stage === 1 ? (
         <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
           <span className="summary-label">Marquise Draft</span>
-          <span className="summary-line">Keep: {marquiseDraft.keepClearingID ?? "Pending"}</span>
-          <span className="summary-line">Sawmill: {marquiseDraft.sawmillClearingID ?? "Pending"}</span>
-          <span className="summary-line">Workshop: {marquiseDraft.workshopClearingID ?? "Pending"}</span>
+          <div className="flow-step-list">
+            <div className={`flow-step-card ${marquiseDraft.keepClearingID === null ? "active" : "done"}`}>
+              <strong>Keep</strong>
+              <span className="summary-line">{marquiseDraft.keepClearingID ?? "Pending"}</span>
+            </div>
+            <div className={`flow-step-card ${marquiseDraft.sawmillClearingID === null ? "active" : "done"}`}>
+              <strong>Sawmill</strong>
+              <span className="summary-line">{marquiseDraft.sawmillClearingID ?? "Pending"}</span>
+            </div>
+            <div className={`flow-step-card ${marquiseDraft.workshopClearingID === null ? "active" : "done"}`}>
+              <strong>Workshop</strong>
+              <span className="summary-line">{marquiseDraft.workshopClearingID ?? "Pending"}</span>
+            </div>
+          </div>
           <button type="button" className="secondary" onClick={onResetMarquiseDraft}>
             Reset Marquise Choice
           </button>

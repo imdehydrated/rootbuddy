@@ -11,6 +11,8 @@ import {
 } from "../labels";
 import { describeKnownCardID } from "../cardCatalog";
 import type { Card, GameState } from "../types";
+import { ReferenceCard } from "./CardUi";
+import { TokenListEditor } from "./TokenListEditor";
 
 type TurnStatePanelProps = {
   state: GameState;
@@ -29,6 +31,10 @@ function parseNumberList(value: string): number[] {
 
 function formatNumberList(values: number[]): string {
   return values.join(", ");
+}
+
+function isValidDecreeCardID(value: number): boolean {
+  return value === -2 || value === -1 || value >= 1;
 }
 
 function describeVisibleCard(card: Card): string {
@@ -304,54 +310,58 @@ export function TurnStatePanel({
               ))}
             </select>
           </label>
-          <label>
-            <span>Eyrie Decree Recruit</span>
-            <input
-              type="text"
-              value={formatNumberList(state.eyrie.decree.recruit)}
-              onChange={(event) =>
-                onUpdateState((draft) => {
-                  draft.eyrie.decree.recruit = parseNumberList(event.target.value);
-                })
-              }
-            />
-          </label>
-          <label>
-            <span>Eyrie Decree Move</span>
-            <input
-              type="text"
-              value={formatNumberList(state.eyrie.decree.move)}
-              onChange={(event) =>
-                onUpdateState((draft) => {
-                  draft.eyrie.decree.move = parseNumberList(event.target.value);
-                })
-              }
-            />
-          </label>
-          <label>
-            <span>Eyrie Decree Battle</span>
-            <input
-              type="text"
-              value={formatNumberList(state.eyrie.decree.battle)}
-              onChange={(event) =>
-                onUpdateState((draft) => {
-                  draft.eyrie.decree.battle = parseNumberList(event.target.value);
-                })
-              }
-            />
-          </label>
-          <label>
-            <span>Eyrie Decree Build</span>
-            <input
-              type="text"
-              value={formatNumberList(state.eyrie.decree.build)}
-              onChange={(event) =>
-                onUpdateState((draft) => {
-                  draft.eyrie.decree.build = parseNumberList(event.target.value);
-                })
-              }
-            />
-          </label>
+          <TokenListEditor
+            label="Eyrie Decree Recruit"
+            values={state.eyrie.decree.recruit}
+            onChange={(values) =>
+              onUpdateState((draft) => {
+                draft.eyrie.decree.recruit = values;
+              })
+            }
+            formatValue={describeKnownCardID}
+            minValue={-2}
+            validateValue={isValidDecreeCardID}
+            placeholder="Add recruit decree cards"
+          />
+          <TokenListEditor
+            label="Eyrie Decree Move"
+            values={state.eyrie.decree.move}
+            onChange={(values) =>
+              onUpdateState((draft) => {
+                draft.eyrie.decree.move = values;
+              })
+            }
+            formatValue={describeKnownCardID}
+            minValue={-2}
+            validateValue={isValidDecreeCardID}
+            placeholder="Add move decree cards"
+          />
+          <TokenListEditor
+            label="Eyrie Decree Battle"
+            values={state.eyrie.decree.battle}
+            onChange={(values) =>
+              onUpdateState((draft) => {
+                draft.eyrie.decree.battle = values;
+              })
+            }
+            formatValue={describeKnownCardID}
+            minValue={-2}
+            validateValue={isValidDecreeCardID}
+            placeholder="Add battle decree cards"
+          />
+          <TokenListEditor
+            label="Eyrie Decree Build"
+            values={state.eyrie.decree.build}
+            onChange={(values) =>
+              onUpdateState((draft) => {
+                draft.eyrie.decree.build = values;
+              })
+            }
+            formatValue={describeKnownCardID}
+            minValue={-2}
+            validateValue={isValidDecreeCardID}
+            placeholder="Add build decree cards"
+          />
           <label>
             <span>Alliance Officers</span>
             <input
@@ -427,63 +437,31 @@ export function TurnStatePanel({
           <span className="summary-label">Card Readout</span>
           <div className="observed-reference-grid">
             {decreePreviewGroups.map((group) => (
-              <div key={group.label} className="observed-reference-card">
-                <span className="summary-label">Decree {group.label}</span>
-                {group.cardIDs.length === 0 ? (
-                  <span>None</span>
-                ) : (
-                  <div className="known-card-pill-list">
-                    {group.cardIDs.map((cardID, index) => (
-                      <span key={`${group.label}-${cardID}-${index}`} className="known-card-pill">
-                        {describeKnownCardID(cardID)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ReferenceCard
+                key={group.label}
+                label={`Decree ${group.label}`}
+                items={group.cardIDs.map((cardID, index) => ({
+                  key: `${group.label}-${cardID}-${index}`,
+                  label: describeKnownCardID(cardID)
+                }))}
+              />
             ))}
-            <div className="observed-reference-card">
-              <span className="summary-label">Alliance Supporters</span>
-              {allianceSupporterLabels.length === 0 ? (
-                <span>None visible</span>
-              ) : (
-                <div className="known-card-pill-list">
-                  {allianceSupporterLabels.map((label, index) => (
-                    <span key={`${label}-${index}`} className="known-card-pill">
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="observed-reference-card">
-              <span className="summary-label">Resolved Decree Cards</span>
-              {resolvedDecreeLabels.length === 0 ? (
-                <span>None</span>
-              ) : (
-                <div className="known-card-pill-list">
-                  {resolvedDecreeLabels.map((label, index) => (
-                    <span key={`${label}-${index}`} className="known-card-pill">
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="observed-reference-card">
-              <span className="summary-label">Used Workshop Clearings</span>
-              {state.turnProgress.usedWorkshopClearings.length === 0 ? (
-                <span>None</span>
-              ) : (
-                <div className="known-card-pill-list">
-                  {state.turnProgress.usedWorkshopClearings.map((clearingID) => (
-                    <span key={clearingID} className="known-card-pill">
-                      Clearing {clearingID}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ReferenceCard
+              label="Alliance Supporters"
+              items={allianceSupporterLabels.map((label, index) => ({ key: `${label}-${index}`, label }))}
+              emptyLabel="None visible"
+            />
+            <ReferenceCard
+              label="Resolved Decree Cards"
+              items={resolvedDecreeLabels.map((label, index) => ({ key: `${label}-${index}`, label }))}
+            />
+            <ReferenceCard
+              label="Used Workshop Clearings"
+              items={state.turnProgress.usedWorkshopClearings.map((clearingID, index) => ({
+                key: `${clearingID}-${index}`,
+                label: `Clearing ${clearingID}`
+              }))}
+            />
           </div>
         </div>
       </div>

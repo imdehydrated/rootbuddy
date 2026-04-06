@@ -24,10 +24,14 @@ type BattleFlowPanelProps = {
 };
 
 type EffectOption = {
+  key: string;
   label: string;
   owner: string;
   available: boolean;
   selected: boolean;
+  disabled: boolean;
+  status: string;
+  onToggle?: () => void;
 };
 
 export function BattleFlowPanel({
@@ -83,50 +87,108 @@ export function BattleFlowPanel({
     multiplayerBattlePrompt !== null && multiplayerBattlePrompt.waitingOnFaction === multiplayerPerspectiveFaction;
   const localPlayerCanResolve =
     multiplayerBattlePrompt !== null && isReadyPrompt && multiplayerPerspectiveFaction === attackerFaction;
+  const defenderAmbushToggleDisabled =
+    assistDefenderAmbushPromptRequired || !defenderCanAmbush || (!!multiplayerBattlePrompt && !isDefenderPrompt);
+  const counterAmbushToggleDisabled =
+    (multiplayerBattlePrompt !== null && !isAttackerPrompt) ||
+    !(assistDefenderAmbushPromptRequired ? assistDefenderAmbushChoice === true : battleModifiers.defenderAmbush) ||
+    !attackerCanCounterAmbush;
   const effectOptions: EffectOption[] = [
     {
+      key: "scouting-party",
       label: "Scouting Party",
       owner: factionLabels[attackerFaction] ?? "Attacker",
       available: attackerHasScoutingParty,
-      selected: attackerHasScoutingParty
+      selected: attackerHasScoutingParty,
+      disabled: true,
+      status: "Passive effect"
     },
     {
+      key: "defender-ambush",
       label: "Ambush",
       owner: factionLabels[defenderFaction] ?? "Defender",
       available: defenderCanAmbush,
-      selected: battleModifiers.defenderAmbush
+      selected: battleModifiers.defenderAmbush,
+      disabled: defenderAmbushToggleDisabled,
+      status: battleModifiers.defenderAmbush ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          defenderAmbush: !current.defenderAmbush,
+          attackerCounterAmbush: !current.defenderAmbush ? current.attackerCounterAmbush : false
+        }))
     },
     {
+      key: "attacker-counter-ambush",
       label: "Counter-Ambush",
       owner: factionLabels[attackerFaction] ?? "Attacker",
       available: attackerCanCounterAmbush,
-      selected: battleModifiers.attackerCounterAmbush
+      selected: battleModifiers.attackerCounterAmbush,
+      disabled: counterAmbushToggleDisabled,
+      status: battleModifiers.attackerCounterAmbush ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          attackerCounterAmbush: !current.attackerCounterAmbush
+        }))
     },
     {
+      key: "attacker-armorers",
       label: "Armorers",
       owner: factionLabels[attackerFaction] ?? "Attacker",
       available: attackerCanArmorers,
-      selected: battleModifiers.attackerUsesArmorers
+      selected: battleModifiers.attackerUsesArmorers,
+      disabled: !attackerCanArmorers || (!!multiplayerBattlePrompt && !isAttackerPrompt),
+      status: battleModifiers.attackerUsesArmorers ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          attackerUsesArmorers: !current.attackerUsesArmorers
+        }))
     },
     {
+      key: "defender-armorers",
       label: "Armorers",
       owner: factionLabels[defenderFaction] ?? "Defender",
       available: defenderCanArmorers,
-      selected: battleModifiers.defenderUsesArmorers
+      selected: battleModifiers.defenderUsesArmorers,
+      disabled: !defenderCanArmorers || (!!multiplayerBattlePrompt && !isDefenderPrompt),
+      status: battleModifiers.defenderUsesArmorers ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          defenderUsesArmorers: !current.defenderUsesArmorers
+        }))
     },
     {
+      key: "attacker-brutal-tactics",
       label: "Brutal Tactics",
       owner: factionLabels[attackerFaction] ?? "Attacker",
       available: attackerCanBrutalTactics,
-      selected: battleModifiers.attackerUsesBrutalTactics
+      selected: battleModifiers.attackerUsesBrutalTactics,
+      disabled: !attackerCanBrutalTactics || (!!multiplayerBattlePrompt && !isAttackerPrompt),
+      status: battleModifiers.attackerUsesBrutalTactics ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          attackerUsesBrutalTactics: !current.attackerUsesBrutalTactics
+        }))
     },
     {
+      key: "defender-sappers",
       label: "Sappers",
       owner: factionLabels[defenderFaction] ?? "Defender",
       available: defenderCanSappers,
-      selected: battleModifiers.defenderUsesSappers
+      selected: battleModifiers.defenderUsesSappers,
+      disabled: !defenderCanSappers || (!!multiplayerBattlePrompt && !isDefenderPrompt),
+      status: battleModifiers.defenderUsesSappers ? "Selected for this battle" : "Click to use",
+      onToggle: () =>
+        onSetBattleModifiers((current) => ({
+          ...current,
+          defenderUsesSappers: !current.defenderUsesSappers
+        }))
     }
-  ].filter((effect) => effect.available || effect.selected);
+  ].filter((effect) => (effect.key === "scouting-party" ? effect.available : effect.available || effect.selected));
   const chosenEffects = effectOptions.filter((effect) => effect.selected);
 
   return (
@@ -146,13 +208,17 @@ export function BattleFlowPanel({
           <span className="summary-label">Battle Effect Cards</span>
           <div className="battle-effect-grid">
             {effectOptions.map((effect) => (
-              <div key={`${effect.owner}-${effect.label}`} className={`battle-effect-card ${effect.selected ? "selected" : ""}`}>
+              <button
+                key={effect.key}
+                type="button"
+                className={`battle-effect-card toggle ${effect.selected ? "selected" : ""} ${effect.disabled ? "disabled" : ""}`}
+                disabled={effect.disabled}
+                onClick={() => effect.onToggle?.()}
+              >
                 <span className="summary-label">{effect.owner}</span>
                 <strong>{effect.label}</strong>
-                <span className="summary-line">
-                  {effect.selected ? "Selected for this battle" : "Available to use"}
-                </span>
-              </div>
+                <span className="summary-line">{effect.status}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -232,100 +298,6 @@ export function BattleFlowPanel({
           </div>
         </div>
       ) : null}
-
-      <div className="control-grid" style={{ marginTop: "1rem" }}>
-        {!assistDefenderAmbushPromptRequired && (!multiplayerBattlePrompt || isDefenderPrompt) ? (
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={battleModifiers.defenderAmbush}
-              disabled={!defenderCanAmbush || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
-              onChange={(event) =>
-                onSetBattleModifiers((current) => ({
-                  ...current,
-                  defenderAmbush: event.target.checked,
-                  attackerCounterAmbush: event.target.checked ? current.attackerCounterAmbush : false
-                }))
-              }
-            />
-            Defender Ambush
-          </label>
-        ) : null}
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={battleModifiers.attackerCounterAmbush}
-            disabled={
-              (multiplayerBattlePrompt !== null && !isAttackerPrompt) ||
-              !(assistDefenderAmbushPromptRequired ? assistDefenderAmbushChoice === true : battleModifiers.defenderAmbush) ||
-              !attackerCanCounterAmbush
-            }
-            onChange={(event) =>
-              onSetBattleModifiers((current) => ({
-                ...current,
-                attackerCounterAmbush: event.target.checked
-              }))
-            }
-          />
-          Attacker Counter-Ambush
-        </label>
-        <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={battleModifiers.attackerUsesArmorers}
-            disabled={!attackerCanArmorers || (!!multiplayerBattlePrompt && !isAttackerPrompt)}
-            onChange={(event) =>
-              onSetBattleModifiers((current) => ({
-                ...current,
-                attackerUsesArmorers: event.target.checked
-              }))
-            }
-          />
-          Attacker Armorers
-        </label>
-        <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={battleModifiers.defenderUsesArmorers}
-            disabled={!defenderCanArmorers || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
-            onChange={(event) =>
-              onSetBattleModifiers((current) => ({
-                ...current,
-                defenderUsesArmorers: event.target.checked
-              }))
-            }
-          />
-          Defender Armorers
-        </label>
-        <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={battleModifiers.attackerUsesBrutalTactics}
-            disabled={!attackerCanBrutalTactics || (!!multiplayerBattlePrompt && !isAttackerPrompt)}
-            onChange={(event) =>
-              onSetBattleModifiers((current) => ({
-                ...current,
-                attackerUsesBrutalTactics: event.target.checked
-              }))
-            }
-          />
-          Attacker Brutal Tactics
-        </label>
-        <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={battleModifiers.defenderUsesSappers}
-            disabled={!defenderCanSappers || (!!multiplayerBattlePrompt && !isDefenderPrompt)}
-            onChange={(event) =>
-              onSetBattleModifiers((current) => ({
-                ...current,
-                defenderUsesSappers: event.target.checked
-              }))
-            }
-          />
-          Defender Sappers
-        </label>
-      </div>
 
       {attackerHasScoutingParty ? (
         <p className="message" style={{ marginTop: "0.8rem" }}>
