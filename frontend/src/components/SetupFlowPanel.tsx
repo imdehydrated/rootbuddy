@@ -4,6 +4,7 @@ type MarquiseSetupDraft = {
   keepClearingID: number | null;
   sawmillClearingID: number | null;
   workshopClearingID: number | null;
+  recruiterClearingID: number | null;
 };
 
 type SetupFlowPanelProps = {
@@ -39,7 +40,10 @@ function stageInstruction(stage: number, draft: MarquiseSetupDraft): string {
       if (draft.workshopClearingID === null) {
         return "Click a legal clearing for the starting workshop.";
       }
-      return "Click a legal clearing for the starting recruiter.";
+      if (draft.recruiterClearingID === null) {
+        return "Click a legal clearing for the starting recruiter.";
+      }
+      return "Applying the Marquise setup.";
     case 2:
       return "Click a highlighted corner clearing.";
     case 3:
@@ -101,6 +105,10 @@ export function SetupFlowPanel({
             <div className={`flow-step-card ${marquiseDraft.workshopClearingID === null ? "active" : "done"}`}>
               <strong>Workshop</strong>
               <span className="summary-line">{marquiseDraft.workshopClearingID ?? "Pending"}</span>
+            </div>
+            <div className={`flow-step-card ${marquiseDraft.recruiterClearingID === null ? "active" : "done"}`}>
+              <strong>Recruiter</strong>
+              <span className="summary-line">{marquiseDraft.recruiterClearingID ?? "Pending"}</span>
             </div>
           </div>
           <button type="button" className="secondary" onClick={onResetMarquiseDraft}>

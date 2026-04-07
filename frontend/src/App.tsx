@@ -20,6 +20,7 @@ import {
   assistBoardHighlights,
   buildAssistBoardCandidates,
   movementSourceMatches,
+  type AssistActionCandidateRef,
   type AssistMovementSource
 } from "./assistDirector";
 import { boardLayoutForState } from "./boardLayouts";
@@ -36,7 +37,6 @@ import { JoinScreen } from "./components/JoinScreen";
 import { LobbyScreen } from "./components/LobbyScreen";
 import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
 import { SessionStatusPanel } from "./components/SessionStatusPanel";
-import { SetupFlowPanel } from "./components/SetupFlowPanel";
 import { TurnFlowPanel } from "./components/TurnFlowPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnStatePanel } from "./components/TurnStatePanel";
@@ -53,6 +53,7 @@ import {
   type SavedSession
 } from "./localSession";
 import { actionHeadline } from "./actionPresentation";
+import type { ClearingPreviewPiece } from "./components/ClearingMarker";
 import type { MultiplayerConnectionStatus, MultiplayerSession, SetupScreen } from "./multiplayer";
 import { sampleState } from "./sampleState";
 import type { Action, BattleContext, BattleModifiers, BattlePrompt, Clearing, GameState, Lobby, LobbyPlayer } from "./types";
@@ -69,12 +70,14 @@ type MarquiseSetupDraft = {
   keepClearingID: number | null;
   sawmillClearingID: number | null;
   workshopClearingID: number | null;
+  recruiterClearingID: number | null;
 };
 
 const emptyMarquiseSetupDraft: MarquiseSetupDraft = {
   keepClearingID: null,
   sawmillClearingID: null,
-  workshopClearingID: null
+  workshopClearingID: null,
+  recruiterClearingID: null
 };
 
 const emptyBattleModifiers: BattleModifiers = {
@@ -184,7 +187,7 @@ function zeroActionHint(state: GameState): string {
 
 function marquiseSetupMatches(
   action: Action,
-  draft: MarquiseSetupDraft & { recruiterClearingID?: number }
+  draft: MarquiseSetupDraft
 ): boolean {
   const payload = action.marquiseSetup;
   if (!payload) {
@@ -200,7 +203,7 @@ function marquiseSetupMatches(
   if (draft.workshopClearingID !== null && payload.workshopClearingID !== draft.workshopClearingID) {
     return false;
   }
-  if (draft.recruiterClearingID !== undefined && payload.recruiterClearingID !== draft.recruiterClearingID) {
+  if (draft.recruiterClearingID !== undefined && draft.recruiterClearingID !== null && payload.recruiterClearingID !== draft.recruiterClearingID) {
     return false;
   }
 
@@ -223,6 +226,78 @@ function gameOverStatusMessage(state: GameState): string {
   }
 
   return `Game over. Reviewing the final result for ${factionLabels[state.winner] ?? "Unknown"}.`;
+}
+
+function setupBoardPrompt(stage: number, draft: MarquiseSetupDraft): { title: string; instruction: string; detail: string } {
+  switch (stage) {
+    case 1:
+      if (draft.keepClearingID === null) {
+        return {
+          title: "Marquise Setup",
+          instruction: "Choose the Keep corner",
+          detail: "Click one of the highlighted corner clearings."
+        };
+      }
+      if (draft.sawmillClearingID === null) {
+        return {
+          title: "Marquise Setup",
+          instruction: "Place the sawmill",
+          detail: "Click a highlighted legal clearing. The pending building appears immediately."
+        };
+      }
+      if (draft.workshopClearingID === null) {
+        return {
+          title: "Marquise Setup",
+          instruction: "Place the workshop",
+          detail: "Click a highlighted legal clearing. The pending building appears immediately."
+        };
+      }
+      return {
+        title: "Marquise Setup",
+        instruction: "Place the recruiter",
+        detail: "Click a highlighted legal clearing to finish Marquise setup."
+      };
+    case 2:
+      return {
+        title: "Eyrie Setup",
+        instruction: "Choose the starting roost",
+        detail: "Click one of the highlighted corner clearings."
+      };
+    case 3:
+      return {
+        title: "Vagabond Setup",
+        instruction: "Choose the starting forest",
+        detail: "Click one of the highlighted forest markers."
+      };
+    default:
+      return {
+        title: "Setup",
+        instruction: "Choose a highlighted setup target",
+        detail: "The board highlights the legal setup choices."
+      };
+  }
+}
+
+function factionHandSize(state: GameState, faction: number): number {
+  switch (faction) {
+    case 0:
+      return state.marquise.cardsInHand.length > 0 ? state.marquise.cardsInHand.length : state.otherHandCounts[String(faction)] ?? 0;
+    case 1:
+      return state.alliance.cardsInHand.length > 0 ? state.alliance.cardsInHand.length : state.otherHandCounts[String(faction)] ?? 0;
+    case 2:
+      return state.eyrie.cardsInHand.length > 0 ? state.eyrie.cardsInHand.length : state.otherHandCounts[String(faction)] ?? 0;
+    case 3:
+      return state.vagabond.cardsInHand.length > 0 ? state.vagabond.cardsInHand.length : state.otherHandCounts[String(faction)] ?? 0;
+    default:
+      return 0;
+  }
+}
+
+function sameCandidateRefs(current: AssistActionCandidateRef[], next: AssistActionCandidateRef[]) {
+  return (
+    current.length === next.length &&
+    current.every((candidate, index) => candidate.actionIndex === next[index].actionIndex && candidate.action === next[index].action)
+  );
 }
 
 export default function App() {
@@ -252,17 +327,22 @@ export default function App() {
   const [stateText, setStateText] = useState(initialJSON);
   const deferredStateText = useDeferredValue(stateText);
   const [parsedState, setParsedState] = useState<GameState>(initialState);
+  const currentStateRef = useRef<GameState>(initialState);
   const [selectedClearingID, setSelectedClearingID] = useState<number>(
     initialState.map.clearings[0]?.id ?? 0
   );
   const [actions, setActions] = useState<Action[]>([]);
   const [selectedBattleIndex, setSelectedBattleIndex] = useState<number | null>(null);
   const [hoveredActionIndex, setHoveredActionIndex] = useState<number | null>(null);
-  const [assistBattleCandidateIndices, setAssistBattleCandidateIndices] = useState<number[]>([]);
-  const [assistMovementCandidateIndices, setAssistMovementCandidateIndices] = useState<number[]>([]);
+  const [assistBattleCandidateRefs, setAssistBattleCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
+  const [assistMovementCandidateRefs, setAssistMovementCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
   const [assistMovementSource, setAssistMovementSource] = useState<AssistMovementSource | null>(null);
-  const [assistBuildRecruitCandidateIndices, setAssistBuildRecruitCandidateIndices] = useState<number[]>([]);
-  const [assistFactionSpatialCandidateIndices, setAssistFactionSpatialCandidateIndices] = useState<number[]>([]);
+  const [playerMovementCandidateRefs, setPlayerMovementCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
+  const [playerMovementSource, setPlayerMovementSource] = useState<AssistMovementSource | null>(null);
+  const [assistBuildRecruitCandidateRefs, setAssistBuildRecruitCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
+  const [playerBuildRecruitCandidateRefs, setPlayerBuildRecruitCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
+  const [assistFactionSpatialCandidateRefs, setAssistFactionSpatialCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
+  const [playerFactionSpatialCandidateRefs, setPlayerFactionSpatialCandidateRefs] = useState<AssistActionCandidateRef[]>([]);
   const [attackerRoll, setAttackerRoll] = useState("1");
   const [defenderRoll, setDefenderRoll] = useState("0");
   const [battleModifiers, setBattleModifiers] = useState<BattleModifiers>(emptyBattleModifiers);
@@ -282,6 +362,8 @@ export default function App() {
   const [showWorkspaceTools, setShowWorkspaceTools] = useState(false);
   const [showRecoveryTools, setShowRecoveryTools] = useState(false);
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
+  const [eyrieSetupDraftClearingID, setEyrieSetupDraftClearingID] = useState<number | null>(null);
+  const [vagabondSetupDraftForestID, setVagabondSetupDraftForestID] = useState<number | null>(null);
   const multiplayerToken = multiplayerSession?.playerToken ?? null;
   const previousConnectionStatus = useRef<MultiplayerConnectionStatus>("disconnected");
   const autoLoadedActionKey = useRef<string>("");
@@ -290,6 +372,7 @@ export default function App() {
   useEffect(() => {
     try {
       const nextState = JSON.parse(deferredStateText) as GameState;
+      currentStateRef.current = nextState;
       setParsedState(nextState);
       setError("");
     } catch (err) {
@@ -307,6 +390,8 @@ export default function App() {
 
   useEffect(() => {
     setMarquiseSetupDraft(emptyMarquiseSetupDraft);
+    setEyrieSetupDraftClearingID(null);
+    setVagabondSetupDraftForestID(null);
   }, [parsedState.gamePhase, parsedState.setupStage]);
 
   useEffect(() => {
@@ -730,6 +815,7 @@ export default function App() {
 
   function syncState(nextState: GameState) {
     const normalizedState = normalizeState(nextState);
+    currentStateRef.current = normalizedState;
     startTransition(() => {
       setParsedState(normalizedState);
       setStateText(stringifyState(normalizedState));
@@ -745,6 +831,7 @@ export default function App() {
 
   async function loadActionsForState(baseState: GameState, options?: { successStatus?: string }) {
     const requestState = normalizeState(baseState);
+    currentStateRef.current = requestState;
     const { actions: nextActions, revision } = await fetchValidActions(requestState, serverGameID, multiplayerToken);
     if (revision !== null) {
       setServerRevision(revision);
@@ -800,7 +887,7 @@ export default function App() {
 
     try {
       setStatus("Fetching valid actions...");
-      await loadActionsForState(parsedState);
+      await loadActionsForState(currentStateRef.current);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to fetch actions";
       setStatus(message);
@@ -808,20 +895,32 @@ export default function App() {
   }
 
   function needsStandAndDeliverObservation(action: Action): boolean {
+    const currentState = currentStateRef.current;
     return (
-      parsedState.gameMode === 1 &&
+      currentState.gameMode === 1 &&
+      !multiplayerToken &&
       action.usePersistentEffect?.effectID === "stand_and_deliver" &&
-      action.usePersistentEffect.faction === parsedState.playerFaction &&
-      action.usePersistentEffect.targetFaction !== parsedState.playerFaction &&
+      action.usePersistentEffect.targetFaction !== action.usePersistentEffect.faction &&
+      factionHandSize(currentState, action.usePersistentEffect.targetFaction) > 0 &&
       (action.usePersistentEffect.observedCardID ?? 0) <= 0
+    );
+  }
+
+  function isImpossibleStandAndDeliver(action: Action): boolean {
+    const currentState = currentStateRef.current;
+    return (
+      action.usePersistentEffect?.effectID === "stand_and_deliver" &&
+      action.usePersistentEffect.targetFaction !== action.usePersistentEffect.faction &&
+      factionHandSize(currentState, action.usePersistentEffect.targetFaction) === 0
     );
   }
 
   async function applyFinalizedAction(actionToApply: Action) {
     try {
+      const currentState = currentStateRef.current;
       setStatus("Applying action...");
       const { state: nextState, effectResult, revision } = await applyAction(
-        parsedState,
+        currentState,
         actionToApply,
         serverGameID,
         serverRevision,
@@ -846,6 +945,11 @@ export default function App() {
   }
 
   async function handleApply(action: Action) {
+    if (isImpossibleStandAndDeliver(action)) {
+      setStatus("Stand and Deliver cannot target a faction with no recorded cards.");
+      return;
+    }
+
     if (needsStandAndDeliverObservation(action)) {
       setPendingStandAndDeliverAction(action);
       setStandAndDeliverCardID("");
@@ -1002,7 +1106,7 @@ export default function App() {
       return;
     }
 
-    setStatus("Battle selected. Resolve it from Battle Flow in the sidebar.");
+    setStatus("Battle selected. Resolve it from Battle Flow.");
   }
 
   async function handleResumeSavedGame() {
@@ -1202,12 +1306,12 @@ export default function App() {
     buildRecruitCandidates: assistBuildRecruitCandidates,
     factionSpatialCandidates: assistFactionSpatialCandidates
   } = buildAssistBoardCandidates({
-    actions,
-    battleCandidateIndices: assistBattleCandidateIndices,
-    movementCandidateIndices: assistMovementCandidateIndices,
-    buildRecruitCandidateIndices: assistBuildRecruitCandidateIndices,
-    factionSpatialCandidateIndices: assistFactionSpatialCandidateIndices
+    battleCandidates: assistBattleCandidateRefs,
+    movementCandidates: [...assistMovementCandidateRefs, ...playerMovementCandidateRefs],
+    buildRecruitCandidates: [...assistBuildRecruitCandidateRefs, ...playerBuildRecruitCandidateRefs],
+    factionSpatialCandidates: [...assistFactionSpatialCandidateRefs, ...playerFactionSpatialCandidateRefs]
   });
+  const activeMovementSource = assistMovementSource ?? playerMovementSource;
   const highlightedClearings = previewedAction
     ? affectedClearings(previewedAction)
     : assistBoardHighlights({
@@ -1215,7 +1319,7 @@ export default function App() {
         movementCandidates: assistMovementCandidates,
         buildRecruitCandidates: assistBuildRecruitCandidates,
         factionSpatialCandidates: assistFactionSpatialCandidates,
-        movementSource: assistMovementSource
+        movementSource: activeMovementSource
       });
   const selectedBattleAction =
     selectedBattleIndex !== null && actions[selectedBattleIndex]?.type === ACTION_TYPE.BATTLE
@@ -1315,41 +1419,34 @@ export default function App() {
     return "Use this area for the active workflow before opening any secondary tools.";
   })();
 
-  const handleAssistBattleCandidatesChange = useCallback((actionIndices: number[]) => {
-    setAssistBattleCandidateIndices((current) => {
-      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
-        return current;
-      }
-      return actionIndices;
-    });
+  const handleAssistBattleCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setAssistBattleCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
   }, []);
 
-  const handleAssistMovementCandidatesChange = useCallback((actionIndices: number[]) => {
-    setAssistMovementCandidateIndices((current) => {
-      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
-        return current;
-      }
-      return actionIndices;
-    });
+  const handleAssistMovementCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setAssistMovementCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
     setAssistMovementSource(null);
   }, []);
 
-  const handleAssistBuildRecruitCandidatesChange = useCallback((actionIndices: number[]) => {
-    setAssistBuildRecruitCandidateIndices((current) => {
-      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
-        return current;
-      }
-      return actionIndices;
-    });
+  const handlePlayerMovementCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setPlayerMovementCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
+    setPlayerMovementSource(null);
   }, []);
 
-  const handleAssistFactionSpatialCandidatesChange = useCallback((actionIndices: number[]) => {
-    setAssistFactionSpatialCandidateIndices((current) => {
-      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
-        return current;
-      }
-      return actionIndices;
-    });
+  const handleAssistBuildRecruitCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setAssistBuildRecruitCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
+  }, []);
+
+  const handlePlayerBuildRecruitCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setPlayerBuildRecruitCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
+  }, []);
+
+  const handleAssistFactionSpatialCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setAssistFactionSpatialCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
+  }, []);
+
+  const handlePlayerFactionSpatialCandidatesChange = useCallback((candidates: AssistActionCandidateRef[]) => {
+    setPlayerFactionSpatialCandidateRefs((current) => (sameCandidateRefs(current, candidates) ? current : candidates));
   }, []);
 
   const legalSetupClearingIDs =
@@ -1395,10 +1492,42 @@ export default function App() {
 
   const selectedSetupClearingIDs =
     parsedState.gamePhase === 0 && parsedState.setupStage === 1
-      ? [marquiseSetupDraft.keepClearingID, marquiseSetupDraft.sawmillClearingID, marquiseSetupDraft.workshopClearingID].filter(
+      ? [
+          marquiseSetupDraft.keepClearingID,
+          marquiseSetupDraft.sawmillClearingID,
+          marquiseSetupDraft.workshopClearingID,
+          marquiseSetupDraft.recruiterClearingID
+        ].filter(
           (value): value is number => value !== null
         )
+      : parsedState.gamePhase === 0 && parsedState.setupStage === 2 && eyrieSetupDraftClearingID !== null
+        ? [eyrieSetupDraftClearingID]
       : [];
+
+  const setupPreviewPiecesByClearing = (() => {
+    const previews: Record<number, ClearingPreviewPiece[]> = {};
+    const addPreview = (clearingID: number | null, piece: ClearingPreviewPiece) => {
+      if (clearingID === null) {
+        return;
+      }
+      previews[clearingID] ??= [];
+      previews[clearingID].push(piece);
+    };
+
+    if (parsedState.gamePhase === 0 && parsedState.setupStage === 1) {
+      addPreview(marquiseSetupDraft.keepClearingID, { kind: "keep", label: "Pending Keep", preview: true });
+      addPreview(marquiseSetupDraft.sawmillClearingID, { kind: "sawmill", label: "Pending sawmill", preview: true });
+      addPreview(marquiseSetupDraft.workshopClearingID, { kind: "workshop", label: "Pending workshop", preview: true });
+      addPreview(marquiseSetupDraft.recruiterClearingID, { kind: "recruiter", label: "Pending recruiter", preview: true });
+    }
+
+    if (parsedState.gamePhase === 0 && parsedState.setupStage === 2) {
+      addPreview(eyrieSetupDraftClearingID, { kind: "roost", label: "Pending roost", preview: true });
+      addPreview(eyrieSetupDraftClearingID, { kind: "eyrie", count: 6, label: "Pending Eyrie warriors 6", preview: true });
+    }
+
+    return previews;
+  })();
 
   const forestTargets =
     parsedState.gamePhase === 0 && parsedState.setupStage === 3
@@ -1406,26 +1535,33 @@ export default function App() {
           forestID: forest.id,
           label: `Forest ${forest.id}`,
           legal: vagabondSetupActions.some((action) => action.vagabondSetup?.forestID === forest.id),
-          selected: false
+          selected: vagabondSetupDraftForestID === forest.id
         }))
-      : assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction
+      : assistMovementCandidates.length > 0 && parsedState.gamePhase === 1
         ? parsedState.map.forests
             .map((forest) => {
               const legal =
-                assistMovementSource === null
+                activeMovementSource === null
                   ? assistMovementCandidates.some((candidate) => candidate.endpoints.fromForestID === forest.id)
                   : assistMovementCandidates.some(
-                      (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toForestID === forest.id
+                      (candidate) => movementSourceMatches(candidate.endpoints, activeMovementSource) && candidate.endpoints.toForestID === forest.id
                     );
               return {
                 forestID: forest.id,
                 label: `Forest ${forest.id}`,
                 legal,
-                selected: assistMovementSource?.kind === "forest" && assistMovementSource.id === forest.id
+                selected: activeMovementSource?.kind === "forest" && activeMovementSource.id === forest.id
               };
             })
             .filter((forest) => forest.legal || forest.selected)
         : [];
+  const setupPrompt = showPrimarySetupFlow ? setupBoardPrompt(parsedState.setupStage, marquiseSetupDraft) : null;
+  const setupLegalChoiceCount = parsedState.setupStage === 3 ? forestTargets.filter((target) => target.legal).length : legalSetupClearingIDs.length;
+  const hasMarquiseDraftSelection =
+    marquiseSetupDraft.keepClearingID !== null ||
+    marquiseSetupDraft.sawmillClearingID !== null ||
+    marquiseSetupDraft.workshopClearingID !== null ||
+    marquiseSetupDraft.recruiterClearingID !== null;
 
   useEffect(() => {
     if (assistDefenderAmbushPromptRequired) {
@@ -1492,6 +1628,16 @@ export default function App() {
     };
   }, [multiplayerBattlePrompt, multiplayerToken, parsedState, selectedBattleAction, serverGameID]);
 
+  function setBoardMovementSource(source: AssistMovementSource | null) {
+    if (parsedState.factionTurn === parsedState.playerFaction) {
+      setPlayerMovementSource(source);
+      setAssistMovementSource(null);
+      return;
+    }
+    setAssistMovementSource(source);
+    setPlayerMovementSource(null);
+  }
+
   async function handleSetupClearingClick(clearingID: number) {
     if (assistBattleCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
       setSelectedClearingID(clearingID);
@@ -1509,9 +1655,9 @@ export default function App() {
       return;
     }
 
-    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1) {
       setSelectedClearingID(clearingID);
-      if (assistMovementSource === null) {
+      if (activeMovementSource === null) {
         const sourceMatches = assistMovementCandidates.filter((candidate) => candidate.endpoints.fromClearingID === clearingID);
         if (sourceMatches.length === 0) {
           setStatus("Choose one of the highlighted move source clearings.");
@@ -1524,19 +1670,19 @@ export default function App() {
           await handleApply(sourceMatches[0].action);
           return;
         }
-        setAssistMovementSource({ kind: "clearing", id: clearingID });
+        setBoardMovementSource({ kind: "clearing", id: clearingID });
         setStatus(`Move source selected: clearing ${clearingID}. Choose a highlighted destination.`);
         return;
       }
 
       const matchingMoves = assistMovementCandidates.filter(
-        (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toClearingID === clearingID
+        (candidate) => movementSourceMatches(candidate.endpoints, activeMovementSource) && candidate.endpoints.toClearingID === clearingID
       );
       if (matchingMoves.length === 1) {
-        const sourceLabel = assistMovementSource.kind === "clearing" ? `clearing ${assistMovementSource.id}` : `forest ${assistMovementSource.id}`;
+        const sourceLabel = activeMovementSource.kind === "clearing" ? `clearing ${activeMovementSource.id}` : `forest ${activeMovementSource.id}`;
         setStatus(`Recording movement from ${sourceLabel} to clearing ${clearingID}...`);
         await handleApply(matchingMoves[0].action);
-        setAssistMovementSource(null);
+        setBoardMovementSource(null);
         return;
       }
       if (matchingMoves.length > 1) {
@@ -1544,7 +1690,7 @@ export default function App() {
         return;
       }
       if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromClearingID === clearingID)) {
-        setAssistMovementSource({ kind: "clearing", id: clearingID });
+        setBoardMovementSource({ kind: "clearing", id: clearingID });
         setStatus(`Move source changed to clearing ${clearingID}. Choose a highlighted destination.`);
         return;
       }
@@ -1552,7 +1698,7 @@ export default function App() {
       return;
     }
 
-    if (assistBuildRecruitCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+    if (assistBuildRecruitCandidates.length > 0 && parsedState.gamePhase === 1) {
       setSelectedClearingID(clearingID);
       const matchingCandidates = assistBuildRecruitCandidates.filter((candidate) => candidate.clearingIDs.includes(clearingID));
       if (matchingCandidates.length === 1) {
@@ -1568,7 +1714,7 @@ export default function App() {
       return;
     }
 
-    if (assistFactionSpatialCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+    if (assistFactionSpatialCandidates.length > 0 && parsedState.gamePhase === 1) {
       setSelectedClearingID(clearingID);
       const matchingCandidates = assistFactionSpatialCandidates.filter((candidate) => candidate.clearingIDs.includes(clearingID));
       if (matchingCandidates.length === 1) {
@@ -1617,13 +1763,16 @@ export default function App() {
         return;
       }
 
+      const finalDraft = { ...marquiseSetupDraft, recruiterClearingID: clearingID };
       const action = marquiseSetupActions.find((candidate) =>
-        marquiseSetupMatches(candidate, { ...marquiseSetupDraft, recruiterClearingID: clearingID })
+        marquiseSetupMatches(candidate, finalDraft)
       );
       if (!action) {
         setStatus("That building placement is not legal.");
         return;
       }
+      setMarquiseSetupDraft(finalDraft);
+      setStatus("Applying Marquise setup...");
       await handleApply(action);
       return;
     }
@@ -1634,13 +1783,15 @@ export default function App() {
         setStatus("That starting clearing is not legal for the Eyrie.");
         return;
       }
+      setEyrieSetupDraftClearingID(clearingID);
+      setStatus("Applying Eyrie setup...");
       await handleApply(action);
     }
   }
 
   async function handleSetupForestClick(forestID: number) {
-    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
-      if (assistMovementSource === null) {
+    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1) {
+      if (activeMovementSource === null) {
         const sourceMatches = assistMovementCandidates.filter((candidate) => candidate.endpoints.fromForestID === forestID);
         if (sourceMatches.length === 0) {
           setStatus("Choose one of the highlighted move source forests.");
@@ -1653,19 +1804,19 @@ export default function App() {
           await handleApply(sourceMatches[0].action);
           return;
         }
-        setAssistMovementSource({ kind: "forest", id: forestID });
+        setBoardMovementSource({ kind: "forest", id: forestID });
         setStatus(`Move source selected: forest ${forestID}. Choose a highlighted destination.`);
         return;
       }
 
       const matchingMoves = assistMovementCandidates.filter(
-        (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toForestID === forestID
+        (candidate) => movementSourceMatches(candidate.endpoints, activeMovementSource) && candidate.endpoints.toForestID === forestID
       );
       if (matchingMoves.length === 1) {
-        const sourceLabel = assistMovementSource.kind === "clearing" ? `clearing ${assistMovementSource.id}` : `forest ${assistMovementSource.id}`;
+        const sourceLabel = activeMovementSource.kind === "clearing" ? `clearing ${activeMovementSource.id}` : `forest ${activeMovementSource.id}`;
         setStatus(`Recording movement from ${sourceLabel} to forest ${forestID}...`);
         await handleApply(matchingMoves[0].action);
-        setAssistMovementSource(null);
+        setBoardMovementSource(null);
         return;
       }
       if (matchingMoves.length > 1) {
@@ -1673,7 +1824,7 @@ export default function App() {
         return;
       }
       if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromForestID === forestID)) {
-        setAssistMovementSource({ kind: "forest", id: forestID });
+        setBoardMovementSource({ kind: "forest", id: forestID });
         setStatus(`Move source changed to forest ${forestID}. Choose a highlighted destination.`);
         return;
       }
@@ -1690,6 +1841,8 @@ export default function App() {
       setStatus("That forest is not a legal Vagabond starting forest.");
       return;
     }
+    setVagabondSetupDraftForestID(forestID);
+    setStatus("Applying Vagabond setup...");
     await handleApply(action);
   }
 
@@ -1785,6 +1938,31 @@ export default function App() {
   return (
     <main className="app-shell workspace-shell">
       <div className="board-stage">
+        {setupPrompt ? (
+          <>
+            <div className="board-phase-banner">
+              <span>{setupPrompt.title}</span>
+            </div>
+            <div className="board-setup-prompt">
+              <p className="eyebrow">Setup</p>
+              <strong>{setupPrompt.instruction}</strong>
+              <span>{setupPrompt.detail}</span>
+              <span>{setupLegalChoiceCount} legal choice{setupLegalChoiceCount === 1 ? "" : "s"}</span>
+              {parsedState.setupStage === 1 && hasMarquiseDraftSelection ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setMarquiseSetupDraft(emptyMarquiseSetupDraft);
+                    setStatus("Marquise setup draft reset.");
+                  }}
+                >
+                  Reset Marquise setup
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : null}
         {parsedState.gamePhase === 2 ? (
           <div className="board-hint endgame-banner">
             {gameOverHeadline(parsedState)}. Open the Game Over panel for the final standings.
@@ -1803,6 +1981,7 @@ export default function App() {
           previewedAction={previewedAction}
           setupLegalClearingIDs={legalSetupClearingIDs}
           setupSelectedClearingIDs={selectedSetupClearingIDs}
+          setupPreviewPiecesByClearing={setupPreviewPiecesByClearing}
           forestTargets={forestTargets}
           onSelectClearing={handleSetupClearingClick}
           onSelectForest={handleSetupForestClick}
@@ -1811,7 +1990,7 @@ export default function App() {
         {boardIsEmpty && parsedState.gamePhase !== 0 ? <div className="board-hint">Click a clearing to select it for board editing.</div> : null}
       </div>
 
-      <aside className="app-sidebar">
+      <aside className={`app-command-deck ${showPrimarySetupFlow ? "setup-deck" : ""}`} aria-label="Play controls">
         <section className="panel sidebar-panel">
           <p className="eyebrow">RootBuddy</p>
           <div className="status-block">
@@ -1838,21 +2017,22 @@ export default function App() {
           <span className={error ? "message error" : "message"}>{error || status}</span>
         </section>
 
-        <div className="primary-flow-stack">
-          <section className="panel sidebar-panel primary-flow-panel">
-            <p className="eyebrow">Primary Workflow</p>
-            <span className="summary-label">{primaryFlowLabel}</span>
-            <span className="summary-line">{primaryFlowSummary}</span>
-          </section>
+        {!showPrimarySetupFlow ? (
+          <div className="primary-flow-stack">
+            <section className="panel sidebar-panel primary-flow-panel">
+              <p className="eyebrow">Primary Workflow</p>
+              <span className="summary-label">{primaryFlowLabel}</span>
+              <span className="summary-line">{primaryFlowSummary}</span>
+            </section>
 
-          {multiplayerNotice ? (
+            {multiplayerNotice ? (
             <section className={`panel sidebar-panel notice-panel ${multiplayerNotice.level}`}>
               <p className="eyebrow">{multiplayerNotice.title}</p>
               <span className="summary-line">{multiplayerNotice.detail}</span>
             </section>
-          ) : null}
+            ) : null}
 
-          {!showPrimaryAssistFlow ? (
+            {!showPrimaryAssistFlow ? (
             <FlowGuidePanel
               state={parsedState}
               loadedActionCount={actions.length}
@@ -1863,22 +2043,9 @@ export default function App() {
               onGenerateActions={refreshActions}
               onOpenHelp={() => setShowGuideHelp(true)}
             />
-          ) : null}
+            ) : null}
 
-          {showPrimarySetupFlow ? (
-            <SetupFlowPanel
-              stage={parsedState.setupStage}
-              activeFaction={parsedState.factionTurn}
-              legalChoiceCount={parsedState.setupStage === 3 ? forestTargets.filter((target) => target.legal).length : legalSetupClearingIDs.length}
-              marquiseDraft={marquiseSetupDraft}
-              onResetMarquiseDraft={() => {
-                setMarquiseSetupDraft(emptyMarquiseSetupDraft);
-                setStatus("Marquise setup draft reset.");
-              }}
-            />
-          ) : null}
-
-          {hasPrimaryBattleFlow ? (
+            {hasPrimaryBattleFlow ? (
             <BattleFlowPanel
               selectedBattleIndex={selectedBattleIndex}
               selectedBattleAction={selectedBattleAction}
@@ -1908,9 +2075,9 @@ export default function App() {
                 setStatus("Cleared selected battle.");
               }}
             />
-          ) : null}
+            ) : null}
 
-          {showPrimaryReviewFlow ? (
+            {showPrimaryReviewFlow ? (
             <EndgamePanel
               state={parsedState}
               hasSavedSession={hasSavedSession}
@@ -1943,9 +2110,9 @@ export default function App() {
                 setActiveModal("json");
               }}
             />
-          ) : null}
+            ) : null}
 
-          {showPrimaryAssistFlow ? (
+            {showPrimaryAssistFlow ? (
             <AssistWorkflowPanel
               state={parsedState}
               actions={actions}
@@ -1958,9 +2125,9 @@ export default function App() {
               onBuildRecruitCandidatesChange={handleAssistBuildRecruitCandidatesChange}
               onFactionSpatialCandidatesChange={handleAssistFactionSpatialCandidatesChange}
             />
-          ) : null}
+            ) : null}
 
-          {showPrimaryPlayerFlow ? (
+            {showPrimaryPlayerFlow ? (
             <PlayerActionsPanel
               state={parsedState}
               actions={actions}
@@ -1969,11 +2136,15 @@ export default function App() {
               onGenerateActions={refreshActions}
               onOpenBattle={openBattleForActionIndex}
               onPreviewAction={setHoveredActionIndex}
+              onMovementCandidatesChange={handlePlayerMovementCandidatesChange}
+              onBuildRecruitCandidatesChange={handlePlayerBuildRecruitCandidatesChange}
+              onFactionSpatialCandidatesChange={handlePlayerFactionSpatialCandidatesChange}
             />
-          ) : null}
-        </div>
+            ) : null}
+          </div>
+        ) : null}
 
-        {showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
+        {!showPrimarySetupFlow && showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
         {parsedState.gamePhase === 1 && !multiplayerToken ? (
           <details
             className="panel sidebar-panel board-editor-drawer"
@@ -2016,6 +2187,7 @@ export default function App() {
           </details>
         ) : null}
 
+        {!showPrimarySetupFlow ? (
         <details
           className="panel sidebar-panel context-drawer secondary-drawer"
           open={showContextDrawer}
@@ -2039,7 +2211,9 @@ export default function App() {
             />
           </div>
         </details>
+        ) : null}
 
+        {!showPrimarySetupFlow ? (
         <details
           className="panel sidebar-panel sidebar-actions-panel secondary-drawer"
           open={showWorkspaceTools}
@@ -2161,6 +2335,7 @@ export default function App() {
             ) : null}
           </div>
         </details>
+        ) : null}
       </aside>
 
       {activeModal ? (

@@ -72,9 +72,11 @@ button.secondary {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.75rem;
   align-items: stretch;
+  position: relative;
 }
 
 .entry-shell {
@@ -142,15 +144,20 @@ button.secondary {
   position: relative;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
-.app-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.app-command-deck {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 2fr) minmax(16rem, 0.85fr);
+  gap: 0.75rem;
+  align-items: start;
   min-height: 0;
+  max-height: 34vh;
   overflow: auto;
-  padding-right: 0.2rem;
+  padding: 0;
 }
 
 .sidebar-panel {
@@ -158,12 +165,13 @@ button.secondary {
 }
 
 .sidebar-actions-panel {
-  margin-top: auto;
+  margin-top: 0;
 }
 
 .primary-flow-stack {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .primary-flow-panel {
@@ -256,8 +264,6 @@ button.secondary {
   box-shadow:
     inset 0 0 0 1px rgba(255, 247, 232, 0.42),
     0 26px 55px rgba(66, 44, 22, 0.18);
-  --board-focus-x: 50%;
-  --board-focus-y: 50%;
 }
 
 .board-canvas::before {
@@ -274,13 +280,7 @@ button.secondary {
 .board-view {
   position: absolute;
   inset: 0;
-  transform-origin: var(--board-focus-x) var(--board-focus-y);
-  transition: transform 220ms ease;
   z-index: 1;
-}
-
-.board-canvas.zoomed .board-view {
-  transform: scale(1.16);
 }
 
 .board-map-art {
@@ -309,6 +309,81 @@ button.secondary {
   inset: auto 1rem 1rem auto;
   z-index: 4;
   pointer-events: none;
+}
+
+.board-phase-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  min-width: min(24rem, calc(100% - 2rem));
+  padding: 0.55rem 1rem 0.62rem;
+  border-radius: 10px 10px 16px 16px;
+  text-align: center;
+  color: #2b1d13;
+  background:
+    linear-gradient(90deg, rgba(116, 75, 38, 0.18), transparent 10%, transparent 90%, rgba(116, 75, 38, 0.18)),
+    linear-gradient(180deg, rgba(255, 246, 219, 0.98), rgba(227, 190, 123, 0.96));
+  border: 1px solid rgba(98, 62, 27, 0.35);
+  box-shadow: 0 10px 22px rgba(54, 33, 16, 0.16);
+  pointer-events: none;
+}
+
+.board-phase-banner span {
+  font-size: clamp(1.05rem, 1.8vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.board-setup-prompt {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 6;
+  width: min(26rem, calc(100% - 2rem));
+  display: grid;
+  gap: 0.16rem;
+  justify-items: start;
+  padding: 0.25rem 0.35rem;
+  border-radius: 12px;
+  text-align: left;
+  color: #fff8e8;
+  background: rgba(20, 17, 13, 0.24);
+  border: 1px solid rgba(255, 238, 196, 0.18);
+  box-shadow: none;
+  backdrop-filter: blur(3px);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.board-setup-prompt .eyebrow {
+  margin: 0;
+  color: rgba(255, 244, 214, 0.82);
+}
+
+.board-setup-prompt strong {
+  font-size: clamp(0.98rem, 1.3vw, 1.22rem);
+  color: #fff7e4;
+}
+
+.board-setup-prompt span {
+  color: rgba(255, 244, 224, 0.88);
+  line-height: 1.25;
+}
+
+.board-setup-prompt button {
+  margin-top: 0.25rem;
+  padding: 0.38rem 0.75rem;
+  background: rgba(255, 246, 223, 0.12);
+  border-color: rgba(255, 236, 194, 0.38);
+  color: #fff7e6;
+  text-shadow: none;
+}
+
+.app-command-deck.setup-deck {
+  grid-template-columns: minmax(18rem, 30rem);
+  justify-content: center;
+  max-height: 6.5rem;
 }
 
 .board-focus-card {
@@ -765,32 +840,33 @@ button.secondary {
 
 .clearing-marker {
   position: absolute;
-  width: 6.9rem;
-  min-height: 7.4rem;
+  width: 6.6rem;
+  height: 6.6rem;
+  min-height: 0;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 0.4rem;
+  gap: 0.22rem;
   transform: translate(-50%, -50%);
-  border-radius: 28px;
-  border: 1px solid rgba(88, 65, 43, 0.86);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 247, 225, 0.45);
   background:
-    linear-gradient(180deg, rgba(255, 250, 241, 0.96), rgba(237, 222, 193, 0.98));
+    radial-gradient(circle at 50% 48%, rgba(255, 246, 224, 0.38), rgba(255, 239, 199, 0.16) 58%, rgba(79, 55, 30, 0.18) 100%);
   color: #fff8ee;
-  padding: 0.7rem 0.45rem 0.78rem;
+  padding: 0.75rem 0.5rem 0.55rem;
   box-shadow:
-    0 14px 28px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(2px);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.12);
+  backdrop-filter: none;
   z-index: 1;
 }
 
 .clearing-marker::before {
   content: "";
   position: absolute;
-  inset: 0.32rem;
-  border-radius: 22px;
-  border: 1px solid rgba(125, 97, 64, 0.22);
+  inset: 0.3rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(255, 250, 230, 0.62);
   pointer-events: none;
 }
 
@@ -801,22 +877,22 @@ button.secondary {
 .clearing-marker.selected {
   box-shadow:
     0 0 0 4px rgba(252, 206, 92, 0.72),
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .clearing-marker.focused:not(.selected) {
   box-shadow:
     0 0 0 3px rgba(249, 219, 132, 0.46),
-    0 14px 28px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 14px 28px rgba(0, 0, 0, 0.18);
 }
 
 .clearing-marker.adjacent-focus:not(.selected):not(.focused) {
   box-shadow:
     0 0 0 2px rgba(255, 241, 203, 0.28),
-    0 12px 24px rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 12px 24px rgba(0, 0, 0, 0.16);
 }
 
 .clearing-marker.dimmed:not(.selected):not(.focused) {
@@ -825,42 +901,51 @@ button.secondary {
 }
 
 .clearing-marker.dense-marker {
-  min-height: 6.95rem;
+  min-height: 0;
   gap: 0.3rem;
-  padding-bottom: 0.68rem;
+  padding-bottom: 0.55rem;
 }
 
 .clearing-marker.highlight-source {
   box-shadow:
     0 0 0 4px rgba(97, 166, 255, 0.72),
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .clearing-marker.highlight-target,
 .clearing-marker.highlight-affected {
   box-shadow:
     0 0 0 4px rgba(255, 143, 110, 0.72),
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .clearing-marker.setup-legal {
   box-shadow:
-    0 0 0 4px rgba(51, 118, 90, 0.44),
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+    0 0 0 5px rgba(67, 185, 112, 0.7),
+    0 0 0 10px rgba(67, 185, 112, 0.18),
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .clearing-marker.setup-chosen {
   box-shadow:
-    0 0 0 4px rgba(244, 190, 77, 0.76),
-    0 10px 20px rgba(0, 0, 0, 0.18),
-    inset 0 2px 0 rgba(255, 255, 255, 0.62);
+    0 0 0 5px rgba(244, 190, 77, 0.76),
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
+}
+
+.clearing-marker.setup-legal.setup-chosen {
+  box-shadow:
+    0 0 0 5px rgba(244, 190, 77, 0.82),
+    0 0 0 10px rgba(67, 185, 112, 0.42),
+    inset 0 0 0 2px rgba(105, 72, 38, 0.26),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .marker-token-cluster {
-  min-height: 1.15rem;
+  min-height: 1.05rem;
   width: 100%;
   display: flex;
   align-items: center;
@@ -873,10 +958,10 @@ button.secondary {
 
 .marker-clearing-id {
   position: absolute;
-  top: 0.45rem;
-  left: 0.52rem;
-  min-width: 1.75rem;
-  height: 1.75rem;
+  top: -0.2rem;
+  left: -0.15rem;
+  min-width: 1.65rem;
+  height: 1.65rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -892,12 +977,12 @@ button.secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.45rem;
-  padding: 0.18rem 0.44rem;
+  min-width: 2rem;
+  padding: 0.16rem 0.34rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.38);
   color: #fff8ee;
-  font-size: 0.54rem;
+  font-size: 0.5rem;
   font-weight: 700;
   line-height: 1;
   text-transform: uppercase;
@@ -927,7 +1012,7 @@ button.secondary {
   justify-content: center;
   gap: 0.3rem;
   color: #5f4f3f;
-  font-size: 0.54rem;
+  font-size: 0.48rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -936,8 +1021,8 @@ button.secondary {
 .marker-footer span {
   display: inline-flex;
   align-items: center;
-  min-height: 1.2rem;
-  padding: 0.12rem 0.34rem;
+  min-height: 1rem;
+  padding: 0.1rem 0.25rem;
   border-radius: 999px;
   background: rgba(122, 97, 65, 0.12);
 }
@@ -1031,6 +1116,13 @@ button.secondary {
 .dense-marker .token-chip {
   width: 1.18rem;
   height: 1.18rem;
+}
+
+.token-chip.preview {
+  outline: 2px dashed rgba(255, 245, 206, 0.92);
+  outline-offset: 2px;
+  filter: saturate(1.08) brightness(1.06);
+  animation: pending-piece-pop 160ms ease-out;
 }
 
 .token-count {
@@ -1636,6 +1728,17 @@ textarea {
 
 .forest-marker.selected {
   box-shadow: 0 0 0 4px rgba(244, 190, 77, 0.68);
+  background: rgba(255, 243, 200, 0.94);
+}
+
+@keyframes pending-piece-pop {
+  from {
+    transform: scale(0.82);
+  }
+
+  to {
+    transform: scale(1);
+  }
 }
 
 .forest-marker-label {
@@ -2299,18 +2402,27 @@ textarea {
 
   .workspace-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
   }
 
   .board-stage {
     height: 68vh;
   }
 
-  .board-canvas.zoomed .board-view {
-    transform: scale(1.08);
-  }
-
   .board-preview-overlay {
     inset: auto 0.75rem 0.75rem 0.75rem;
+  }
+
+  .board-phase-banner {
+    top: 0.65rem;
+    min-width: min(22rem, calc(100% - 1.2rem));
+    padding: 0.58rem 1rem 0.66rem;
+  }
+
+  .board-setup-prompt {
+    bottom: 0.65rem;
+    width: min(24rem, calc(100% - 1.2rem));
+    padding: 0.35rem 0.5rem;
   }
 
   .board-preview-badge {
@@ -2328,7 +2440,9 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .app-sidebar {
+  .app-command-deck {
+    grid-template-columns: 1fr;
+    max-height: none;
     overflow: visible;
     padding-right: 0;
   }
@@ -2354,12 +2468,13 @@ textarea {
   }
 
   .clearing-marker {
-    width: 5.7rem;
-    min-height: 6.25rem;
+    width: 5.35rem;
+    height: 5.35rem;
+    min-height: 0;
   }
 
   .dense-marker {
-    min-height: 5.9rem;
+    min-height: 0;
   }
 
   .indicator-pill,

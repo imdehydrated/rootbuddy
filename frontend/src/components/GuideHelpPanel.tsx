@@ -21,8 +21,8 @@ export function GuideHelpPanel({ gamePhase, onClose }: GuideHelpPanelProps) {
           </>
         ) : (
           <>
-            <p>1. Click a clearing to select it, then use the Board Editor in the sidebar to place warriors, buildings, sympathy, wood, ruins, the Keep, and the Vagabond.</p>
-            <p>2. Use Turn Controls in the sidebar to set the acting faction and phase, and open Advanced Turn only when you need a manual correction.</p>
+            <p>1. Click a clearing to select it, then use Board Editor in the guided controls to place warriors, buildings, sympathy, wood, ruins, the Keep, and the Vagabond.</p>
+            <p>2. Use Turn Controls in the guided controls to set the acting faction and phase, and open Advanced Turn only when you need a manual correction.</p>
             <p>3. Load or refresh actions from the Flow Guide, then apply them from Player Turn, Observed Turn, or Battle Flow.</p>
           </>
         )}

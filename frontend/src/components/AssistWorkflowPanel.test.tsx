@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ACTION_TYPE } from "../labels";
 import { sampleState } from "../sampleState";
 import type { Action, GameState } from "../types";
+import type { AssistActionCandidateRef } from "../assistDirector";
 import { AssistWorkflowPanel } from "./AssistWorkflowPanel";
 
 function observedState(overrides: Partial<GameState> = {}): GameState {
@@ -26,10 +27,10 @@ function renderPanel(options: {
   onGenerateActions?: () => Promise<void>;
   onOpenTurnState?: () => void;
   onOpenBattle?: (actionIndex: number) => void;
-  onBattleCandidatesChange?: (actionIndices: number[]) => void;
-  onMovementCandidatesChange?: (actionIndices: number[]) => void;
-  onBuildRecruitCandidatesChange?: (actionIndices: number[]) => void;
-  onFactionSpatialCandidatesChange?: (actionIndices: number[]) => void;
+  onBattleCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 } = {}) {
   return render(
     <AssistWorkflowPanel
@@ -134,7 +135,30 @@ describe("AssistWorkflowPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Move/i }));
 
-    await waitFor(() => expect(onMovementCandidatesChange).toHaveBeenLastCalledWith([0]));
+    await waitFor(() => expect(onMovementCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: movementAction }]));
+  });
+
+  it("keeps exact generated candidates closed by default for normal observed intents", () => {
+    const movementAction: Action = {
+      type: ACTION_TYPE.MOVEMENT,
+      movement: {
+        faction: 2,
+        count: 1,
+        maxCount: 1,
+        from: 3,
+        to: 7,
+        fromForestID: 0,
+        toForestID: 0,
+        decreeCardID: 0,
+        sourceEffectID: ""
+      }
+    };
+
+    const { container } = renderPanel({ actions: [movementAction] });
+
+    fireEvent.click(screen.getByRole("button", { name: /Move/i }));
+
+    expect(container.querySelector(".assist-exact-candidate-drawer")?.hasAttribute("open")).toBe(false);
   });
 
   it("reports build and recruit candidates only after the Build / Recruit intent is selected", async () => {
@@ -156,7 +180,7 @@ describe("AssistWorkflowPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Build \/ Recruit/i }));
 
-    await waitFor(() => expect(onBuildRecruitCandidatesChange).toHaveBeenLastCalledWith([0]));
+    await waitFor(() => expect(onBuildRecruitCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: buildAction }]));
   });
 
   it("reports clearing-based faction action candidates only after Faction Action is selected", async () => {
@@ -175,7 +199,7 @@ describe("AssistWorkflowPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Faction Action/i }));
 
-    await waitFor(() => expect(onFactionSpatialCandidatesChange).toHaveBeenLastCalledWith([0]));
+    await waitFor(() => expect(onFactionSpatialCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: organizeAction }]));
   });
 
   it("applies ambiguous Spread Sympathy choices from card-specific faction prompts", async () => {

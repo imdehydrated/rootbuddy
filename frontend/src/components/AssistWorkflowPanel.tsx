@@ -14,6 +14,7 @@ import {
   factionSpatialChoiceLabel,
   groupActionsByIntent,
   observedPromptTemplates,
+  type AssistActionCandidateRef,
   type AssistIntentKey
 } from "../assistDirector";
 import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels } from "../labels";
@@ -31,10 +32,10 @@ type AssistWorkflowPanelProps = {
   onGenerateActions: () => Promise<void>;
   onOpenTurnState: () => void;
   onOpenBattle: (actionIndex: number) => void;
-  onBattleCandidatesChange?: (actionIndices: number[]) => void;
-  onMovementCandidatesChange?: (actionIndices: number[]) => void;
-  onBuildRecruitCandidatesChange?: (actionIndices: number[]) => void;
-  onFactionSpatialCandidatesChange?: (actionIndices: number[]) => void;
+  onBattleCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 };
 
 export function AssistWorkflowPanel({
@@ -131,26 +132,34 @@ export function AssistWorkflowPanel({
       : [];
   const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
   const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
-  const battleCandidateIndices =
+  const candidateRefsForSelectedGroup = (enabled: boolean): AssistActionCandidateRef[] =>
+    enabled && selectedGroup
+      ? selectedGroup.actions
+          .map((action) => ({ actionIndex: actions.indexOf(action), action }))
+          .filter((candidate) => candidate.actionIndex >= 0)
+      : [];
+  const battleCandidates =
     selectedIntent === "battle" && selectedGroup
-      ? selectedGroup.actions.map((action) => actions.indexOf(action)).filter((index) => index >= 0)
+      ? candidateRefsForSelectedGroup(true)
       : [];
-  const movementCandidateIndices =
+  const movementCandidates =
     selectedIntent === "movement" && selectedGroup
-      ? selectedGroup.actions.map((action) => actions.indexOf(action)).filter((index) => index >= 0)
+      ? candidateRefsForSelectedGroup(true)
       : [];
-  const buildRecruitCandidateIndices =
+  const buildRecruitCandidates =
     selectedIntent === "build_recruit" && selectedGroup
-      ? selectedGroup.actions.map((action) => actions.indexOf(action)).filter((index) => index >= 0)
+      ? candidateRefsForSelectedGroup(true)
       : [];
-  const factionSpatialCandidateIndices =
+  const factionSpatialCandidates =
     selectedIntent === "faction" && selectedGroup
-      ? selectedGroup.actions.map((action) => actions.indexOf(action)).filter((index) => index >= 0)
+      ? candidateRefsForSelectedGroup(true)
       : [];
-  const battleCandidateKey = battleCandidateIndices.join(",");
-  const movementCandidateKey = movementCandidateIndices.join(",");
-  const buildRecruitCandidateKey = buildRecruitCandidateIndices.join(",");
-  const factionSpatialCandidateKey = factionSpatialCandidateIndices.join(",");
+  const candidateKey = (candidates: AssistActionCandidateRef[]) =>
+    candidates.map((candidate) => `${candidate.actionIndex}:${candidate.action.type}`).join(",");
+  const battleCandidateKey = candidateKey(battleCandidates);
+  const movementCandidateKey = candidateKey(movementCandidates);
+  const buildRecruitCandidateKey = candidateKey(buildRecruitCandidates);
+  const factionSpatialCandidateKey = candidateKey(factionSpatialCandidates);
   const actorLabel = factionLabels[state.factionTurn] ?? "Unknown";
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
   const nextAssistSummary =
@@ -159,22 +168,22 @@ export function AssistWorkflowPanel({
       : `Loading public candidates for ${actorLabel}. If the action involved hidden information, use Other observed event.`;
 
   useEffect(() => {
-    onBattleCandidatesChange?.(battleCandidateIndices);
+    onBattleCandidatesChange?.(battleCandidates);
     return () => onBattleCandidatesChange?.([]);
   }, [battleCandidateKey, onBattleCandidatesChange]);
 
   useEffect(() => {
-    onMovementCandidatesChange?.(movementCandidateIndices);
+    onMovementCandidatesChange?.(movementCandidates);
     return () => onMovementCandidatesChange?.([]);
   }, [movementCandidateKey, onMovementCandidatesChange]);
 
   useEffect(() => {
-    onBuildRecruitCandidatesChange?.(buildRecruitCandidateIndices);
+    onBuildRecruitCandidatesChange?.(buildRecruitCandidates);
     return () => onBuildRecruitCandidatesChange?.([]);
   }, [buildRecruitCandidateKey, onBuildRecruitCandidatesChange]);
 
   useEffect(() => {
-    onFactionSpatialCandidatesChange?.(factionSpatialCandidateIndices);
+    onFactionSpatialCandidatesChange?.(factionSpatialCandidates);
     return () => onFactionSpatialCandidatesChange?.([]);
   }, [factionSpatialCandidateKey, onFactionSpatialCandidatesChange]);
 

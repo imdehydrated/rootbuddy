@@ -10,6 +10,7 @@ import {
   factionChoiceDetail,
   factionChoiceLabel,
   groupActionsByIntent,
+  type AssistActionCandidateRef,
   type AssistIntentKey
 } from "../assistDirector";
 import { describeAction } from "../actionPresentation";
@@ -25,6 +26,9 @@ type PlayerActionsPanelProps = {
   onGenerateActions: () => Promise<void>;
   onOpenBattle: (actionIndex: number) => void;
   onPreviewAction?: (actionIndex: number | null) => void;
+  onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 };
 
 export function PlayerActionsPanel({
@@ -34,7 +38,10 @@ export function PlayerActionsPanel({
   onApply,
   onGenerateActions,
   onOpenBattle,
-  onPreviewAction
+  onPreviewAction,
+  onMovementCandidatesChange,
+  onBuildRecruitCandidatesChange,
+  onFactionSpatialCandidatesChange
 }: PlayerActionsPanelProps) {
   const [showAllActions, setShowAllActions] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<AssistIntentKey | null>(null);
@@ -54,6 +61,29 @@ export function PlayerActionsPanel({
 
   const actionGroups = groupActionsByIntent(actions);
   const selectedGroup = actionGroups.find((group) => group.key === selectedIntent) ?? null;
+  const candidateRefsForSelectedGroup = (enabled: boolean): AssistActionCandidateRef[] =>
+    enabled && selectedGroup
+      ? selectedGroup.actions
+          .map((action) => ({ actionIndex: actions.indexOf(action), action }))
+          .filter((candidate) => candidate.actionIndex >= 0)
+      : [];
+  const movementCandidates =
+    selectedIntent === "movement" && selectedGroup
+      ? candidateRefsForSelectedGroup(true)
+      : [];
+  const buildRecruitCandidates =
+    selectedIntent === "build_recruit" && selectedGroup
+      ? candidateRefsForSelectedGroup(true)
+      : [];
+  const factionSpatialCandidates =
+    selectedIntent === "faction" && selectedGroup
+      ? candidateRefsForSelectedGroup(true)
+      : [];
+  const candidateKey = (candidates: AssistActionCandidateRef[]) =>
+    candidates.map((candidate) => `${candidate.actionIndex}:${candidate.action.type}`).join(",");
+  const movementCandidateKey = candidateKey(movementCandidates);
+  const buildRecruitCandidateKey = candidateKey(buildRecruitCandidates);
+  const factionSpatialCandidateKey = candidateKey(factionSpatialCandidates);
   const visibleActions = showAllActions ? actions : actions.slice(0, 6);
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
   const battleTargetChoices =
@@ -83,6 +113,21 @@ export function PlayerActionsPanel({
       : [];
   const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
   const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
+
+  useEffect(() => {
+    onMovementCandidatesChange?.(movementCandidates);
+    return () => onMovementCandidatesChange?.([]);
+  }, [movementCandidateKey, onMovementCandidatesChange]);
+
+  useEffect(() => {
+    onBuildRecruitCandidatesChange?.(buildRecruitCandidates);
+    return () => onBuildRecruitCandidatesChange?.([]);
+  }, [buildRecruitCandidateKey, onBuildRecruitCandidatesChange]);
+
+  useEffect(() => {
+    onFactionSpatialCandidatesChange?.(factionSpatialCandidates);
+    return () => onFactionSpatialCandidatesChange?.([]);
+  }, [factionSpatialCandidateKey, onFactionSpatialCandidatesChange]);
 
   return (
     <section className="panel sidebar-panel">

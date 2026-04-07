@@ -15,6 +15,7 @@ type ClearingMarkerProps = {
   highlightRole?: HighlightedClearing["role"];
   isSetupLegal?: boolean;
   isSetupChosen?: boolean;
+  previewPieces?: ClearingPreviewPiece[];
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onHover?: (hovered: boolean) => void;
 };
@@ -36,9 +37,11 @@ type TokenChipProps = {
     | "ruins";
   count?: number;
   label: string;
+  preview?: boolean;
 };
 
 type TokenChipDatum = TokenChipProps;
+export type ClearingPreviewPiece = TokenChipDatum;
 
 const tokenGlyphLabels: Record<TokenChipProps["kind"], string> = {
   marquise: "M",
@@ -56,9 +59,9 @@ const tokenGlyphLabels: Record<TokenChipProps["kind"], string> = {
   ruins: "Ru"
 };
 
-export function TokenChip({ kind, count, label }: TokenChipProps) {
+export function TokenChip({ kind, count, label, preview = false }: TokenChipProps) {
   return (
-    <span className={`token-chip ${kind}`} aria-label={label} title={label}>
+    <span className={`token-chip ${kind} ${preview ? "preview" : ""}`} aria-label={label} title={label}>
       <span className={`token-glyph ${kind}`} aria-hidden="true">
         {tokenGlyphLabels[kind]}
       </span>
@@ -78,8 +81,8 @@ function renderTokenRow(chips: TokenChipDatum[], maxVisible: number, compact = f
 
   return (
     <span className={`indicator-row ${compact ? "compact" : ""}`}>
-      {visible.map((chip) => (
-        <TokenChip key={`${chip.kind}-${chip.label}`} kind={chip.kind} count={chip.count} label={chip.label} />
+      {visible.map((chip, index) => (
+        <TokenChip key={`${chip.kind}-${chip.label}-${index}`} kind={chip.kind} count={chip.count} label={chip.label} preview={chip.preview} />
       ))}
       {hiddenCount > 0 ? (
         <span
@@ -106,10 +109,11 @@ export function ClearingMarker({
   highlightRole,
   isSetupLegal = false,
   isSetupChosen = false,
+  previewPieces = [],
   onClick,
   onHover
 }: ClearingMarkerProps) {
-  const occupiedSlots = usedBuildSlots(clearing);
+  const baseOccupiedSlots = usedBuildSlots(clearing);
   const marquiseWarriors = clearing.warriors["0"] ?? 0;
   const allianceWarriors = clearing.warriors["1"] ?? 0;
   const eyrieWarriors = clearing.warriors["2"] ?? 0;
@@ -119,6 +123,14 @@ export function ClearingMarker({
   const roosts = countBuildings(clearing.buildings, 2, 3);
   const allianceBases = countBuildings(clearing.buildings, 1, 4);
   const sympathy = countTokens(clearing.tokens, 1, 1);
+  const previewStructureKinds = new Set<TokenChipProps["kind"]>(["sawmill", "workshop", "recruiter", "roost", "base", "sympathy", "keep", "ruins"]);
+  const previewBuildingKinds = new Set<TokenChipProps["kind"]>(["sawmill", "workshop", "recruiter", "roost", "base"]);
+  const previewStructureChips = previewPieces.filter((piece) => previewStructureKinds.has(piece.kind));
+  const previewPieceChips = previewPieces.filter((piece) => !previewStructureKinds.has(piece.kind));
+  const previewBuildSlotCount = previewPieces
+    .filter((piece) => previewBuildingKinds.has(piece.kind))
+    .reduce((total, piece) => total + (piece.count ?? 1), 0);
+  const occupiedSlots = Math.min(clearing.buildSlots, baseOccupiedSlots + previewBuildSlotCount);
   const structureChips: TokenChipDatum[] = [
     sawmills > 0 ? { kind: "sawmill", count: sawmills, label: `Sawmills ${sawmills}` } : null,
     workshops > 0 ? { kind: "workshop", count: workshops, label: `Workshops ${workshops}` } : null,
@@ -128,14 +140,14 @@ export function ClearingMarker({
     sympathy > 0 ? { kind: "sympathy", count: sympathy, label: `Sympathy ${sympathy}` } : null,
     hasKeep ? { kind: "keep", label: "Keep" } : null,
     clearing.ruins ? { kind: "ruins", label: "Ruins" } : null
-  ].filter((chip): chip is TokenChipDatum => chip !== null);
+  ].filter((chip): chip is TokenChipDatum => chip !== null).concat(previewStructureChips);
   const pieceChips: TokenChipDatum[] = [
     marquiseWarriors > 0 ? { kind: "marquise", count: marquiseWarriors, label: `Marquise warriors ${marquiseWarriors}` } : null,
     allianceWarriors > 0 ? { kind: "alliance", count: allianceWarriors, label: `Alliance warriors ${allianceWarriors}` } : null,
     eyrieWarriors > 0 ? { kind: "eyrie", count: eyrieWarriors, label: `Eyrie warriors ${eyrieWarriors}` } : null,
     hasVagabond ? { kind: "vagabond", label: "Vagabond" } : null,
     clearing.wood > 0 ? { kind: "wood", count: clearing.wood, label: `Wood ${clearing.wood}` } : null
-  ].filter((chip): chip is TokenChipDatum => chip !== null);
+  ].filter((chip): chip is TokenChipDatum => chip !== null).concat(previewPieceChips);
   const denseStructures = structureChips.length > 4;
   const densePieces = pieceChips.length > 4;
   const denseMarker = denseStructures || densePieces;
@@ -184,12 +196,12 @@ export function ClearingMarker({
         {suitLabels[clearing.suit] ?? "Unknown"}
       </span>
       <span className="marker-token-cluster marker-structures">
-        {hasAnyIndicators([sawmills, workshops, recruiters, roosts, allianceBases, sympathy], clearing.ruins || hasKeep)
+        {hasAnyIndicators([sawmills, workshops, recruiters, roosts, allianceBases, sympathy, previewStructureChips.length], clearing.ruins || hasKeep)
           ? renderTokenRow(structureChips, denseStructures ? 3 : 5, true)
           : null}
       </span>
       <span className="marker-token-cluster marker-pieces">
-        {hasAnyIndicators([marquiseWarriors, allianceWarriors, eyrieWarriors, clearing.wood], hasVagabond)
+        {hasAnyIndicators([marquiseWarriors, allianceWarriors, eyrieWarriors, clearing.wood, previewPieceChips.length], hasVagabond)
           ? renderTokenRow(pieceChips, densePieces ? 3 : 5)
           : null}
       </span>

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ACTION_TYPE } from "../labels";
 import { sampleState } from "../sampleState";
 import type { Action, GameState } from "../types";
+import type { AssistActionCandidateRef } from "../assistDirector";
 import { PlayerActionsPanel } from "./PlayerActionsPanel";
 
 function activeState(overrides: Partial<GameState> = {}): GameState {
@@ -27,6 +28,9 @@ function renderPanel(options: {
   onGenerateActions?: () => Promise<void>;
   onOpenBattle?: (actionIndex: number) => void;
   onPreviewAction?: (actionIndex: number | null) => void;
+  onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 } = {}) {
   return render(
     <PlayerActionsPanel
@@ -37,6 +41,9 @@ function renderPanel(options: {
       onGenerateActions={options.onGenerateActions ?? vi.fn(async () => undefined)}
       onOpenBattle={options.onOpenBattle ?? vi.fn()}
       onPreviewAction={options.onPreviewAction}
+      onMovementCandidatesChange={options.onMovementCandidatesChange}
+      onBuildRecruitCandidatesChange={options.onBuildRecruitCandidatesChange}
+      onFactionSpatialCandidatesChange={options.onFactionSpatialCandidatesChange}
     />
   );
 }
@@ -68,6 +75,96 @@ describe("PlayerActionsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Move up to 1 from clearing 3 to clearing 7/i }));
 
     await waitFor(() => expect(onApply).toHaveBeenCalledWith(movementAction));
+  });
+
+  it("reports active movement candidates only after the Move intent is selected", async () => {
+    const movementAction: Action = {
+      type: ACTION_TYPE.MOVEMENT,
+      movement: {
+        faction: 2,
+        count: 1,
+        maxCount: 1,
+        from: 3,
+        to: 7,
+        fromForestID: 0,
+        toForestID: 0,
+        decreeCardID: 0,
+        sourceEffectID: ""
+      }
+    };
+    const onMovementCandidatesChange = vi.fn();
+
+    renderPanel({ actions: [movementAction], onMovementCandidatesChange });
+
+    await waitFor(() => expect(onMovementCandidatesChange).toHaveBeenLastCalledWith([]));
+
+    fireEvent.click(screen.getByRole("button", { name: /Move.*Pieces changed clearings/i }));
+
+    await waitFor(() => expect(onMovementCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: movementAction }]));
+  });
+
+  it("keeps exact legal actions closed by default for normal active intents", () => {
+    const movementAction: Action = {
+      type: ACTION_TYPE.MOVEMENT,
+      movement: {
+        faction: 2,
+        count: 1,
+        maxCount: 1,
+        from: 3,
+        to: 7,
+        fromForestID: 0,
+        toForestID: 0,
+        decreeCardID: 0,
+        sourceEffectID: ""
+      }
+    };
+
+    const { container } = renderPanel({ actions: [movementAction] });
+
+    fireEvent.click(screen.getByRole("button", { name: /Move.*Pieces changed clearings/i }));
+
+    expect(container.querySelector(".assist-exact-candidate-drawer")?.hasAttribute("open")).toBe(false);
+  });
+
+  it("reports active Build / Recruit candidates only after the intent is selected", async () => {
+    const buildAction: Action = {
+      type: ACTION_TYPE.BUILD,
+      build: {
+        faction: 0,
+        clearingID: 1,
+        buildingType: 0,
+        woodSources: [{ clearingID: 1, amount: 1 }],
+        decreeCardID: 0
+      }
+    };
+    const onBuildRecruitCandidatesChange = vi.fn();
+
+    renderPanel({ state: activeState({ playerFaction: 0, factionTurn: 0 }), actions: [buildAction], onBuildRecruitCandidatesChange });
+
+    await waitFor(() => expect(onBuildRecruitCandidatesChange).toHaveBeenLastCalledWith([]));
+
+    fireEvent.click(screen.getByRole("button", { name: /Build \/ Recruit.*Pieces, wood, or buildings/i }));
+
+    await waitFor(() => expect(onBuildRecruitCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: buildAction }]));
+  });
+
+  it("reports active clearing-based Faction Action candidates only after the intent is selected", async () => {
+    const organizeAction: Action = {
+      type: ACTION_TYPE.ORGANIZE,
+      organize: {
+        faction: 1,
+        clearingID: 4
+      }
+    };
+    const onFactionSpatialCandidatesChange = vi.fn();
+
+    renderPanel({ state: activeState({ playerFaction: 1, factionTurn: 1 }), actions: [organizeAction], onFactionSpatialCandidatesChange });
+
+    await waitFor(() => expect(onFactionSpatialCandidatesChange).toHaveBeenLastCalledWith([]));
+
+    fireEvent.click(screen.getByRole("button", { name: /Faction Action.*faction-specific public step/i }));
+
+    await waitFor(() => expect(onFactionSpatialCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: organizeAction }]));
   });
 
   it("opens battle flow from an active-turn battle target prompt", () => {

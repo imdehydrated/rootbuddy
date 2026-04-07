@@ -93,7 +93,7 @@ function playerTurnGuide(
     detail:
       loadedActionCount > 0
         ? "Apply one of the loaded legal actions below. Battles still resolve through the battle flow."
-        : "Generate legal actions for the current board and turn state, then apply them from the sidebar.",
+        : "Generate legal actions for the current board and turn state, then apply them from the guided controls.",
     checklist: [
       {
         title: "Use loaded legal actions",

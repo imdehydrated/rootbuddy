@@ -1,8 +1,8 @@
-import { ClearingMarker } from "./ClearingMarker";
+import { ClearingMarker, type ClearingPreviewPiece } from "./ClearingMarker";
 import { clearingPosition } from "../gameHelpers";
 import { ACTION_TYPE, factionLabels } from "../labels";
 import { describeAction } from "../actionPresentation";
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import type { BoardLayout } from "../boardLayouts";
 import type { Action, Clearing, Forest, GameState, HighlightedClearing } from "../types";
 
@@ -19,6 +19,7 @@ type BoardPanelProps = {
   previewedAction?: Action | null;
   setupLegalClearingIDs?: number[];
   setupSelectedClearingIDs?: number[];
+  setupPreviewPiecesByClearing?: Record<number, ClearingPreviewPiece[]>;
   forestTargets?: Array<{
     forestID: number;
     label: string;
@@ -42,13 +43,13 @@ export function BoardPanel({
   previewedAction = null,
   setupLegalClearingIDs = [],
   setupSelectedClearingIDs = [],
+  setupPreviewPiecesByClearing = {},
   forestTargets = [],
   onSelectClearing
   ,
   onSelectForest
 }: BoardPanelProps) {
   const [hoveredClearingID, setHoveredClearingID] = useState<number | null>(null);
-  const [zoomedClearingID, setZoomedClearingID] = useState<number | null>(null);
   const highlightByClearing = new Map(
     highlightedClearings.map((highlight) => [highlight.clearingID, highlight.role])
   );
@@ -289,26 +290,9 @@ export function BoardPanel({
             };
           })
           .filter((annotation): annotation is NonNullable<typeof annotation> => annotation !== null);
-  const zoomTargetClearing = clearings.find((clearing) => clearing.id === zoomedClearingID) ?? null;
-  const zoomTargetPosition =
-    zoomTargetClearing === null
-      ? null
-      : boardLayout.clearingPositions[zoomTargetClearing.id] ?? clearingBoardPosition(zoomTargetClearing.id);
-  const boardCanvasStyle =
-    zoomTargetPosition === null
-      ? undefined
-      : ({
-          "--board-focus-x": `${zoomTargetPosition.left}%`,
-          "--board-focus-y": `${zoomTargetPosition.top}%`
-        } as CSSProperties);
-
   return (
     <section className="board-panel">
-      <div
-        className={`board-canvas ${previewedAction ? "preview-active" : ""} ${zoomTargetPosition ? "zoomed" : ""}`}
-        style={boardCanvasStyle}
-        onClick={() => setZoomedClearingID(null)}
-      >
+      <div className={`board-canvas ${previewedAction ? "preview-active" : ""}`}>
         <div className="board-view">
           <img
             className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
@@ -388,9 +372,9 @@ export function BoardPanel({
                 highlightRole={highlightByClearing.get(clearing.id)}
                 isSetupLegal={legalSetupClearings.has(clearing.id)}
                 isSetupChosen={selectedSetupClearings.has(clearing.id)}
+                previewPieces={setupPreviewPiecesByClearing[clearing.id] ?? []}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setZoomedClearingID(clearing.id);
                   onSelectClearing(clearing.id);
                 }}
                 onHover={(hovered) => setHoveredClearingID(hovered ? clearing.id : null)}
