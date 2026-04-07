@@ -1546,6 +1546,19 @@ textarea {
   background: rgba(255, 249, 240, 0.72);
 }
 
+.turn-state-hero {
+  margin-top: 0.9rem;
+}
+
+.turn-state-guide {
+  margin-top: 0.9rem;
+}
+
+.stand-deliver-hero,
+.stand-deliver-field {
+  margin-top: 0.9rem;
+}
+
 .summary-line {
   color: var(--ink);
   font-size: 0.92rem;
@@ -1686,6 +1699,28 @@ textarea {
   margin-top: 0.75rem;
 }
 
+.observed-template-guide {
+  margin-top: 0.85rem;
+}
+
+.observed-issue-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.observed-issue {
+  margin: 0;
+}
+
+.observed-preview-drawer {
+  margin-top: 1rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 249, 240, 0.58);
+}
+
 .observed-preview {
   min-height: 12rem;
 }
@@ -1707,6 +1742,92 @@ textarea {
 
 .assist-workflow-panel .sidebar-actions {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.assist-director-stack {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.assist-intent-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  margin-top: 0.7rem;
+}
+
+.assist-intent-card {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: start;
+  width: 100%;
+  min-height: 6.5rem;
+  padding: 0.78rem 0.82rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background: rgba(255, 249, 240, 0.76);
+  color: var(--ink);
+  text-align: left;
+}
+
+.assist-intent-card:hover,
+.assist-intent-card:focus-visible,
+.assist-intent-card.selected {
+  border-color: rgba(39, 72, 60, 0.3);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+  color: var(--ink);
+}
+
+.assist-intent-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.assist-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+
+.assist-choice-card {
+  align-items: flex-start;
+  background: rgba(255, 252, 241, 0.78);
+  border: 1px solid rgba(100, 78, 48, 0.2);
+  border-radius: 16px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+}
+
+.assist-choice-card:hover,
+.assist-choice-card:focus-visible,
+.assist-choice-card.selected {
+  border-color: rgba(185, 95, 42, 0.62);
+  box-shadow: 0 10px 22px rgba(69, 45, 24, 0.12);
+}
+
+.assist-choice-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.assist-loading-card,
+.assist-candidate-list,
+.assist-selection-empty,
+.assist-manual-capture,
+.assist-correction-drawer,
+.assist-exact-candidate-drawer {
+  margin-top: 0.9rem;
+}
+
+.assist-exact-candidate-drawer .embedded-action-list {
+  margin-top: 0.75rem;
 }
 
 .shortcut-grid {

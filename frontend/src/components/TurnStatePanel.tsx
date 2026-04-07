@@ -25,8 +25,10 @@ type TurnStatePanelProps = {
 function parseNumberList(value: string): number[] {
   return value
     .split(",")
-    .map((part) => Number(part.trim()))
-    .filter((value) => Number.isFinite(value));
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => Number(part))
+    .filter((value) => Number.isInteger(value));
 }
 
 function formatNumberList(values: number[]): string {
@@ -39,6 +41,23 @@ function isValidDecreeCardID(value: number): boolean {
 
 function describeVisibleCard(card: Card): string {
   return `${card.name} (${suitLabels[card.suit] ?? "Unknown"})`;
+}
+
+function duplicateValues(values: number[]): number[] {
+  const seen = new Set<number>();
+  const duplicates = new Set<number>();
+  values.forEach((value) => {
+    if (seen.has(value)) {
+      duplicates.add(value);
+      return;
+    }
+    seen.add(value);
+  });
+  return Array.from(duplicates);
+}
+
+function formatFactionList(factions: number[]): string {
+  return factions.map((faction) => factionLabels[faction] ?? `Faction ${faction}`).join(", ");
 }
 
 export function TurnStatePanel({
@@ -56,6 +75,10 @@ export function TurnStatePanel({
   ];
   const allianceSupporterLabels = state.alliance.supporters.map(describeVisibleCard);
   const resolvedDecreeLabels = state.turnProgress.resolvedDecreeCardIDs.map(describeKnownCardID);
+  const missingTurnOrderFactions = factionLabels.map((_, index) => index).filter((faction) => !state.turnOrder.includes(faction));
+  const duplicateTurnOrderFactions = duplicateValues(state.turnOrder);
+  const currentPhaseLabel = phaseLabels[state.currentPhase] ?? `Phase ${state.currentPhase}`;
+  const currentStepLabel = stepLabels[state.currentStep] ?? `Step ${state.currentStep}`;
 
   return (
     <section className="panel modal-panel">
@@ -68,9 +91,34 @@ export function TurnStatePanel({
         ) : null}
       </div>
 
-      <p className="message">
-        Use this only when the quick sidebar flow is not enough and you need to correct the turn structure directly.
-      </p>
+      <div className="flow-guide-hero turn-state-hero">
+        <span className="summary-label">Assist Recovery Surface</span>
+        <strong>{factionLabels[state.factionTurn] ?? "Unknown"} - {currentPhaseLabel}</strong>
+        <span className="summary-line">
+          Use this when the observed table state and the app's turn flow have drifted. Prefer checkpoint shortcuts before editing faction internals.
+        </span>
+      </div>
+
+      <div className="flow-step-list turn-state-guide">
+        <div className="flow-step-card active">
+          <strong>1. Confirm the turn owner</strong>
+          <span className="summary-line">
+            Current target is {factionLabels[state.factionTurn] ?? "Unknown"} at {currentPhaseLabel} / {currentStepLabel}.
+          </span>
+        </div>
+        <div className="flow-step-card note">
+          <strong>2. Use checkpoint shortcuts first</strong>
+          <span className="summary-line">
+            Birdsong, Daylight, and Evening only reset broad phase/step position. They are safer than editing counters directly.
+          </span>
+        </div>
+        <div className="flow-step-card waiting">
+          <strong>3. Edit internals only for real drift</strong>
+          <span className="summary-line">
+            Decree cards, supporter visibility, Vagabond position, and turn-progress counters are direct recovery controls.
+          </span>
+        </div>
+      </div>
 
       <div className="turn-state-actions">
         <button
@@ -179,6 +227,21 @@ export function TurnStatePanel({
           />
         </label>
       </div>
+
+      {missingTurnOrderFactions.length > 0 || duplicateTurnOrderFactions.length > 0 ? (
+        <div className="observed-issue-list" aria-live="polite">
+          {missingTurnOrderFactions.length > 0 ? (
+            <span className="message observed-issue error">
+              Turn order is missing: {formatFactionList(missingTurnOrderFactions)}.
+            </span>
+          ) : null}
+          {duplicateTurnOrderFactions.length > 0 ? (
+            <span className="message observed-issue error">
+              Turn order has duplicates: {formatFactionList(duplicateTurnOrderFactions)}.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="summary-section">
         <h3>Victory Points</h3>

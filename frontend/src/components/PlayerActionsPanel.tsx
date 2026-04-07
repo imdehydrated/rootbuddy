@@ -1,7 +1,21 @@
 import { useEffect, useState } from "react";
-import { ACTION_TYPE, phaseLabels } from "../labels";
-import { actionCardReferences, actionContextTags, actionHeadline, createVisibleCardLookup, describeAction, formatCardReferenceLabel } from "../actionPresentation";
+import { phaseLabels } from "../labels";
+import {
+  battleTargetKey,
+  battleTargetLabel,
+  cardEffectChoiceLabel,
+  craftCardID,
+  craftRouteLabel,
+  drawAdvanceChoiceLabel,
+  factionChoiceDetail,
+  factionChoiceLabel,
+  groupActionsByIntent,
+  type AssistIntentKey
+} from "../assistDirector";
+import { describeAction } from "../actionPresentation";
+import { describeKnownCardID } from "../cardCatalog";
 import type { Action, GameState } from "../types";
+import { ActionOptionCard, ExactActionDrawer, IntentGrid } from "./ActionPromptUi";
 
 type PlayerActionsPanelProps = {
   state: GameState;
@@ -23,18 +37,52 @@ export function PlayerActionsPanel({
   onPreviewAction
 }: PlayerActionsPanelProps) {
   const [showAllActions, setShowAllActions] = useState(false);
+  const [selectedIntent, setSelectedIntent] = useState<AssistIntentKey | null>(null);
+  const [choiceMessage, setChoiceMessage] = useState("");
+  const [selectedCraftCardID, setSelectedCraftCardID] = useState<number | null>(null);
 
   useEffect(() => {
     setShowAllActions(false);
+    setSelectedIntent(null);
+    setChoiceMessage("");
+    setSelectedCraftCardID(null);
   }, [state.factionTurn, state.currentPhase, state.currentStep, actions.length]);
 
   if (state.gamePhase !== 1 || state.factionTurn !== state.playerFaction) {
     return null;
   }
 
+  const actionGroups = groupActionsByIntent(actions);
+  const selectedGroup = actionGroups.find((group) => group.key === selectedIntent) ?? null;
   const visibleActions = showAllActions ? actions : actions.slice(0, 6);
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
-  const visibleCardLookup = createVisibleCardLookup(state);
+  const battleTargetChoices =
+    selectedGroup?.key === "battle"
+      ? Array.from(new Set(selectedGroup.actions.map(battleTargetKey).filter((key) => key.length > 0))).map((key) => {
+          const matchingActions = selectedGroup.actions.filter((action) => battleTargetKey(action) === key);
+          return {
+            key,
+            label: battleTargetLabel(matchingActions[0]),
+            actions: matchingActions
+          };
+        })
+      : [];
+  const craftChoices =
+    selectedGroup?.key === "craft"
+      ? Array.from(new Set(selectedGroup.actions.map(craftCardID).filter((cardID) => cardID > 0))).map((cardID) => ({
+          cardID,
+          actions: selectedGroup.actions.filter((action) => craftCardID(action) === cardID)
+        }))
+      : [];
+  const selectedCraftChoice = craftChoices.find((choice) => choice.cardID === selectedCraftCardID) ?? null;
+  const factionChoiceActions =
+    selectedGroup?.key === "faction"
+      ? selectedGroup.actions
+          .map((action) => ({ action, label: factionChoiceLabel(action, state), detail: factionChoiceDetail(action, state) }))
+          .filter((choice): choice is { action: Action; label: string; detail: string } => choice.label !== null)
+      : [];
+  const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
+  const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
 
   return (
     <section className="panel sidebar-panel">
@@ -43,7 +91,7 @@ export function PlayerActionsPanel({
         <span className="summary-label">{phaseLabel}</span>
         <span className="summary-line">
           {visibleActions.length > 0
-            ? `${visibleActions.length} loaded action(s) ready below.`
+            ? `Choose your intent, then choose the matching legal action.`
             : isMultiplayer
               ? "Actions refresh automatically when the server hands you priority."
               : "No loaded actions yet."}
@@ -57,53 +105,199 @@ export function PlayerActionsPanel({
           </button>
         </div>
       ) : (
-        <div className="embedded-action-list" style={{ marginTop: "0.9rem" }}>
-          {visibleActions.map((action, index) => (
-            <article
-              key={`${action.type}-${index}`}
-              className="player-action-card"
-              onMouseEnter={() => onPreviewAction?.(index)}
-              onMouseLeave={() => onPreviewAction?.(null)}
-              onFocus={() => onPreviewAction?.(index)}
-              onBlur={() => onPreviewAction?.(null)}
-            >
-              <div className="player-action-card-header">
-                <strong>{actionHeadline(action)}</strong>
-                <span className="player-action-index">#{index + 1}</span>
-              </div>
-              <span className="summary-line">{describeAction(action, state)}</span>
-              {actionContextTags(action).length > 0 ? (
-                <div className="player-action-chip-row">
-                  {actionContextTags(action).map((tag, tagIndex) => (
-                    <span key={`${index}-${tag}-${tagIndex}`} className="player-action-chip">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              {actionCardReferences(action).length > 0 ? (
-                <div className="player-action-card-links">
-                  <span className="summary-label">Cards</span>
-                  <div className="known-card-pill-list">
-                    {actionCardReferences(action).map((reference, referenceIndex) => (
-                      <span key={`${index}-card-${reference.cardID}-${reference.zoneLabel}-${referenceIndex}`} className="known-card-pill">
-                        {formatCardReferenceLabel(reference, visibleCardLookup)}
-                      </span>
+        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+          <IntentGrid
+            groups={actionGroups}
+            selectedIntent={selectedIntent}
+            countLabel="option(s)"
+            onSelect={(intent) => {
+              setSelectedIntent(intent);
+              setShowAllActions(false);
+              setChoiceMessage("");
+              setSelectedCraftCardID(null);
+            }}
+          />
+
+          {selectedGroup ? (
+            <div className="summary-stack player-action-choice-stack">
+              <span className="summary-label">{selectedGroup.label} Options</span>
+              <span className="summary-line">
+                Choose the legal action that matches what you want to do. Hover or focus an option to preview its board footprint.
+              </span>
+              {selectedGroup.key === "battle" ? (
+                <>
+                  <span className="summary-line">Choose the battle target first. This opens Battle Flow directly when the defender choice maps to one legal battle.</span>
+                  <div className="assist-choice-grid">
+                    {battleTargetChoices.map((choice) => (
+                      <button
+                        key={choice.key}
+                        type="button"
+                        className="assist-choice-card player-action-choice-card"
+                        onClick={() => {
+                          if (choice.actions.length === 1) {
+                            const actionIndex = actions.indexOf(choice.actions[0]);
+                            if (actionIndex >= 0) {
+                              setChoiceMessage("");
+                              onOpenBattle(actionIndex);
+                              return;
+                            }
+                          }
+                          setShowAllActions(true);
+                          setChoiceMessage(`${choice.label} still maps to ${choice.actions.length} legal battle options. Choose the exact battle from the fallback list.`);
+                        }}
+                      >
+                        <strong>{choice.label}</strong>
+                        <span>{choice.actions.length === 1 ? "Open Battle Flow" : `${choice.actions.length} battle options`}</span>
+                      </button>
                     ))}
                   </div>
-                </div>
-              ) : null}
-              {action.type === ACTION_TYPE.BATTLE ? (
-                <button type="button" className="secondary" onClick={() => onOpenBattle(index)}>
-                  Resolve
-                </button>
+                </>
+              ) : selectedGroup.key === "craft" ? (
+                <>
+                  <span className="summary-line">Choose the card to craft first. If multiple workshop routes are legal, choose the route next.</span>
+                  <div className="assist-choice-grid">
+                    {craftChoices.map((choice) => (
+                      <button
+                        key={choice.cardID}
+                        type="button"
+                        className={`assist-choice-card player-action-choice-card ${selectedCraftCardID === choice.cardID ? "selected" : ""}`}
+                        onClick={() => {
+                          if (choice.actions.length === 1) {
+                            setChoiceMessage("");
+                            setSelectedCraftCardID(null);
+                            void onApply(choice.actions[0]);
+                            return;
+                          }
+                          setSelectedCraftCardID(choice.cardID);
+                          setChoiceMessage(`${describeKnownCardID(choice.cardID)} has ${choice.actions.length} legal craft routes. Choose the workshop route.`);
+                        }}
+                      >
+                        <strong>{describeKnownCardID(choice.cardID)}</strong>
+                        <span>{choice.actions.length === 1 ? "Apply exact craft" : `${choice.actions.length} craft routes`}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedCraftChoice ? (
+                    <div className="assist-choice-grid">
+                      {selectedCraftChoice.actions.map((action, actionIndex) => (
+                        <button
+                          key={`${selectedCraftChoice.cardID}-${craftRouteLabel(action)}-${actionIndex}`}
+                          type="button"
+                          className="assist-choice-card player-action-choice-card"
+                          onClick={() => {
+                            setChoiceMessage("");
+                            setSelectedCraftCardID(null);
+                            void onApply(action);
+                          }}
+                        >
+                          <strong>{craftRouteLabel(action)}</strong>
+                          <span>Apply this craft route</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : selectedGroup.key === "faction" && factionChoiceActions.length > 0 ? (
+                <>
+                  <span className="summary-line">Choose the faction-specific option directly. Board-based faction actions still use the generic choices for now.</span>
+                  <div className="assist-choice-grid">
+                    {factionChoiceActions.map((choice, actionIndex) => (
+                      <button
+                        key={`${choice.action.type}-${choice.label}-${actionIndex}`}
+                        type="button"
+                        className="assist-choice-card player-action-choice-card"
+                        onClick={() => {
+                          setChoiceMessage("");
+                          void onApply(choice.action);
+                        }}
+                      >
+                        <strong>{choice.label}</strong>
+                        <span>{choice.detail}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : selectedGroup.key === "draw_advance" ? (
+                <>
+                  <span className="summary-line">Choose the turn bookkeeping directly. These actions do not need the exact legal-action browser first.</span>
+                  <div className="assist-choice-grid">
+                    {drawAdvanceChoices.map((action, actionIndex) => (
+                      <button
+                        key={`${action.type}-${actionIndex}`}
+                        type="button"
+                        className="assist-choice-card player-action-choice-card"
+                        onClick={() => {
+                          setChoiceMessage("");
+                          void onApply(action);
+                        }}
+                      >
+                        <strong>{drawAdvanceChoiceLabel(action)}</strong>
+                        <span>{describeAction(action, state)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : selectedGroup.key === "card_effect" ? (
+                <>
+                  <span className="summary-line">Choose the card or persistent effect directly.</span>
+                  <div className="assist-choice-grid">
+                    {cardEffectChoices.map((action, actionIndex) => (
+                      <button
+                        key={`${action.type}-${actionIndex}`}
+                        type="button"
+                        className="assist-choice-card player-action-choice-card"
+                        onClick={() => {
+                          setChoiceMessage("");
+                          void onApply(action);
+                        }}
+                      >
+                        <strong>{cardEffectChoiceLabel(action)}</strong>
+                        <span>{describeAction(action, state)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <button type="button" className="secondary" onClick={() => void onApply(action)}>
-                  Apply
-                </button>
+                <div className="assist-choice-grid">
+                  {selectedGroup.actions.map((action) => {
+                    const actionIndex = actions.indexOf(action);
+                    return (
+                      <ActionOptionCard
+                        key={`choice-${action.type}-${actionIndex}`}
+                        state={state}
+                        action={action}
+                        actionIndex={actionIndex}
+                        variant="choice"
+                        onApply={onApply}
+                        onOpenBattle={onOpenBattle}
+                        onPreviewAction={onPreviewAction}
+                        choiceClassName="assist-choice-card player-action-choice-card"
+                      />
+                    );
+                  })}
+                </div>
               )}
-            </article>
-          ))}
+              {choiceMessage ? <span className="message">{choiceMessage}</span> : null}
+            </div>
+          ) : (
+            <div className="flow-step-card waiting assist-selection-empty">
+              <strong>Select an intent above.</strong>
+              <span className="summary-line">The matching legal options will appear here.</span>
+            </div>
+          )}
+
+          <ExactActionDrawer
+            title="Exact Legal Actions"
+            summary="Use this only when you need to audit or apply from the raw generated action list."
+            open={showAllActions}
+            actions={visibleActions}
+            allActions={actions}
+            state={state}
+            onToggle={setShowAllActions}
+            onApply={onApply}
+            onOpenBattle={onOpenBattle}
+            onPreviewAction={onPreviewAction}
+          />
         </div>
       )}
 
@@ -111,11 +305,6 @@ export function PlayerActionsPanel({
         <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
           Refresh
         </button>
-        {actions.length > 6 ? (
-          <button type="button" className="secondary" onClick={() => setShowAllActions((current) => !current)}>
-            {showAllActions ? "Show Less" : `Show All (${actions.length})`}
-          </button>
-        ) : null}
       </div>
     </section>
   );

@@ -58,6 +58,11 @@ type ObservedFormState = {
   defenderUsedSappers: boolean;
 };
 
+type ObservedIssue = {
+  message: string;
+  blocking?: boolean;
+};
+
 const templateLabels: Record<ObservedTemplateKey, string> = {
   battle_resolution: "Battle",
   pass_phase: "Advance Phase",
@@ -319,6 +324,60 @@ function templateHint(template: ObservedTemplateKey): string {
   }
 }
 
+function integerFieldIssue(label: string, value: string, minValue: number): ObservedIssue | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minValue) {
+    return {
+      message: `${label} must be an integer ${minValue === 0 ? "0 or greater" : `at least ${minValue}`}.`,
+      blocking: true
+    };
+  }
+  return null;
+}
+
+function observedFormIssues(form: ObservedFormState): ObservedIssue[] {
+  const issues: ObservedIssue[] = [];
+
+  if (form.template === "add_to_decree" && form.decreeCardIDs.length !== form.decreeColumns.length) {
+    issues.push({
+      message: "Each decree card needs a matching decree column.",
+      blocking: true
+    });
+  }
+
+  if ((form.template === "spread_sympathy" || form.template === "revolt") && form.supporterCardIDs.length === 0) {
+    issues.push({
+      message: "Add the supporter cards spent for this Alliance action.",
+      blocking: true
+    });
+  }
+
+  if (form.template === "craft" && form.usedWorkshopClearings.length === 0) {
+    issues.push({
+      message: "Add workshop clearings if the crafted card had a cost; leave this empty only for no-cost effects."
+    });
+  }
+
+  if (form.template === "other_player_draw") {
+    const drawIssue = integerFieldIssue("Draw count", form.count, 1);
+    if (drawIssue) {
+      issues.push(drawIssue);
+    }
+  }
+
+  if (form.template === "battle_resolution") {
+    const battleIssues = [
+      integerFieldIssue("Attacker roll", form.attackerRoll, 0),
+      integerFieldIssue("Defender roll", form.defenderRoll, 0),
+      integerFieldIssue("Attacker losses", form.attackerLosses, 0),
+      integerFieldIssue("Defender losses", form.defenderLosses, 0)
+    ].filter((issue): issue is ObservedIssue => issue !== null);
+    issues.push(...battleIssues);
+  }
+
+  return issues;
+}
+
 function previewCardLabel(cardID: number): string {
   return describeKnownCardID(cardID);
 }
@@ -394,6 +453,8 @@ export function ObservedActionPanel({
 
   const action = buildObservedAction(form);
   const actionPreview = JSON.stringify(action, null, 2);
+  const observedIssues = observedFormIssues(form);
+  const hasBlockingIssue = observedIssues.some((issue) => issue.blocking);
   const enteredCardID = parseNumber(form.cardID);
   const enteredBattleDecreeCardID = parseNumber(form.decreeCardID);
   const enteredDominanceCardID = parseNumber(form.dominanceCardID);
@@ -478,7 +539,20 @@ export function ObservedActionPanel({
         </div>
       </div>
 
-      <p className="message">{templateHint(form.template)}</p>
+      <div className="flow-step-card note observed-template-guide">
+        <strong>{templateLabels[form.template]}</strong>
+        <span className="summary-line">{templateHint(form.template)}</span>
+      </div>
+
+      {observedIssues.length > 0 ? (
+        <div className="observed-issue-list" aria-live="polite">
+          {observedIssues.map((issue) => (
+            <span key={issue.message} className={`message observed-issue${issue.blocking ? " error" : ""}`}>
+              {issue.message}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div className="observed-form-grid">
         {(form.template === "craft" ||
@@ -707,10 +781,13 @@ export function ObservedActionPanel({
         </div>
       ) : null}
 
-      <div className="summary-stack" style={{ marginTop: "1rem" }}>
-        <span className="summary-label">Action Preview</span>
+      <details className="secondary-drawer observed-preview-drawer">
+        <summary className="panel-summary">
+          <span className="summary-label">Raw Action Preview</span>
+          <span className="summary-line">Audit the generated payload when troubleshooting assist bookkeeping.</span>
+        </summary>
         <textarea className="state-editor observed-preview" value={actionPreview} readOnly spellCheck={false} />
-      </div>
+      </details>
 
       <div className="sidebar-actions footer">
         <button
@@ -722,6 +799,7 @@ export function ObservedActionPanel({
         </button>
         <button
           type="button"
+          disabled={hasBlockingIssue}
           onClick={async () => {
             await onApply(action);
           }}

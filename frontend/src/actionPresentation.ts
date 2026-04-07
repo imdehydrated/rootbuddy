@@ -72,8 +72,24 @@ export function formatCardReferenceLabel(reference: ActionCardReference, lookup:
 
 export function actionHeadline(action: Action): string {
   switch (action.type) {
+    case ACTION_TYPE.MOVEMENT:
+      return "Move";
+    case ACTION_TYPE.SLIP:
+      return "Slip";
     case ACTION_TYPE.CRAFT:
       return "Craft";
+    case ACTION_TYPE.BUILD:
+      return "Build";
+    case ACTION_TYPE.RECRUIT:
+      return "Recruit";
+    case ACTION_TYPE.ORGANIZE:
+      return "Organize";
+    case ACTION_TYPE.EXPLORE:
+      return "Explore";
+    case ACTION_TYPE.AID:
+      return "Aid";
+    case ACTION_TYPE.STRIKE:
+      return "Strike";
     case ACTION_TYPE.ADD_TO_DECREE:
       return "Add To Decree";
     case ACTION_TYPE.SPREAD_SYMPATHY:
@@ -181,10 +197,20 @@ function effectLabel(effectID: string): string {
   }
 }
 
+function describeBoardLocation(clearingID: number | undefined, forestID: number | undefined): string {
+  if (forestID && forestID > 0) {
+    return `forest ${forestID}`;
+  }
+  if (clearingID && clearingID > 0) {
+    return `clearing ${clearingID}`;
+  }
+  return "?";
+}
+
 export function describeAction(action: Action, state?: GameState): string {
   switch (action.type) {
     case ACTION_TYPE.MOVEMENT:
-      return `Move up to ${action.movement?.maxCount ?? 0} from ${action.movement?.from ?? "?"} to ${action.movement?.to ?? "?"}`;
+      return `Move up to ${action.movement?.maxCount ?? 0} from ${describeBoardLocation(action.movement?.from, action.movement?.fromForestID)} to ${describeBoardLocation(action.movement?.to, action.movement?.toForestID)}`;
     case ACTION_TYPE.BATTLE:
       return `Battle ${factionLabels[action.battle?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.battle?.clearingID ?? "?"}`;
     case ACTION_TYPE.BATTLE_RESOLUTION:
@@ -224,7 +250,7 @@ export function describeAction(action: Action, state?: GameState): string {
     case ACTION_TYPE.DAYBREAK:
       return `Refresh ${action.daybreak?.refreshedItemIndexes?.length ?? 0} item(s)`;
     case ACTION_TYPE.SLIP:
-      return `Slip to ${action.slip?.toForestID ? `forest ${action.slip.toForestID}` : action.slip?.to ?? "?"}`;
+      return `Slip from ${describeBoardLocation(action.slip?.from, action.slip?.fromForestID)} to ${describeBoardLocation(action.slip?.to, action.slip?.toForestID)}`;
     case ACTION_TYPE.BIRDSONG_WOOD:
       return `Place wood in clearings ${(action.birdsongWood?.clearingIDs ?? []).join(", ")}`;
     case ACTION_TYPE.EVENING_DRAW:

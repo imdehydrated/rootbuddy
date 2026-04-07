@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   applyAction,
   claimLobbyFaction,
@@ -16,7 +16,14 @@ import {
   startLobby,
   submitBattleResponse
 } from "./api";
+import {
+  assistBoardHighlights,
+  buildAssistBoardCandidates,
+  movementSourceMatches,
+  type AssistMovementSource
+} from "./assistDirector";
 import { boardLayoutForState } from "./boardLayouts";
+import { describeKnownCardID } from "./cardCatalog";
 import { AssistWorkflowPanel } from "./components/AssistWorkflowPanel";
 import { BoardPanel } from "./components/BoardPanel";
 import { BattleFlowPanel } from "./components/BattleFlowPanel";
@@ -45,12 +52,13 @@ import {
   saveSavedSession,
   type SavedSession
 } from "./localSession";
+import { actionHeadline } from "./actionPresentation";
 import type { MultiplayerConnectionStatus, MultiplayerSession, SetupScreen } from "./multiplayer";
 import { sampleState } from "./sampleState";
 import type { Action, BattleContext, BattleModifiers, BattlePrompt, Clearing, GameState, Lobby, LobbyPlayer } from "./types";
 import { RootBuddyWebSocketClient } from "./wsClient";
 
-type ActiveModal = "json" | null;
+type ActiveModal = "json" | "standAndDeliver" | null;
 type MultiplayerNotice = {
   level: "warning" | "error";
   title: string;
@@ -250,6 +258,11 @@ export default function App() {
   const [actions, setActions] = useState<Action[]>([]);
   const [selectedBattleIndex, setSelectedBattleIndex] = useState<number | null>(null);
   const [hoveredActionIndex, setHoveredActionIndex] = useState<number | null>(null);
+  const [assistBattleCandidateIndices, setAssistBattleCandidateIndices] = useState<number[]>([]);
+  const [assistMovementCandidateIndices, setAssistMovementCandidateIndices] = useState<number[]>([]);
+  const [assistMovementSource, setAssistMovementSource] = useState<AssistMovementSource | null>(null);
+  const [assistBuildRecruitCandidateIndices, setAssistBuildRecruitCandidateIndices] = useState<number[]>([]);
+  const [assistFactionSpatialCandidateIndices, setAssistFactionSpatialCandidateIndices] = useState<number[]>([]);
   const [attackerRoll, setAttackerRoll] = useState("1");
   const [defenderRoll, setDefenderRoll] = useState("0");
   const [battleModifiers, setBattleModifiers] = useState<BattleModifiers>(emptyBattleModifiers);
@@ -260,6 +273,8 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const [status, setStatus] = useState<string>("Click a clearing to start setting the board.");
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [pendingStandAndDeliverAction, setPendingStandAndDeliverAction] = useState<Action | null>(null);
+  const [standAndDeliverCardID, setStandAndDeliverCardID] = useState("");
   const [showGuideHelp, setShowGuideHelp] = useState(true);
   const [showAdvancedTurnPanel, setShowAdvancedTurnPanel] = useState(false);
   const [showBoardEditor, setShowBoardEditor] = useState(false);
@@ -792,25 +807,17 @@ export default function App() {
     }
   }
 
-  async function handleApply(action: Action) {
-    let actionToApply = action;
-    if (
+  function needsStandAndDeliverObservation(action: Action): boolean {
+    return (
       parsedState.gameMode === 1 &&
       action.usePersistentEffect?.effectID === "stand_and_deliver" &&
       action.usePersistentEffect.faction === parsedState.playerFaction &&
-      action.usePersistentEffect.targetFaction !== parsedState.playerFaction
-    ) {
-      const answer = window.prompt("Stand and Deliver!: if you know the stolen card ID, enter it now. Leave blank to record it manually later.");
-      const observedCardID = answer ? Number(answer) : 0;
-      actionToApply = {
-        ...action,
-        usePersistentEffect: {
-          ...action.usePersistentEffect,
-          observedCardID: Number.isFinite(observedCardID) && observedCardID > 0 ? observedCardID : 0
-        }
-      };
-    }
+      action.usePersistentEffect.targetFaction !== parsedState.playerFaction &&
+      (action.usePersistentEffect.observedCardID ?? 0) <= 0
+    );
+  }
 
+  async function applyFinalizedAction(actionToApply: Action) {
     try {
       setStatus("Applying action...");
       const { state: nextState, effectResult, revision } = await applyAction(
@@ -836,6 +843,18 @@ export default function App() {
       const message = err instanceof Error ? err.message : "Failed to apply action";
       setStatus(message);
     }
+  }
+
+  async function handleApply(action: Action) {
+    if (needsStandAndDeliverObservation(action)) {
+      setPendingStandAndDeliverAction(action);
+      setStandAndDeliverCardID("");
+      setActiveModal("standAndDeliver");
+      setStatus("Confirm the Stand and Deliver observation before applying.");
+      return;
+    }
+
+    await applyFinalizedAction(action);
   }
 
   async function handleResolveAndApply() {
@@ -1177,7 +1196,27 @@ export default function App() {
   const boardIsEmpty = isBoardEmpty(parsedState);
   const previewedAction =
     actions[hoveredActionIndex ?? selectedBattleIndex ?? -1] ?? null;
-  const highlightedClearings = previewedAction ? affectedClearings(previewedAction) : [];
+  const {
+    battleCandidates: assistBattleCandidates,
+    movementCandidates: assistMovementCandidates,
+    buildRecruitCandidates: assistBuildRecruitCandidates,
+    factionSpatialCandidates: assistFactionSpatialCandidates
+  } = buildAssistBoardCandidates({
+    actions,
+    battleCandidateIndices: assistBattleCandidateIndices,
+    movementCandidateIndices: assistMovementCandidateIndices,
+    buildRecruitCandidateIndices: assistBuildRecruitCandidateIndices,
+    factionSpatialCandidateIndices: assistFactionSpatialCandidateIndices
+  });
+  const highlightedClearings = previewedAction
+    ? affectedClearings(previewedAction)
+    : assistBoardHighlights({
+        battleCandidates: assistBattleCandidates,
+        movementCandidates: assistMovementCandidates,
+        buildRecruitCandidates: assistBuildRecruitCandidates,
+        factionSpatialCandidates: assistFactionSpatialCandidates,
+        movementSource: assistMovementSource
+      });
   const selectedBattleAction =
     selectedBattleIndex !== null && actions[selectedBattleIndex]?.type === ACTION_TYPE.BATTLE
       ? actions[selectedBattleIndex]
@@ -1276,6 +1315,43 @@ export default function App() {
     return "Use this area for the active workflow before opening any secondary tools.";
   })();
 
+  const handleAssistBattleCandidatesChange = useCallback((actionIndices: number[]) => {
+    setAssistBattleCandidateIndices((current) => {
+      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
+        return current;
+      }
+      return actionIndices;
+    });
+  }, []);
+
+  const handleAssistMovementCandidatesChange = useCallback((actionIndices: number[]) => {
+    setAssistMovementCandidateIndices((current) => {
+      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
+        return current;
+      }
+      return actionIndices;
+    });
+    setAssistMovementSource(null);
+  }, []);
+
+  const handleAssistBuildRecruitCandidatesChange = useCallback((actionIndices: number[]) => {
+    setAssistBuildRecruitCandidateIndices((current) => {
+      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
+        return current;
+      }
+      return actionIndices;
+    });
+  }, []);
+
+  const handleAssistFactionSpatialCandidatesChange = useCallback((actionIndices: number[]) => {
+    setAssistFactionSpatialCandidateIndices((current) => {
+      if (current.length === actionIndices.length && current.every((value, index) => value === actionIndices[index])) {
+        return current;
+      }
+      return actionIndices;
+    });
+  }, []);
+
   const legalSetupClearingIDs =
     parsedState.gamePhase !== 0
       ? []
@@ -1332,7 +1408,24 @@ export default function App() {
           legal: vagabondSetupActions.some((action) => action.vagabondSetup?.forestID === forest.id),
           selected: false
         }))
-      : [];
+      : assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction
+        ? parsedState.map.forests
+            .map((forest) => {
+              const legal =
+                assistMovementSource === null
+                  ? assistMovementCandidates.some((candidate) => candidate.endpoints.fromForestID === forest.id)
+                  : assistMovementCandidates.some(
+                      (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toForestID === forest.id
+                    );
+              return {
+                forestID: forest.id,
+                label: `Forest ${forest.id}`,
+                legal,
+                selected: assistMovementSource?.kind === "forest" && assistMovementSource.id === forest.id
+              };
+            })
+            .filter((forest) => forest.legal || forest.selected)
+        : [];
 
   useEffect(() => {
     if (assistDefenderAmbushPromptRequired) {
@@ -1400,6 +1493,97 @@ export default function App() {
   }, [multiplayerBattlePrompt, multiplayerToken, parsedState, selectedBattleAction, serverGameID]);
 
   async function handleSetupClearingClick(clearingID: number) {
+    if (assistBattleCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+      setSelectedClearingID(clearingID);
+      const matchingBattles = assistBattleCandidates.filter((candidate) => candidate.action.battle?.clearingID === clearingID);
+      if (matchingBattles.length === 1) {
+        openBattleForActionIndex(matchingBattles[0].actionIndex);
+        setStatus(`Battle selected in clearing ${clearingID}. Resolve it from Battle Flow.`);
+        return;
+      }
+      if (matchingBattles.length > 1) {
+        setStatus(`Clearing ${clearingID} has multiple battle targets. Choose the observed defender in the Battle prompt.`);
+        return;
+      }
+      setStatus("Choose one of the highlighted battle clearings.");
+      return;
+    }
+
+    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+      setSelectedClearingID(clearingID);
+      if (assistMovementSource === null) {
+        const sourceMatches = assistMovementCandidates.filter((candidate) => candidate.endpoints.fromClearingID === clearingID);
+        if (sourceMatches.length === 0) {
+          setStatus("Choose one of the highlighted move source clearings.");
+          return;
+        }
+        const uniqueClearingTargets = Array.from(new Set(sourceMatches.map((candidate) => candidate.endpoints.toClearingID))).filter((value) => value > 0);
+        const uniqueForestTargets = Array.from(new Set(sourceMatches.map((candidate) => candidate.endpoints.toForestID))).filter((value) => value > 0);
+        if (sourceMatches.length === 1 && uniqueClearingTargets.length === 1 && uniqueForestTargets.length === 0) {
+          setStatus(`Recording movement from clearing ${clearingID} to clearing ${uniqueClearingTargets[0]}...`);
+          await handleApply(sourceMatches[0].action);
+          return;
+        }
+        setAssistMovementSource({ kind: "clearing", id: clearingID });
+        setStatus(`Move source selected: clearing ${clearingID}. Choose a highlighted destination.`);
+        return;
+      }
+
+      const matchingMoves = assistMovementCandidates.filter(
+        (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toClearingID === clearingID
+      );
+      if (matchingMoves.length === 1) {
+        const sourceLabel = assistMovementSource.kind === "clearing" ? `clearing ${assistMovementSource.id}` : `forest ${assistMovementSource.id}`;
+        setStatus(`Recording movement from ${sourceLabel} to clearing ${clearingID}...`);
+        await handleApply(matchingMoves[0].action);
+        setAssistMovementSource(null);
+        return;
+      }
+      if (matchingMoves.length > 1) {
+        setStatus(`Multiple moves match that route. Choose the exact candidate from the Move list.`);
+        return;
+      }
+      if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromClearingID === clearingID)) {
+        setAssistMovementSource({ kind: "clearing", id: clearingID });
+        setStatus(`Move source changed to clearing ${clearingID}. Choose a highlighted destination.`);
+        return;
+      }
+      setStatus("Choose a highlighted move destination, or click another highlighted source to restart the route.");
+      return;
+    }
+
+    if (assistBuildRecruitCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+      setSelectedClearingID(clearingID);
+      const matchingCandidates = assistBuildRecruitCandidates.filter((candidate) => candidate.clearingIDs.includes(clearingID));
+      if (matchingCandidates.length === 1) {
+        setStatus(`Recording ${actionHeadline(matchingCandidates[0].action).toLowerCase()} at clearing ${clearingID}...`);
+        await handleApply(matchingCandidates[0].action);
+        return;
+      }
+      if (matchingCandidates.length > 1) {
+        setStatus(`Clearing ${clearingID} matches multiple Build / Recruit candidates. Choose the exact candidate from the list.`);
+        return;
+      }
+      setStatus("Choose one of the highlighted build, recruit, or overwork clearings.");
+      return;
+    }
+
+    if (assistFactionSpatialCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+      setSelectedClearingID(clearingID);
+      const matchingCandidates = assistFactionSpatialCandidates.filter((candidate) => candidate.clearingIDs.includes(clearingID));
+      if (matchingCandidates.length === 1) {
+        setStatus(`Recording ${actionHeadline(matchingCandidates[0].action).toLowerCase()} at clearing ${clearingID}...`);
+        await handleApply(matchingCandidates[0].action);
+        return;
+      }
+      if (matchingCandidates.length > 1) {
+        setStatus(`Clearing ${clearingID} matches multiple faction-action candidates. Choose the exact candidate from the list.`);
+        return;
+      }
+      setStatus("Choose one of the highlighted faction-action clearings.");
+      return;
+    }
+
     if (parsedState.gamePhase !== 0) {
       setSelectedClearingID(clearingID);
       if (multiplayerToken) {
@@ -1455,6 +1639,48 @@ export default function App() {
   }
 
   async function handleSetupForestClick(forestID: number) {
+    if (assistMovementCandidates.length > 0 && parsedState.gamePhase === 1 && parsedState.factionTurn !== parsedState.playerFaction) {
+      if (assistMovementSource === null) {
+        const sourceMatches = assistMovementCandidates.filter((candidate) => candidate.endpoints.fromForestID === forestID);
+        if (sourceMatches.length === 0) {
+          setStatus("Choose one of the highlighted move source forests.");
+          return;
+        }
+        const uniqueClearingTargets = Array.from(new Set(sourceMatches.map((candidate) => candidate.endpoints.toClearingID))).filter((value) => value > 0);
+        const uniqueForestTargets = Array.from(new Set(sourceMatches.map((candidate) => candidate.endpoints.toForestID))).filter((value) => value > 0);
+        if (sourceMatches.length === 1 && uniqueClearingTargets.length === 1 && uniqueForestTargets.length === 0) {
+          setStatus(`Recording movement from forest ${forestID} to clearing ${uniqueClearingTargets[0]}...`);
+          await handleApply(sourceMatches[0].action);
+          return;
+        }
+        setAssistMovementSource({ kind: "forest", id: forestID });
+        setStatus(`Move source selected: forest ${forestID}. Choose a highlighted destination.`);
+        return;
+      }
+
+      const matchingMoves = assistMovementCandidates.filter(
+        (candidate) => movementSourceMatches(candidate.endpoints, assistMovementSource) && candidate.endpoints.toForestID === forestID
+      );
+      if (matchingMoves.length === 1) {
+        const sourceLabel = assistMovementSource.kind === "clearing" ? `clearing ${assistMovementSource.id}` : `forest ${assistMovementSource.id}`;
+        setStatus(`Recording movement from ${sourceLabel} to forest ${forestID}...`);
+        await handleApply(matchingMoves[0].action);
+        setAssistMovementSource(null);
+        return;
+      }
+      if (matchingMoves.length > 1) {
+        setStatus("Multiple moves match that forest route. Choose the exact candidate from the Move list.");
+        return;
+      }
+      if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromForestID === forestID)) {
+        setAssistMovementSource({ kind: "forest", id: forestID });
+        setStatus(`Move source changed to forest ${forestID}. Choose a highlighted destination.`);
+        return;
+      }
+      setStatus("Choose a highlighted move forest, or click another highlighted source to restart the route.");
+      return;
+    }
+
     if (parsedState.gamePhase !== 0 || parsedState.setupStage !== 3) {
       return;
     }
@@ -1545,6 +1771,17 @@ export default function App() {
     );
   }
 
+  const standAndDeliverTargetFaction = pendingStandAndDeliverAction?.usePersistentEffect?.targetFaction ?? -1;
+  const standAndDeliverTargetLabel = factionLabels[standAndDeliverTargetFaction] ?? "the target faction";
+  const standAndDeliverParsedCardID = Number(standAndDeliverCardID);
+  const standAndDeliverCardEntryIsInvalid =
+    standAndDeliverCardID.trim().length > 0 &&
+    (!Number.isInteger(standAndDeliverParsedCardID) || standAndDeliverParsedCardID <= 0);
+  const standAndDeliverCardLabel =
+    standAndDeliverCardID.trim().length > 0 && !standAndDeliverCardEntryIsInvalid
+      ? describeKnownCardID(standAndDeliverParsedCardID)
+      : null;
+
   return (
     <main className="app-shell workspace-shell">
       <div className="board-stage">
@@ -1615,16 +1852,18 @@ export default function App() {
             </section>
           ) : null}
 
-          <FlowGuidePanel
-            state={parsedState}
-            loadedActionCount={actions.length}
-            selectedBattleAction={selectedBattleAction}
-            isMultiplayer={isMultiplayerGame}
-            multiplayerConnectionStatus={multiplayerConnectionStatus}
-            multiplayerBattlePrompt={multiplayerBattlePrompt}
-            onGenerateActions={refreshActions}
-            onOpenHelp={() => setShowGuideHelp(true)}
-          />
+          {!showPrimaryAssistFlow ? (
+            <FlowGuidePanel
+              state={parsedState}
+              loadedActionCount={actions.length}
+              selectedBattleAction={selectedBattleAction}
+              isMultiplayer={isMultiplayerGame}
+              multiplayerConnectionStatus={multiplayerConnectionStatus}
+              multiplayerBattlePrompt={multiplayerBattlePrompt}
+              onGenerateActions={refreshActions}
+              onOpenHelp={() => setShowGuideHelp(true)}
+            />
+          ) : null}
 
           {showPrimarySetupFlow ? (
             <SetupFlowPanel
@@ -1714,6 +1953,10 @@ export default function App() {
               onGenerateActions={refreshActions}
               onOpenTurnState={() => setShowAdvancedTurnPanel(true)}
               onOpenBattle={openBattleForActionIndex}
+              onBattleCandidatesChange={handleAssistBattleCandidatesChange}
+              onMovementCandidatesChange={handleAssistMovementCandidatesChange}
+              onBuildRecruitCandidatesChange={handleAssistBuildRecruitCandidatesChange}
+              onFactionSpatialCandidatesChange={handleAssistFactionSpatialCandidatesChange}
             />
           ) : null}
 
@@ -1938,6 +2181,73 @@ export default function App() {
                   onChange={(event) => setStateText(event.target.value)}
                   spellCheck={false}
                 />
+              </section>
+            ) : null}
+
+            {activeModal === "standAndDeliver" && pendingStandAndDeliverAction?.usePersistentEffect ? (
+              <section className="panel modal-panel">
+                <div className="panel-header">
+                  <h2>Stand and Deliver</h2>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setActiveModal(null);
+                      setPendingStandAndDeliverAction(null);
+                      setStandAndDeliverCardID("");
+                      setStatus("Stand and Deliver cancelled.");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="flow-guide-hero stand-deliver-hero">
+                  <span className="summary-label">Assist Observation</span>
+                  <strong>Record the stolen card if it was revealed.</strong>
+                  <span className="summary-line">
+                    Target: {standAndDeliverTargetLabel}. Leave the card blank if the stolen card stayed hidden and record it later through observed tools.
+                  </span>
+                </div>
+                <label className="stand-deliver-field">
+                  <span>Observed Card ID</span>
+                  <input
+                    value={standAndDeliverCardID}
+                    placeholder="Optional known card ID"
+                    onChange={(event) => setStandAndDeliverCardID(event.target.value)}
+                  />
+                </label>
+                {standAndDeliverCardEntryIsInvalid ? (
+                  <span className="message error">Enter a positive integer card ID, or leave the field blank if the stolen card is unknown.</span>
+                ) : standAndDeliverCardLabel ? (
+                  <span className="summary-line">Known card: {standAndDeliverCardLabel}</span>
+                ) : (
+                  <span className="summary-line">No card ID entered. The action will record the stolen card as unknown.</span>
+                )}
+                <div className="sidebar-actions footer">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={async () => {
+                      const actionToApply: Action = {
+                        ...pendingStandAndDeliverAction,
+                        usePersistentEffect: {
+                          ...pendingStandAndDeliverAction.usePersistentEffect!,
+                          observedCardID:
+                            standAndDeliverCardID.trim().length > 0 && !standAndDeliverCardEntryIsInvalid
+                              ? standAndDeliverParsedCardID
+                              : 0
+                        }
+                      };
+                      setActiveModal(null);
+                      setPendingStandAndDeliverAction(null);
+                      setStandAndDeliverCardID("");
+                      await applyFinalizedAction(actionToApply);
+                    }}
+                    disabled={standAndDeliverCardEntryIsInvalid}
+                  >
+                    Apply Stand and Deliver
+                  </button>
+                </div>
               </section>
             ) : null}
 
