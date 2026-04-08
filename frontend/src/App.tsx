@@ -365,11 +365,15 @@ export default function App() {
   const [eyrieSetupDraftClearingID, setEyrieSetupDraftClearingID] = useState<number | null>(null);
   const [vagabondSetupDraftForestID, setVagabondSetupDraftForestID] = useState<number | null>(null);
   const multiplayerToken = multiplayerSession?.playerToken ?? null;
+  const perspectiveFaction = multiplayerSelf?.hasFaction ? multiplayerSelf.faction : parsedState.playerFaction;
   const previousConnectionStatus = useRef<MultiplayerConnectionStatus>("disconnected");
   const autoLoadedActionKey = useRef<string>("");
   const previousGamePhase = useRef(initialState.gamePhase);
 
   useEffect(() => {
+    if (activeModal !== "json") {
+      return;
+    }
     try {
       const nextState = JSON.parse(deferredStateText) as GameState;
       currentStateRef.current = nextState;
@@ -379,7 +383,7 @@ export default function App() {
       const message = err instanceof Error ? err.message : "Invalid JSON";
       setError(message);
     }
-  }, [deferredStateText]);
+  }, [activeModal, deferredStateText]);
 
   useEffect(() => {
     if (parsedState.map.clearings.some((clearing) => clearing.id === selectedClearingID)) {
@@ -600,7 +604,8 @@ export default function App() {
             return;
           }
 
-          if (message.prompt.waitingOnFaction === parsedState.playerFaction) {
+          const promptPerspectiveFaction = multiplayerSelf?.hasFaction ? multiplayerSelf.faction : parsedState.playerFaction;
+          if (message.prompt.waitingOnFaction === promptPerspectiveFaction) {
             setStatus("Battle response needed.");
           } else {
             setStatus(`Waiting on ${factionLabels[message.prompt.waitingOnFaction] ?? "another player"} for battle response.`);
@@ -624,7 +629,7 @@ export default function App() {
     return () => {
       client.disconnect();
     };
-  }, [multiplayerToken, parsedState.playerFaction]);
+  }, [multiplayerSelf, multiplayerToken, parsedState.playerFaction]);
 
   useEffect(() => {
     const previous = previousConnectionStatus.current;
@@ -721,7 +726,7 @@ export default function App() {
       autoLoadedActionKey.current = "";
       return;
     }
-    if (multiplayerBattlePrompt || parsedState.factionTurn !== parsedState.playerFaction) {
+    if (multiplayerBattlePrompt || parsedState.factionTurn !== perspectiveFaction) {
       autoLoadedActionKey.current = "";
       return;
     }
@@ -762,6 +767,7 @@ export default function App() {
   }, [
     multiplayerBattlePrompt,
     multiplayerToken,
+    perspectiveFaction,
     parsedState,
     serverGameID,
     serverRevision,
@@ -974,7 +980,7 @@ export default function App() {
       return;
     }
     if (multiplayerToken && multiplayerBattlePrompt && multiplayerBattlePrompt.stage !== "ready_to_resolve") {
-      if (multiplayerBattlePrompt.waitingOnFaction === parsedState.playerFaction) {
+      if (multiplayerBattlePrompt.waitingOnFaction === perspectiveFaction) {
         setStatus("Respond to the current battle prompt before resolving.");
       } else {
         setStatus(`Waiting on ${factionLabels[multiplayerBattlePrompt.waitingOnFaction] ?? "another player"} before resolving.`);
@@ -1347,11 +1353,11 @@ export default function App() {
   const showPrimaryAssistFlow =
     parsedState.gamePhase === 1 &&
     parsedState.gameMode === 1 &&
-    parsedState.factionTurn !== parsedState.playerFaction &&
+    parsedState.factionTurn !== perspectiveFaction &&
     !hasPrimaryBattleFlow;
   const showPrimaryPlayerFlow =
     parsedState.gamePhase === 1 &&
-    parsedState.factionTurn === parsedState.playerFaction &&
+    parsedState.factionTurn === perspectiveFaction &&
     !hasPrimaryBattleFlow;
   const primaryFlowLabel = showPrimaryReviewFlow
     ? "Review"
@@ -1374,18 +1380,18 @@ export default function App() {
       if (multiplayerBattlePrompt) {
         if (
           (multiplayerBattlePrompt.stage === "defender_response" || multiplayerBattlePrompt.stage === "attacker_response") &&
-          multiplayerBattlePrompt.waitingOnFaction === parsedState.playerFaction
+          multiplayerBattlePrompt.waitingOnFaction === perspectiveFaction
         ) {
           return "Your battle response is blocking the turn. Submit it here to continue.";
         }
         if (
           (multiplayerBattlePrompt.stage === "defender_response" || multiplayerBattlePrompt.stage === "attacker_response") &&
-          multiplayerBattlePrompt.waitingOnFaction !== parsedState.playerFaction
+          multiplayerBattlePrompt.waitingOnFaction !== perspectiveFaction
         ) {
           return `Battle progress is waiting on ${factionLabels[multiplayerBattlePrompt.waitingOnFaction] ?? "another player"}.`;
         }
         if (multiplayerBattlePrompt.stage === "ready_to_resolve") {
-          return multiplayerBattlePrompt.action.battle?.faction === parsedState.playerFaction
+          return multiplayerBattlePrompt.action.battle?.faction === perspectiveFaction
             ? "All battle responses are in. Resolve here to return to the turn flow."
             : `All battle responses are in. Waiting on ${factionLabels[multiplayerBattlePrompt.action.battle?.faction ?? -1] ?? "the attacker"} to resolve.`;
         }
@@ -2050,7 +2056,7 @@ export default function App() {
               selectedBattleIndex={selectedBattleIndex}
               selectedBattleAction={selectedBattleAction}
               multiplayerBattlePrompt={multiplayerBattlePrompt}
-              multiplayerPerspectiveFaction={parsedState.playerFaction}
+              multiplayerPerspectiveFaction={perspectiveFaction}
               multiplayerSubmitting={multiplayerSubmitting}
               attackerFaction={attackerFaction}
               defenderFaction={defenderFaction}
