@@ -1,20 +1,14 @@
 import { useEffect, useState } from "react";
 import { phaseLabels } from "../labels";
 import {
-  battleTargetKey,
-  battleTargetLabel,
   cardEffectChoiceLabel,
-  craftCardID,
   craftRouteLabel,
   drawAdvanceChoiceLabel,
-  factionChoiceDetail,
-  factionChoiceLabel,
-  groupActionsByIntent,
-  type AssistActionCandidateRef,
-  type AssistIntentKey
+  type AssistActionCandidateRef
 } from "../assistDirector";
 import { describeAction } from "../actionPresentation";
 import { describeKnownCardID } from "../cardCatalog";
+import { useIntentSelection } from "../hooks/useIntentSelection";
 import type { Action, GameState } from "../types";
 import { ActionOptionCard, ExactActionDrawer, IntentGrid } from "./ActionPromptUi";
 
@@ -52,41 +46,38 @@ export function PlayerActionsPanel({
   onFactionSpatialCandidatesChange
 }: PlayerActionsPanelProps) {
   const [showAllActions, setShowAllActions] = useState(false);
-  const [selectedIntent, setSelectedIntent] = useState<AssistIntentKey | null>(null);
   const [choiceMessage, setChoiceMessage] = useState("");
-  const [selectedCraftCardID, setSelectedCraftCardID] = useState<number | null>(null);
 
   useEffect(() => {
     setShowAllActions(false);
-    setSelectedIntent(null);
     setChoiceMessage("");
-    setSelectedCraftCardID(null);
   }, [state.factionTurn, state.currentPhase, state.currentStep, actions.length]);
 
   if (state.gamePhase !== 1 || state.factionTurn !== state.playerFaction) {
     return null;
   }
 
-  const actionGroups = groupActionsByIntent(actions);
-  const selectedGroup = actionGroups.find((group) => group.key === selectedIntent) ?? null;
-  const candidateRefsForSelectedGroup = (enabled: boolean): AssistActionCandidateRef[] =>
-    enabled && selectedGroup
-      ? selectedGroup.actions
-          .map((action) => ({ actionIndex: actions.indexOf(action), action }))
-          .filter((candidate) => candidate.actionIndex >= 0)
-      : [];
-  const movementCandidates =
-    selectedIntent === "movement" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
-  const buildRecruitCandidates =
-    selectedIntent === "build_recruit" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
-  const factionSpatialCandidates =
-    selectedIntent === "faction" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
+  const {
+    actionGroups,
+    selectedIntent,
+    setSelectedIntent,
+    selectedGroup,
+    selectedCraftCardID,
+    setSelectedCraftCardID,
+    movementCandidates,
+    buildRecruitCandidates,
+    factionSpatialCandidates,
+    battleTargetChoices,
+    craftChoices,
+    selectedCraftChoice,
+    factionChoiceActions,
+    drawAdvanceChoices,
+    cardEffectChoices
+  } = useIntentSelection({
+    actions,
+    state,
+    resetKey: `${state.factionTurn}:${state.currentPhase}:${state.currentStep}:${actions.length}`
+  });
   const candidateKey = (candidates: AssistActionCandidateRef[]) =>
     candidates.map((candidate) => `${candidate.actionIndex}:${candidate.action.type}`).join(",");
   const movementCandidateKey = candidateKey(movementCandidates);
@@ -94,33 +85,6 @@ export function PlayerActionsPanel({
   const factionSpatialCandidateKey = candidateKey(factionSpatialCandidates);
   const visibleActions = showAllActions ? actions : actions.slice(0, 6);
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
-  const battleTargetChoices =
-    selectedGroup?.key === "battle"
-      ? Array.from(new Set(selectedGroup.actions.map(battleTargetKey).filter((key) => key.length > 0))).map((key) => {
-          const matchingActions = selectedGroup.actions.filter((action) => battleTargetKey(action) === key);
-          return {
-            key,
-            label: battleTargetLabel(matchingActions[0]),
-            actions: matchingActions
-          };
-        })
-      : [];
-  const craftChoices =
-    selectedGroup?.key === "craft"
-      ? Array.from(new Set(selectedGroup.actions.map(craftCardID).filter((cardID) => cardID > 0))).map((cardID) => ({
-          cardID,
-          actions: selectedGroup.actions.filter((action) => craftCardID(action) === cardID)
-        }))
-      : [];
-  const selectedCraftChoice = craftChoices.find((choice) => choice.cardID === selectedCraftCardID) ?? null;
-  const factionChoiceActions =
-    selectedGroup?.key === "faction"
-      ? selectedGroup.actions
-          .map((action) => ({ action, label: factionChoiceLabel(action, state), detail: factionChoiceDetail(action, state) }))
-          .filter((choice): choice is { action: Action; label: string; detail: string } => choice.label !== null)
-      : [];
-  const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
-  const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
   const currentPrompt =
     visibleActions.length === 0
       ? "Preparing your turn options."
@@ -193,11 +157,11 @@ export function PlayerActionsPanel({
             groups={actionGroups}
             selectedIntent={selectedIntent}
             countLabel="option(s)"
-            onSelect={(intent) => {
-              setSelectedIntent(intent);
-              setShowAllActions(false);
-              setChoiceMessage("");
-              setSelectedCraftCardID(null);
+              onSelect={(intent) => {
+                setSelectedIntent(intent);
+                setShowAllActions(false);
+                setChoiceMessage("");
+                setSelectedCraftCardID(null);
             }}
           />
 

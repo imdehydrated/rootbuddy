@@ -1,0 +1,168 @@
+﻿.app-shell {
+  width: 100vw;
+  height: 100vh;
+  padding: 1rem;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  position: relative;
+}
+
+.entry-shell {
+  min-height: 100vh;
+  height: auto;
+  overflow: auto;
+  display: block;
+}
+
+.entry-panel {
+  width: min(100%, 820px);
+  margin: 2rem auto;
+}
+
+.app-command-deck {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 2fr) minmax(16rem, 0.85fr);
+  gap: 0.75rem;
+  align-items: start;
+  min-height: 0;
+  max-height: 34vh;
+  overflow: auto;
+  padding: 0;
+}
+
+.sidebar-panel {
+  margin: 0;
+}
+
+.sidebar-actions-panel {
+  margin-top: 0;
+}
+
+.primary-flow-stack {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.primary-flow-panel {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.08), rgba(39, 72, 60, 0.03));
+}
+
+.secondary-drawer {
+  border-color: rgba(39, 72, 60, 0.16);
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sidebar-actions.footer {
+  margin-top: 0.9rem;
+}
+
+.panel {
+  background: var(--paper);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(213, 195, 169, 0.92);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 0.95rem;
+}
+
+.panel-header,
+.resolve-grid {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.panel-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.panel-summary::-webkit-details-marker {
+  display: none;
+}
+
+.secondary-drawer .panel-summary {
+  min-height: 2.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.12rem;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(33, 26, 19, 0.38);
+  backdrop-filter: blur(5px);
+  z-index: 20;
+}
+
+.modal-shell {
+  width: min(760px, calc(100vw - 3rem));
+  max-height: calc(100vh - 3rem);
+  overflow: auto;
+}
+
+.modal-panel {
+  margin: 0;
+}
+
+.correction-mode-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.correction-mode-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.inspector-panel {
+  margin: 0;
+}
+
+.compact-help {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.compact-help p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+

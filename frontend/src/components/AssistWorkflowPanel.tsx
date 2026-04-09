@@ -1,25 +1,19 @@
 import {
-  battleTargetKey,
-  battleTargetLabel,
   cardEffectChoiceLabel,
-  craftCardID,
   craftRouteLabel,
   decreeCardKey,
   decreeCardLabel,
   decreeColumnAssignmentLabel,
   drawAdvanceChoiceLabel,
-  factionChoiceDetail,
-  factionChoiceLabel,
   factionSpatialChoiceDetail,
   factionSpatialChoiceLabel,
-  groupActionsByIntent,
   observedPromptTemplates,
-  type AssistActionCandidateRef,
-  type AssistIntentKey
+  type AssistActionCandidateRef
 } from "../assistDirector";
 import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels } from "../labels";
 import { describeAction } from "../actionPresentation";
 import { describeKnownCardID } from "../cardCatalog";
+import { useIntentSelection } from "../hooks/useIntentSelection";
 import type { Action, GameState } from "../types";
 import { ExactActionDrawer, IntentGrid } from "./ActionPromptUi";
 import { ObservedActionPanel, type ObservedTemplateKey } from "./ObservedActionPanel";
@@ -58,11 +52,9 @@ export function AssistWorkflowPanel({
 }: AssistWorkflowPanelProps) {
   const [preferredTemplate, setPreferredTemplate] = useState<ObservedTemplateKey | null>(null);
   const [showAllGeneratedActions, setShowAllGeneratedActions] = useState(false);
-  const [selectedIntent, setSelectedIntent] = useState<AssistIntentKey | null>(null);
   const [manualCaptureOpen, setManualCaptureOpen] = useState(false);
   const [observedNotesOpen, setObservedNotesOpen] = useState(false);
   const [choiceMessage, setChoiceMessage] = useState("");
-  const [selectedCraftCardID, setSelectedCraftCardID] = useState<number | null>(null);
   const [selectedDecreeCardKey, setSelectedDecreeCardKey] = useState<string | null>(null);
   const autoLoadKey = useRef("");
   const traySurface = surface === "tray";
@@ -70,11 +62,9 @@ export function AssistWorkflowPanel({
   useEffect(() => {
     setPreferredTemplate(null);
     setShowAllGeneratedActions(false);
-    setSelectedIntent(null);
     setManualCaptureOpen(false);
     setObservedNotesOpen(false);
     setChoiceMessage("");
-    setSelectedCraftCardID(null);
     setSelectedDecreeCardKey(null);
   }, [state.factionTurn, state.currentPhase, state.currentStep]);
 
@@ -91,29 +81,30 @@ export function AssistWorkflowPanel({
     void onGenerateActions();
   }, [actions.length, onGenerateActions, state.currentPhase, state.currentStep, state.factionTurn, state.gameMode, state.gamePhase, state.playerFaction, state.roundNumber]);
 
-  const actionGroups = groupActionsByIntent(actions);
-  const selectedGroup = actionGroups.find((group) => group.key === selectedIntent) ?? null;
+  const {
+    actionGroups,
+    selectedIntent,
+    setSelectedIntent,
+    selectedCraftCardID,
+    setSelectedCraftCardID,
+    selectedGroup,
+    battleCandidates,
+    movementCandidates,
+    buildRecruitCandidates,
+    factionSpatialCandidates,
+    battleTargetChoices,
+    craftChoices,
+    selectedCraftChoice,
+    factionChoiceActions,
+    drawAdvanceChoices,
+    cardEffectChoices
+  } = useIntentSelection({
+    actions,
+    state,
+    resetKey: `${state.factionTurn}:${state.currentPhase}:${state.currentStep}:${actions.length}`
+  });
   const exactCandidateDrawerOpen = Boolean(showAllGeneratedActions || selectedGroup?.key === "other");
   const observedGeneratedActions = selectedGroup ? (exactCandidateDrawerOpen ? selectedGroup.actions : selectedGroup.actions.slice(0, 6)) : [];
-  const craftChoices =
-    selectedGroup?.key === "craft"
-      ? Array.from(new Set(selectedGroup.actions.map(craftCardID).filter((cardID) => cardID > 0))).map((cardID) => ({
-          cardID,
-          actions: selectedGroup.actions.filter((action) => craftCardID(action) === cardID)
-        }))
-      : [];
-  const selectedCraftChoice = craftChoices.find((choice) => choice.cardID === selectedCraftCardID) ?? null;
-  const battleTargetChoices =
-    selectedGroup?.key === "battle"
-      ? Array.from(new Set(selectedGroup.actions.map(battleTargetKey).filter((key) => key.length > 0))).map((key) => {
-          const matchingActions = selectedGroup.actions.filter((action) => battleTargetKey(action) === key);
-          return {
-            key,
-            label: battleTargetLabel(matchingActions[0]),
-            actions: matchingActions
-          };
-        })
-      : [];
   const decreeActions =
     selectedGroup?.key === "faction"
       ? selectedGroup.actions.filter((action) => action.type === ACTION_TYPE.ADD_TO_DECREE && (action.addToDecree?.cardIDs.length ?? 0) > 0)
@@ -127,41 +118,11 @@ export function AssistWorkflowPanel({
     };
   });
   const selectedDecreeCardChoice = decreeCardChoices.find((choice) => choice.key === selectedDecreeCardKey) ?? null;
-  const factionChoiceActions =
-    selectedGroup?.key === "faction"
-      ? selectedGroup.actions
-          .map((action) => ({ action, label: factionChoiceLabel(action, state), detail: factionChoiceDetail(action, state) }))
-          .filter((choice): choice is { action: Action; label: string; detail: string } => choice.label !== null)
-      : [];
   const factionSpatialChoiceActions =
     selectedGroup?.key === "faction"
       ? selectedGroup.actions
           .map((action) => ({ action, label: factionSpatialChoiceLabel(action), detail: factionSpatialChoiceDetail(action) }))
           .filter((choice): choice is { action: Action; label: string; detail: string } => choice.label !== null)
-      : [];
-  const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
-  const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
-  const candidateRefsForSelectedGroup = (enabled: boolean): AssistActionCandidateRef[] =>
-    enabled && selectedGroup
-      ? selectedGroup.actions
-          .map((action) => ({ actionIndex: actions.indexOf(action), action }))
-          .filter((candidate) => candidate.actionIndex >= 0)
-      : [];
-  const battleCandidates =
-    selectedIntent === "battle" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
-  const movementCandidates =
-    selectedIntent === "movement" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
-  const buildRecruitCandidates =
-    selectedIntent === "build_recruit" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
-      : [];
-  const factionSpatialCandidates =
-    selectedIntent === "faction" && selectedGroup
-      ? candidateRefsForSelectedGroup(true)
       : [];
   const candidateKey = (candidates: AssistActionCandidateRef[]) =>
     candidates.map((candidate) => `${candidate.actionIndex}:${candidate.action.type}`).join(",");

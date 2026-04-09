@@ -1,0 +1,176 @@
+﻿.turn-summary-panel {
+  margin: 0;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.summary-grid.dense {
+  grid-template-columns: 1fr;
+}
+
+.summary-card,
+.summary-section {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.summary-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.summary-stack {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.faction-state-grid,
+.decree-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.faction-state-card,
+.decree-column-card {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.faction-state-card strong,
+.decree-column-card strong {
+  font-size: 1rem;
+}
+
+.flow-guide-panel {
+  border-color: rgba(39, 72, 60, 0.24);
+}
+
+.flow-guide-hero {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.flow-step-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.flow-step-card {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.flow-step-card strong {
+  font-size: 0.96rem;
+}
+
+.flow-step-card.active {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+}
+
+.flow-step-card.waiting {
+  border-color: rgba(185, 143, 41, 0.2);
+  background: linear-gradient(180deg, rgba(185, 143, 41, 0.1), rgba(185, 143, 41, 0.04));
+}
+
+.flow-step-card.done {
+  border-color: rgba(84, 114, 100, 0.18);
+  background: linear-gradient(180deg, rgba(84, 114, 100, 0.1), rgba(84, 114, 100, 0.04));
+}
+
+.flow-step-card.note {
+  border-color: rgba(97, 112, 141, 0.16);
+  background: linear-gradient(180deg, rgba(97, 112, 141, 0.08), rgba(97, 112, 141, 0.03));
+}
+.notice-panel.warning {
+  border-color: rgba(189, 107, 47, 0.28);
+  background: linear-gradient(180deg, rgba(189, 107, 47, 0.1), rgba(189, 107, 47, 0.03));
+}
+
+.notice-panel.error {
+  border-color: rgba(138, 53, 53, 0.24);
+  background: linear-gradient(180deg, rgba(138, 53, 53, 0.1), rgba(138, 53, 53, 0.03));
+}
+
+.context-drawer-body {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.context-drawer-body > .panel {
+  margin: 0;
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.turn-state-hero {
+  margin-top: 0.9rem;
+}
+
+.turn-state-guide {
+  margin-top: 0.9rem;
+}
+
+.stand-deliver-hero,
+.stand-deliver-field {
+  margin-top: 0.9rem;
+}
+
+.summary-line {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.score-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #efe5d3;
+  border: 1px solid var(--line);
+  padding: 0.34rem 0.72rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.endgame-hero {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(138, 53, 53, 0.1), rgba(138, 53, 53, 0.03));
+  border: 1px solid rgba(138, 53, 53, 0.16);
+  margin-bottom: 0.9rem;
+}
+
+.endgame-winner-line {
+  font-weight: 700;
+  color: var(--accent-strong);
+}

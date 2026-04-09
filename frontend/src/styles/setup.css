@@ -1,0 +1,160 @@
+﻿.landing-hero {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.2rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(189, 107, 47, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(39, 72, 60, 0.11), rgba(39, 72, 60, 0.04));
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+
+.landing-title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1.04;
+  color: var(--accent-strong);
+}
+
+.landing-copy {
+  margin: 0;
+  max-width: 38rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.landing-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mode-choice-card {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 11rem;
+  padding: 1.2rem;
+  border-radius: 24px;
+  text-align: left;
+  align-content: start;
+}
+
+.mode-choice-card strong {
+  font-size: 1.28rem;
+}
+
+.mode-choice-card span:last-child {
+  line-height: 1.5;
+}
+.saved-session-card {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0.9rem 0 1rem;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: rgba(39, 72, 60, 0.06);
+  border: 1px solid rgba(39, 72, 60, 0.14);
+}
+.setup-stage-strip {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.9rem;
+}
+
+.setup-stage-pill {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 18px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+}
+
+.setup-stage-pill strong {
+  font-size: 0.84rem;
+}
+
+.setup-stage-pill.active {
+  border-color: rgba(39, 72, 60, 0.24);
+  background: linear-gradient(180deg, rgba(39, 72, 60, 0.1), rgba(39, 72, 60, 0.04));
+}
+
+.setup-stage-pill.done {
+  border-color: rgba(84, 114, 100, 0.18);
+  background: linear-gradient(180deg, rgba(84, 114, 100, 0.1), rgba(84, 114, 100, 0.04));
+}
+
+.setup-stage-pill.upcoming {
+  border-color: rgba(97, 112, 141, 0.16);
+  background: linear-gradient(180deg, rgba(97, 112, 141, 0.08), rgba(97, 112, 141, 0.03));
+}
+.pregame-hero {
+  padding: 1.15rem 1.2rem;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(189, 107, 47, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(39, 72, 60, 0.08), rgba(39, 72, 60, 0.03));
+  border: 1px solid rgba(39, 72, 60, 0.12);
+}
+
+.pregame-mode-grid {
+  margin-top: 1rem;
+}
+
+.pregame-mode-card {
+  min-height: 10rem;
+}
+
+.pregame-saved-card,
+.pregame-selected-mode,
+.pregame-assist-config,
+.pregame-lobby-shell {
+  border-radius: 22px;
+  border: 1px solid rgba(39, 72, 60, 0.12);
+  background: rgba(255, 249, 240, 0.76);
+  padding: 0.95rem 1rem;
+}
+
+.pregame-lobby-shell {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pregame-seat-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.pregame-seat-card {
+  display: grid;
+  gap: 0.32rem;
+  align-content: start;
+  justify-items: start;
+  min-height: 9.5rem;
+  padding: 0.95rem 1rem;
+  border-radius: 24px;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 34%),
+    rgba(255, 249, 240, 0.86);
+  color: var(--ink);
+  text-align: left;
+}
+
+.pregame-seat-card button {
+  margin-top: auto;
+}
+
+.pregame-seat-card.selected,
+.pregame-seat-card:hover,
+.pregame-seat-card:focus-visible {
+  border-color: rgba(39, 72, 60, 0.28);
+  box-shadow: 0 12px 22px rgba(39, 72, 60, 0.08);
+}
+
+.pregame-table-hero {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
