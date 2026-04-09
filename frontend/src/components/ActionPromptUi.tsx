@@ -126,7 +126,7 @@ export function ActionOptionCard({
           </button>
         )
       ) : (
-        <span className="summary-label">{action.type === ACTION_TYPE.BATTLE ? "Open Battle Flow" : "Apply this action"}</span>
+        <span className="summary-label">{action.type === ACTION_TYPE.BATTLE ? "Open Battle" : "Use This Move"}</span>
       )}
     </Element>
   );

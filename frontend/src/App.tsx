@@ -30,7 +30,6 @@ import { BoardPanel } from "./components/BoardPanel";
 import { BattleFlowPanel } from "./components/BattleFlowPanel";
 import { CardVisibilityPanel } from "./components/CardVisibilityPanel";
 import { EndgamePanel } from "./components/EndgamePanel";
-import { FlowGuidePanel } from "./components/FlowGuidePanel";
 import { GuideHelpPanel } from "./components/GuideHelpPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { JoinScreen } from "./components/JoinScreen";
@@ -59,7 +58,7 @@ import { sampleState } from "./sampleState";
 import type { Action, BattleContext, BattleModifiers, BattlePrompt, Clearing, GameState, Lobby, LobbyPlayer } from "./types";
 import { RootBuddyWebSocketClient } from "./wsClient";
 
-type ActiveModal = "json" | "standAndDeliver" | null;
+type ActiveModal = "correction" | "json" | "standAndDeliver" | null;
 type MultiplayerNotice = {
   level: "warning" | "error";
   title: string;
@@ -328,6 +327,8 @@ export default function App() {
   const deferredStateText = useDeferredValue(stateText);
   const [parsedState, setParsedState] = useState<GameState>(initialState);
   const currentStateRef = useRef<GameState>(initialState);
+  const multiplayerSelfRef = useRef<LobbyPlayer | null>(null);
+  const playerFactionRef = useRef(initialState.playerFaction);
   const [selectedClearingID, setSelectedClearingID] = useState<number>(
     initialState.map.clearings[0]?.id ?? 0
   );
@@ -361,6 +362,7 @@ export default function App() {
   const [showContextDrawer, setShowContextDrawer] = useState(false);
   const [showWorkspaceTools, setShowWorkspaceTools] = useState(false);
   const [showRecoveryTools, setShowRecoveryTools] = useState(false);
+  const [playerTrayPrompt, setPlayerTrayPrompt] = useState<string | null>(null);
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
   const [eyrieSetupDraftClearingID, setEyrieSetupDraftClearingID] = useState<number | null>(null);
   const [vagabondSetupDraftForestID, setVagabondSetupDraftForestID] = useState<number | null>(null);
@@ -384,6 +386,14 @@ export default function App() {
       setError(message);
     }
   }, [activeModal, deferredStateText]);
+
+  useEffect(() => {
+    multiplayerSelfRef.current = multiplayerSelf;
+  }, [multiplayerSelf]);
+
+  useEffect(() => {
+    playerFactionRef.current = parsedState.playerFaction;
+  }, [parsedState.playerFaction]);
 
   useEffect(() => {
     if (parsedState.map.clearings.some((clearing) => clearing.id === selectedClearingID)) {
@@ -570,6 +580,13 @@ export default function App() {
           setShowSetup(false);
           setShowBoardEditor(false);
           setShowGuideHelp(false);
+          if (message.state.gamePhase === 0) {
+            setStatus("Loading setup choices...");
+            void loadActionsForState(message.state, {
+              successStatus: "Choose a highlighted setup target."
+            });
+            return;
+          }
           if (message.type === "conflict") {
             setMultiplayerNotice({
               level: "warning",
@@ -604,7 +621,8 @@ export default function App() {
             return;
           }
 
-          const promptPerspectiveFaction = multiplayerSelf?.hasFaction ? multiplayerSelf.faction : parsedState.playerFaction;
+          const currentSelf = multiplayerSelfRef.current;
+          const promptPerspectiveFaction = currentSelf?.hasFaction ? currentSelf.faction : playerFactionRef.current;
           if (message.prompt.waitingOnFaction === promptPerspectiveFaction) {
             setStatus("Battle response needed.");
           } else {
@@ -629,7 +647,7 @@ export default function App() {
     return () => {
       client.disconnect();
     };
-  }, [multiplayerSelf, multiplayerToken, parsedState.playerFaction]);
+  }, [multiplayerToken]);
 
   useEffect(() => {
     const previous = previousConnectionStatus.current;
@@ -722,11 +740,12 @@ export default function App() {
   }, [multiplayerToken, serverGameID, showSetup]);
 
   useEffect(() => {
-    if (!multiplayerToken || showSetup || parsedState.gamePhase !== 1) {
+    const activeState = currentStateRef.current;
+    if (showSetup || activeState.gamePhase !== 1) {
       autoLoadedActionKey.current = "";
       return;
     }
-    if (multiplayerBattlePrompt || parsedState.factionTurn !== perspectiveFaction) {
+    if (multiplayerBattlePrompt || activeState.factionTurn !== perspectiveFaction) {
       autoLoadedActionKey.current = "";
       return;
     }
@@ -734,10 +753,10 @@ export default function App() {
     const loadKey = [
       serverGameID ?? "",
       serverRevision ?? "na",
-      parsedState.roundNumber,
-      parsedState.currentPhase,
-      parsedState.currentStep,
-      parsedState.factionTurn
+      activeState.roundNumber,
+      activeState.currentPhase,
+      activeState.currentStep,
+      activeState.factionTurn
     ].join(":");
     if (autoLoadedActionKey.current === loadKey) {
       return;
@@ -748,14 +767,14 @@ export default function App() {
 
     async function loadTurnActions() {
       try {
-        setStatus("Your turn. Loading legal actions...");
-        await loadActionsForState(parsedState);
+        setStatus("Your turn. Getting the board ready...");
+        await loadActionsForState(activeState);
       } catch (err) {
         if (cancelled) {
           return;
         }
         autoLoadedActionKey.current = "";
-        setStatus(err instanceof Error ? err.message : "Failed to refresh legal actions");
+        setStatus(err instanceof Error ? err.message : "Failed to prepare turn options");
       }
     }
 
@@ -766,7 +785,6 @@ export default function App() {
     };
   }, [
     multiplayerBattlePrompt,
-    multiplayerToken,
     perspectiveFaction,
     parsedState,
     serverGameID,
@@ -857,7 +875,13 @@ export default function App() {
 
     setStatus(
       options?.successStatus ??
-        (nextActions.length > 0 ? `Loaded ${nextActions.length} action(s).` : zeroActionHint(requestState))
+        (nextActions.length > 0
+          ? requestState.gamePhase === 1 && requestState.factionTurn === requestState.playerFaction
+            ? "Choose your next move."
+            : requestState.gamePhase === 1
+              ? "Record what happened on the board."
+              : "Choose a highlighted setup target."
+          : zeroActionHint(requestState))
     );
 
     return nextActions;
@@ -1028,7 +1052,7 @@ export default function App() {
       syncState(nextState);
       if (!multiplayerToken && nextState.gamePhase === 1) {
         await loadActionsForState(nextState, {
-          successStatus: effectResult?.message ?? "Battle resolved. Loaded the next legal actions."
+          successStatus: effectResult?.message ?? "Battle resolved. Your next options are ready."
         });
         setActiveModal(null);
         return;
@@ -1302,6 +1326,8 @@ export default function App() {
     parsedState.map.clearings.find((clearing) => clearing.id === selectedClearingID) ??
     parsedState.map.clearings[0];
   const selectedClearingRuler = selectedClearing ? rulerOfClearing(selectedClearing) : null;
+  const selectedClearingRulerLabel =
+    typeof selectedClearingRuler === "number" ? factionLabels[selectedClearingRuler] ?? "Unknown" : "None";
   const boardLayout = boardLayoutForState(parsedState);
   const boardIsEmpty = isBoardEmpty(parsedState);
   const previewedAction =
@@ -1359,6 +1385,11 @@ export default function App() {
     parsedState.gamePhase === 1 &&
     parsedState.factionTurn === perspectiveFaction &&
     !hasPrimaryBattleFlow;
+  useEffect(() => {
+    if (!showPrimaryPlayerFlow) {
+      setPlayerTrayPrompt(null);
+    }
+  }, [showPrimaryPlayerFlow]);
   const primaryFlowLabel = showPrimaryReviewFlow
     ? "Review"
     : hasPrimaryBattleFlow
@@ -1368,7 +1399,7 @@ export default function App() {
         : showPrimaryAssistFlow
           ? "Observed Turn"
           : showPrimaryPlayerFlow
-            ? "Player Turn"
+            ? "Your Turn"
             : isMultiplayerGame
               ? "Waiting"
               : "Flow";
@@ -1405,16 +1436,19 @@ export default function App() {
     }
     if (showPrimaryAssistFlow) {
       return actions.length > 0
-        ? `${actions.length} public action(s) are loaded for the observed turn.`
-        : "Load public actions or record observed events manually here.";
+        ? `${actions.length} guided observed step(s) are ready for the current table state.`
+        : "Refresh the table view or record the table event manually here.";
     }
     if (showPrimaryPlayerFlow) {
+      if (playerTrayPrompt) {
+        return playerTrayPrompt;
+      }
       if (actions.length > 0) {
-        return `${actions.length} legal action(s) are loaded and ready.`;
+        return "Choose your next move on the board or in the action tray.";
       }
       return isMultiplayerGame
-        ? "Your turn has priority. Legal actions will refresh automatically here."
-        : "Load legal actions here to continue the turn.";
+        ? "Your turn has priority. Board-ready options refresh automatically here."
+        : "Preparing board-ready turn options automatically.";
     }
     if (isMultiplayerGame) {
       if (multiplayerConnectionStatus === "reconnecting" || multiplayerConnectionStatus === "connecting") {
@@ -1568,6 +1602,21 @@ export default function App() {
     marquiseSetupDraft.sawmillClearingID !== null ||
     marquiseSetupDraft.workshopClearingID !== null ||
     marquiseSetupDraft.recruiterClearingID !== null;
+  const phaseStatusLabel =
+    parsedState.gamePhase === 0
+      ? setupStageLabels[parsedState.setupStage] ?? "Setup"
+      : parsedState.gamePhase === 2
+        ? gameOverHeadline(parsedState)
+        : `${factionLabels[parsedState.factionTurn] ?? "Unknown"} • ${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`;
+  const connectionStatusLabel = multiplayerToken
+    ? multiplayerConnectionStatus === "connected"
+      ? "Live"
+      : multiplayerConnectionStatus === "reconnecting"
+        ? "Reconnecting"
+        : multiplayerConnectionStatus === "connecting"
+          ? "Connecting"
+          : "Offline"
+    : null;
 
   useEffect(() => {
     if (assistDefenderAmbushPromptRequired) {
@@ -1692,7 +1741,7 @@ export default function App() {
         return;
       }
       if (matchingMoves.length > 1) {
-        setStatus(`Multiple moves match that route. Choose the exact candidate from the Move list.`);
+        setStatus("Multiple move options match that route. Choose the exact one from the Move tray.");
         return;
       }
       if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromClearingID === clearingID)) {
@@ -1713,7 +1762,7 @@ export default function App() {
         return;
       }
       if (matchingCandidates.length > 1) {
-        setStatus(`Clearing ${clearingID} matches multiple Build / Recruit candidates. Choose the exact candidate from the list.`);
+        setStatus(`Clearing ${clearingID} matches multiple Build / Recruit options. Choose the exact one from the tray.`);
         return;
       }
       setStatus("Choose one of the highlighted build, recruit, or overwork clearings.");
@@ -1729,7 +1778,7 @@ export default function App() {
         return;
       }
       if (matchingCandidates.length > 1) {
-        setStatus(`Clearing ${clearingID} matches multiple faction-action candidates. Choose the exact candidate from the list.`);
+        setStatus(`Clearing ${clearingID} matches multiple faction-action options. Choose the exact one from the tray.`);
         return;
       }
       setStatus("Choose one of the highlighted faction-action clearings.");
@@ -1738,12 +1787,12 @@ export default function App() {
 
     if (parsedState.gamePhase !== 0) {
       setSelectedClearingID(clearingID);
-      if (multiplayerToken) {
-        setStatus("Board editing is disabled in multiplayer.");
+      if (!multiplayerToken && activeModal === "correction") {
+        setShowBoardEditor(true);
+        setStatus(`Selected clearing ${clearingID} for board editing.`);
         return;
       }
-      setShowBoardEditor(true);
-      setStatus(`Selected clearing ${clearingID} for board editing.`);
+      setStatus(`Selected clearing ${clearingID}.`);
       return;
     }
 
@@ -1826,7 +1875,7 @@ export default function App() {
         return;
       }
       if (matchingMoves.length > 1) {
-        setStatus("Multiple moves match that forest route. Choose the exact candidate from the Move list.");
+        setStatus("Multiple move options match that forest route. Choose the exact one from the Move tray.");
         return;
       }
       if (assistMovementCandidates.some((candidate) => candidate.endpoints.fromForestID === forestID)) {
@@ -1968,10 +2017,46 @@ export default function App() {
               ) : null}
             </div>
           </>
-        ) : null}
+        ) : (
+          <>
+            <div className="board-phase-banner board-phase-banner-live">
+              <span>{phaseStatusLabel}</span>
+            </div>
+            <div className="board-top-hud">
+              <section className="panel board-status-hud">
+                <p className="eyebrow">RootBuddy</p>
+                <div className="status-block">
+                  <div className="status-block-main">
+                    <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
+                    <span>{phaseLabels[parsedState.currentPhase] ?? "Unknown"} / {stepLabels[parsedState.currentStep] ?? "Unknown"}</span>
+                  </div>
+                  {connectionStatusLabel ? (
+                    <span className={`connection-pill compact ${multiplayerConnectionStatus}`}>{connectionStatusLabel}</span>
+                  ) : null}
+                </div>
+              </section>
+              <div className="board-utility-hud">
+                {multiplayerNotice ? (
+                  <section className={`panel notice-panel board-notice-panel ${multiplayerNotice?.level ?? ""}`}>
+                    <p className="eyebrow">{multiplayerNotice?.title}</p>
+                    <span className="summary-line">{multiplayerNotice?.detail}</span>
+                  </section>
+                ) : null}
+                <button type="button" className="secondary correction-mode-toggle" onClick={() => setActiveModal("correction")}>
+                  Correction Mode
+                </button>
+              </div>
+            </div>
+            <div className="board-prompt-strip">
+              <p className="eyebrow">{primaryFlowLabel}</p>
+              <strong>{status}</strong>
+              <span>{error || primaryFlowSummary}</span>
+            </div>
+          </>
+        )}
         {parsedState.gamePhase === 2 ? (
           <div className="board-hint endgame-banner">
-            {gameOverHeadline(parsedState)}. Open the Game Over panel for the final standings.
+            {gameOverHeadline(parsedState)}. Review the result from the board event panel.
           </div>
         ) : null}
         <BoardPanel
@@ -1992,66 +2077,47 @@ export default function App() {
           onSelectClearing={handleSetupClearingClick}
           onSelectForest={handleSetupForestClick}
         />
-
-        {boardIsEmpty && parsedState.gamePhase !== 0 ? <div className="board-hint">Click a clearing to select it for board editing.</div> : null}
-      </div>
-
-      <aside className={`app-command-deck ${showPrimarySetupFlow ? "setup-deck" : ""}`} aria-label="Play controls">
-        <section className="panel sidebar-panel">
-          <p className="eyebrow">RootBuddy</p>
-          <div className="status-block">
-            <div className="status-block-main">
-              <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
-              <span>
-                {parsedState.gamePhase === 0
-                  ? setupStageLabels[parsedState.setupStage] ?? "Setup"
-                  : `${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`}
-              </span>
-            </div>
-            {multiplayerToken ? (
-              <span className={`connection-pill compact ${multiplayerConnectionStatus}`}>
-                {multiplayerConnectionStatus === "connected"
-                  ? "Live"
-                  : multiplayerConnectionStatus === "reconnecting"
-                    ? "Reconnecting"
-                    : multiplayerConnectionStatus === "connecting"
-                      ? "Connecting"
-                      : "Offline"}
-              </span>
-            ) : null}
-          </div>
-          <span className={error ? "message error" : "message"}>{error || status}</span>
-        </section>
-
-        {!showPrimarySetupFlow ? (
-          <div className="primary-flow-stack">
-            <section className="panel sidebar-panel primary-flow-panel">
-              <p className="eyebrow">Primary Workflow</p>
-              <span className="summary-label">{primaryFlowLabel}</span>
-              <span className="summary-line">{primaryFlowSummary}</span>
-            </section>
-
-            {multiplayerNotice ? (
-            <section className={`panel sidebar-panel notice-panel ${multiplayerNotice.level}`}>
-              <p className="eyebrow">{multiplayerNotice.title}</p>
-              <span className="summary-line">{multiplayerNotice.detail}</span>
-            </section>
-            ) : null}
-
-            {!showPrimaryAssistFlow ? (
-            <FlowGuidePanel
+        {showPrimaryPlayerFlow ? (
+          <div className="board-action-tray" aria-label="Live action tray">
+            <PlayerActionsPanel
               state={parsedState}
-              loadedActionCount={actions.length}
-              selectedBattleAction={selectedBattleAction}
+              actions={actions}
               isMultiplayer={isMultiplayerGame}
-              multiplayerConnectionStatus={multiplayerConnectionStatus}
-              multiplayerBattlePrompt={multiplayerBattlePrompt}
+              onPromptChange={setPlayerTrayPrompt}
+              onApply={handleApply}
               onGenerateActions={refreshActions}
-              onOpenHelp={() => setShowGuideHelp(true)}
+              onOpenBattle={openBattleForActionIndex}
+              onPreviewAction={setHoveredActionIndex}
+              onMovementCandidatesChange={handlePlayerMovementCandidatesChange}
+              onBuildRecruitCandidatesChange={handlePlayerBuildRecruitCandidatesChange}
+              onFactionSpatialCandidatesChange={handlePlayerFactionSpatialCandidatesChange}
+              surface="tray"
+              showFallbackDrawer={false}
+              showRefreshButton={false}
             />
-            ) : null}
-
-            {hasPrimaryBattleFlow ? (
+          </div>
+        ) : null}
+        {showPrimaryAssistFlow ? (
+          <div className="board-action-tray" aria-label="Observed action tray">
+            <AssistWorkflowPanel
+              state={parsedState}
+              actions={actions}
+              onApply={handleApply}
+              onGenerateActions={refreshActions}
+              onOpenTurnState={() => setActiveModal("correction")}
+              onOpenBattle={openBattleForActionIndex}
+              onBattleCandidatesChange={handleAssistBattleCandidatesChange}
+              onMovementCandidatesChange={handleAssistMovementCandidatesChange}
+              onBuildRecruitCandidatesChange={handleAssistBuildRecruitCandidatesChange}
+              onFactionSpatialCandidatesChange={handleAssistFactionSpatialCandidatesChange}
+              surface="tray"
+              showFallbackDrawer={false}
+              showCorrectionControls={false}
+            />
+          </div>
+        ) : null}
+        {hasPrimaryBattleFlow ? (
+          <div className="board-event-shell" aria-label="Battle event">
             <BattleFlowPanel
               selectedBattleIndex={selectedBattleIndex}
               selectedBattleAction={selectedBattleAction}
@@ -2080,10 +2146,12 @@ export default function App() {
                 setAssistDefenderAmbushChoice(null);
                 setStatus("Cleared selected battle.");
               }}
+              surface="modal"
             />
-            ) : null}
-
-            {showPrimaryReviewFlow ? (
+          </div>
+        ) : null}
+        {showPrimaryReviewFlow ? (
+          <div className="board-event-shell review-event-shell" aria-label="Review event">
             <EndgamePanel
               state={parsedState}
               hasSavedSession={hasSavedSession}
@@ -2115,238 +2183,220 @@ export default function App() {
                 }
                 setActiveModal("json");
               }}
-            />
-            ) : null}
-
-            {showPrimaryAssistFlow ? (
-            <AssistWorkflowPanel
-              state={parsedState}
-              actions={actions}
-              onApply={handleApply}
-              onGenerateActions={refreshActions}
-              onOpenTurnState={() => setShowAdvancedTurnPanel(true)}
-              onOpenBattle={openBattleForActionIndex}
-              onBattleCandidatesChange={handleAssistBattleCandidatesChange}
-              onMovementCandidatesChange={handleAssistMovementCandidatesChange}
-              onBuildRecruitCandidatesChange={handleAssistBuildRecruitCandidatesChange}
-              onFactionSpatialCandidatesChange={handleAssistFactionSpatialCandidatesChange}
-            />
-            ) : null}
-
-            {showPrimaryPlayerFlow ? (
-            <PlayerActionsPanel
-              state={parsedState}
-              actions={actions}
-              isMultiplayer={isMultiplayerGame}
-              onApply={handleApply}
-              onGenerateActions={refreshActions}
-              onOpenBattle={openBattleForActionIndex}
-              onPreviewAction={setHoveredActionIndex}
-              onMovementCandidatesChange={handlePlayerMovementCandidatesChange}
-              onBuildRecruitCandidatesChange={handlePlayerBuildRecruitCandidatesChange}
-              onFactionSpatialCandidatesChange={handlePlayerFactionSpatialCandidatesChange}
-            />
-            ) : null}
-          </div>
-        ) : null}
-
-        {!showPrimarySetupFlow && showGuideHelp ? <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} /> : null}
-        {parsedState.gamePhase === 1 && !multiplayerToken ? (
-          <details
-            className="panel sidebar-panel board-editor-drawer"
-            open={showBoardEditor}
-            onToggle={(event) => setShowBoardEditor(event.currentTarget.open)}
-          >
-            <summary className="panel-summary">
-              <span className="summary-label">Board Editor</span>
-              <span className="summary-line">
-                {showBoardEditor
-                  ? `Editing clearing ${selectedClearing?.id ?? "?"}.`
-                  : `Click a clearing to open correction controls for clearing ${selectedClearing?.id ?? "?"}.`}
-              </span>
-            </summary>
-            {showBoardEditor ? (
-              <div className="context-drawer-body">
-                <InspectorPanel
-                  title="Board Editor"
-                  showCloseButton={false}
-                  clearing={selectedClearing}
-                  keepClearingID={parsedState.marquise.keepClearingID}
-                  vagabondClearingID={parsedState.vagabond.clearingID}
-                  vagabondInForest={parsedState.vagabond.inForest}
-                  onUpdateClearing={updateClearing}
-                  onSetKeepClearing={(clearingID) =>
-                    updateState((draft) => {
-                      draft.marquise.keepClearingID = clearingID;
-                    })
-                  }
-                  onSetVagabondClearing={(clearingID, inForest) =>
-                    updateState((draft) => {
-                      draft.vagabond.clearingID = clearingID;
-                      draft.vagabond.inForest = inForest;
-                    })
-                  }
-                  onClose={() => setShowBoardEditor(false)}
-                />
-              </div>
-            ) : null}
-          </details>
-        ) : null}
-
-        {!showPrimarySetupFlow ? (
-        <details
-          className="panel sidebar-panel context-drawer secondary-drawer"
-          open={showContextDrawer}
-          onToggle={(event) => setShowContextDrawer(event.currentTarget.open)}
-        >
-          <summary className="panel-summary">
-            <span className="summary-label">Context & Reference</span>
-            <span className="summary-line">Turn summary, card visibility, and session details live here as secondary reference.</span>
-          </summary>
-          <div className="context-drawer-body">
-            <TurnSummaryPanel state={parsedState} />
-            <CardVisibilityPanel state={parsedState} />
-            <SessionStatusPanel
-              state={parsedState}
-              hasSavedSession={hasSavedSession}
-              serverGameID={serverGameID}
-              savedSessionInfo={savedSessionInfo}
-              multiplayerSession={multiplayerSession}
-              multiplayerConnectionStatus={multiplayerConnectionStatus}
-              multiplayerBattlePrompt={multiplayerBattlePrompt}
+              surface="modal"
             />
           </div>
-        </details>
         ) : null}
-
-        {!showPrimarySetupFlow ? (
-        <details
-          className="panel sidebar-panel sidebar-actions-panel secondary-drawer"
-          open={showWorkspaceTools}
-          onToggle={(event) => setShowWorkspaceTools(event.currentTarget.open)}
-        >
-          <summary className="panel-summary">
-            <span className="summary-label">{parsedState.gamePhase === 2 ? "Review Workspace" : "Workspace Tools"}</span>
-            <span className="summary-line">
-              {parsedState.gamePhase === 2
-                ? "Restart and review controls live here after the match ends."
-                : "Board inspection and setup/recovery controls live here as secondary tools."}
-            </span>
-          </summary>
-          {parsedState.gamePhase === 2 ? (
-            <div className="summary-stack" style={{ margin: "0.9rem 0" }}>
-              <span className="summary-line">The match is finished. Use these controls for review, restart, or recovery only.</span>
-            </div>
-          ) : (
-            <div className="summary-stack" style={{ margin: "0.9rem 0" }}>
-              <span className="summary-label">Board</span>
-              <span className="summary-line">Selected clearing: {selectedClearing?.id ?? "None"}</span>
-              {selectedClearing ? (
-                <>
-                  <span className="summary-line">Suit: {suitLabels[selectedClearing.suit] ?? "Unknown"}</span>
-                  <span className="summary-line">
-                    Ruler: {selectedClearingRuler === null ? "None" : factionLabels[selectedClearingRuler] ?? "Unknown"}
-                  </span>
-                  <span className="summary-line">
-                    Paths / slots: {selectedClearing.adj.length} / {usedBuildSlots(selectedClearing)}/{selectedClearing.buildSlots}
-                  </span>
-                </>
-              ) : null}
-            </div>
-          )}
-          <div className="sidebar-actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                if (multiplayerToken) {
-                  setStatus("Return to setup is disabled while a multiplayer session is active.");
-                  return;
-                }
-                resetToSetup({
-                  clearSaved: parsedState.gamePhase !== 2,
-                  status: parsedState.gamePhase === 2 ? "Returned to setup. Resume is still available until you clear it." : "Start a new game."
-                });
-              }}
-            >
-              {parsedState.gamePhase === 2 ? "Return to Setup" : "Setup"}
-            </button>
-          </div>
-          {!multiplayerToken ? (
-            <details
-              className="advanced-tools secondary-drawer"
-              style={{ marginTop: "0.9rem" }}
-              open={showRecoveryTools}
-              onToggle={(event) => setShowRecoveryTools(event.currentTarget.open)}
-            >
-              <summary className="panel-summary">
-                <span className="summary-label">Recovery Tools</span>
-                <span className="summary-line">Manual correction and recovery controls live here, away from the primary play flow.</span>
-              </summary>
-              {parsedState.gamePhase !== 2 ? (
-                <div style={{ marginTop: "0.9rem" }}>
-                  <TurnFlowPanel
-                    state={parsedState}
-                    onApply={handleApply}
-                    onGenerateActions={refreshActions}
-                    onOpenAdvanced={() => setShowAdvancedTurnPanel(true)}
-                    onUpdateState={updateState}
-                  />
-                </div>
-              ) : null}
-              <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
-                {parsedState.gamePhase !== 2 ? (
-                  <button type="button" className="secondary" onClick={() => setShowAdvancedTurnPanel((current) => !current)}>
-                    {showAdvancedTurnPanel ? "Hide Advanced Turn" : "Advanced Turn"}
-                  </button>
-                ) : null}
-                <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
-                  Debug JSON
-                </button>
-              </div>
-              {showAdvancedTurnPanel && parsedState.gamePhase !== 2 ? (
-                <div style={{ marginTop: "0.9rem" }}>
-                  <TurnStatePanel
-                    state={parsedState}
-                    onUpdateState={updateState}
-                    title="Advanced Turn"
-                    showCloseButton={false}
-                    onClose={() => setShowAdvancedTurnPanel(false)}
-                  />
-                </div>
-              ) : null}
-            </details>
-          ) : null}
-          <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
-            {!multiplayerToken && parsedState.gamePhase !== 2 ? (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  syncState(initialState);
-                  setServerGameID(null);
-                  setServerRevision(null);
-                  setShowBoardEditor(false);
-                  setStatus("Board reset. Click a clearing to start setting the board.");
-                  setShowGuideHelp(true);
-                }}
-              >
-                Reset
-              </button>
-            ) : null}
-            {parsedState.gamePhase === 2 ? (
-              <button type="button" onClick={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}>
-                New Game
-              </button>
-            ) : null}
-          </div>
-        </details>
-        ) : null}
-      </aside>
+      </div>
 
       {activeModal ? (
         <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
           <div className="modal-shell" onClick={(event) => event.stopPropagation()}>
+            {activeModal === "correction" ? (
+              <section className="panel modal-panel correction-mode-panel">
+                <div className="panel-header">
+                  <h2>Correction Mode</h2>
+                  <button type="button" className="secondary" onClick={() => setActiveModal(null)}>
+                    Close
+                  </button>
+                </div>
+                <p className="message">
+                  Recovery, inspection, and manual tools live here. Routine play should stay on the board.
+                </p>
+                <div className="correction-mode-grid">
+                  <details
+                    className="panel secondary-drawer"
+                    open={showContextDrawer}
+                    onToggle={(event) => setShowContextDrawer(event.currentTarget.open)}
+                  >
+                    <summary className="panel-summary">
+                      <span className="summary-label">Context & Reference</span>
+                      <span className="summary-line">Turn summary, card visibility, and session details.</span>
+                    </summary>
+                    <div className="context-drawer-body">
+                      <TurnSummaryPanel state={parsedState} />
+                      <CardVisibilityPanel state={parsedState} />
+                      <SessionStatusPanel
+                        state={parsedState}
+                        hasSavedSession={hasSavedSession}
+                        serverGameID={serverGameID}
+                        savedSessionInfo={savedSessionInfo}
+                        multiplayerSession={multiplayerSession}
+                        multiplayerConnectionStatus={multiplayerConnectionStatus}
+                        multiplayerBattlePrompt={multiplayerBattlePrompt}
+                      />
+                    </div>
+                  </details>
+
+                  <details
+                    className="panel secondary-drawer"
+                    open={showWorkspaceTools}
+                    onToggle={(event) => setShowWorkspaceTools(event.currentTarget.open)}
+                  >
+                    <summary className="panel-summary">
+                      <span className="summary-label">{parsedState.gamePhase === 2 ? "Review Workspace" : "Workspace Tools"}</span>
+                      <span className="summary-line">Board selection, restart, and review controls live here.</span>
+                    </summary>
+                    <div className="summary-stack" style={{ margin: "0.9rem 0" }}>
+                      <span className="summary-line">Selected clearing: {selectedClearing?.id ?? "None"}</span>
+                      {selectedClearing ? (
+                        <>
+                          <span className="summary-line">Suit: {suitLabels[selectedClearing.suit] ?? "Unknown"}</span>
+                          <span className="summary-line">
+                            Ruler: {selectedClearingRulerLabel}
+                          </span>
+                          <span className="summary-line">
+                            Paths / slots: {selectedClearing.adj.length} / {usedBuildSlots(selectedClearing)}/{selectedClearing.buildSlots}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          if (multiplayerToken) {
+                            setStatus("Return to setup is disabled while a multiplayer session is active.");
+                            return;
+                          }
+                          resetToSetup({
+                            clearSaved: parsedState.gamePhase !== 2,
+                            status: parsedState.gamePhase === 2 ? "Returned to setup. Resume is still available until you clear it." : "Start a new game."
+                          });
+                        }}
+                      >
+                        {parsedState.gamePhase === 2 ? "Return to Setup" : "Setup"}
+                      </button>
+                      {parsedState.gamePhase === 2 ? (
+                        <button type="button" onClick={() => resetToSetup({ clearSaved: true, status: "Start a new game." })}>
+                          New Game
+                        </button>
+                      ) : null}
+                    </div>
+                    {!multiplayerToken && parsedState.gamePhase !== 2 ? (
+                      <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => {
+                            syncState(initialState);
+                            setServerGameID(null);
+                            setServerRevision(null);
+                            setShowBoardEditor(false);
+                            setStatus("Board reset.");
+                            setShowGuideHelp(true);
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    ) : null}
+                  </details>
+
+                  <details
+                    className="panel secondary-drawer"
+                    open={showGuideHelp}
+                    onToggle={(event) => setShowGuideHelp(event.currentTarget.open)}
+                  >
+                    <summary className="panel-summary">
+                      <span className="summary-label">Guide</span>
+                      <span className="summary-line">Reference help for the current phase.</span>
+                    </summary>
+                    <div className="context-drawer-body">
+                      <GuideHelpPanel gamePhase={parsedState.gamePhase} onClose={() => setShowGuideHelp(false)} />
+                    </div>
+                  </details>
+
+                  {!multiplayerToken ? (
+                    <details
+                      className="panel secondary-drawer"
+                      open={showRecoveryTools}
+                      onToggle={(event) => setShowRecoveryTools(event.currentTarget.open)}
+                    >
+                      <summary className="panel-summary">
+                        <span className="summary-label">Recovery Tools</span>
+                        <span className="summary-line">Manual correction and recovery controls.</span>
+                      </summary>
+                      {parsedState.gamePhase !== 2 ? (
+                        <div style={{ marginTop: "0.9rem" }}>
+                          <TurnFlowPanel
+                            state={parsedState}
+                            onApply={handleApply}
+                            onGenerateActions={refreshActions}
+                            onOpenAdvanced={() => setShowAdvancedTurnPanel(true)}
+                            onUpdateState={updateState}
+                          />
+                        </div>
+                      ) : null}
+                      <div className="sidebar-actions" style={{ marginTop: "0.9rem" }}>
+                        {parsedState.gamePhase !== 2 ? (
+                          <button type="button" className="secondary" onClick={() => setShowAdvancedTurnPanel((current) => !current)}>
+                            {showAdvancedTurnPanel ? "Hide Advanced Turn" : "Advanced Turn"}
+                          </button>
+                        ) : null}
+                        <button type="button" className="secondary" onClick={() => setActiveModal("json")}>
+                          Debug JSON
+                        </button>
+                      </div>
+                      {showAdvancedTurnPanel && parsedState.gamePhase !== 2 ? (
+                        <div style={{ marginTop: "0.9rem" }}>
+                          <TurnStatePanel
+                            state={parsedState}
+                            onUpdateState={updateState}
+                            title="Advanced Turn"
+                            showCloseButton={false}
+                            onClose={() => setShowAdvancedTurnPanel(false)}
+                          />
+                        </div>
+                      ) : null}
+                    </details>
+                  ) : null}
+
+                  {parsedState.gamePhase === 1 && !multiplayerToken ? (
+                    <details
+                      className="panel secondary-drawer"
+                      open={showBoardEditor}
+                      onToggle={(event) => setShowBoardEditor(event.currentTarget.open)}
+                    >
+                      <summary className="panel-summary">
+                        <span className="summary-label">Board Editor</span>
+                        <span className="summary-line">
+                          {showBoardEditor
+                            ? `Editing clearing ${selectedClearing?.id ?? "?"}.`
+                            : `Select a clearing on the board, then open its editor here.`}
+                        </span>
+                      </summary>
+                      {showBoardEditor ? (
+                        <div className="context-drawer-body">
+                          <InspectorPanel
+                            title="Board Editor"
+                            showCloseButton={false}
+                            clearing={selectedClearing}
+                            keepClearingID={parsedState.marquise.keepClearingID}
+                            vagabondClearingID={parsedState.vagabond.clearingID}
+                            vagabondInForest={parsedState.vagabond.inForest}
+                            onUpdateClearing={updateClearing}
+                            onSetKeepClearing={(clearingID) =>
+                              updateState((draft) => {
+                                draft.marquise.keepClearingID = clearingID;
+                              })
+                            }
+                            onSetVagabondClearing={(clearingID, inForest) =>
+                              updateState((draft) => {
+                                draft.vagabond.clearingID = clearingID;
+                                draft.vagabond.inForest = inForest;
+                              })
+                            }
+                            onClose={() => setShowBoardEditor(false)}
+                          />
+                        </div>
+                      ) : null}
+                    </details>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
             {activeModal === "json" ? (
               <section className="panel modal-panel">
                 <div className="panel-header">

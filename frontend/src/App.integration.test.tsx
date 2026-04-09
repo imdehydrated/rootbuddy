@@ -395,6 +395,26 @@ describe("App setup integration", () => {
 });
 
 describe("App board action integration", () => {
+  it("keeps routine live play board-first and only reveals correction tools through correction mode", async () => {
+    const state = activeTurnState();
+    mockActiveTurnApi(state, [movementAction(3, 7)], state, "Move applied.");
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Assist Mode/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start Assist Game/i }));
+
+    expect(await screen.findByText("Game created.")).toBeInTheDocument();
+    expect(screen.queryByText("Primary Workflow")).not.toBeInTheDocument();
+    expect(screen.queryByText("Flow Guide")).not.toBeInTheDocument();
+    expect(screen.queryByText("Context & Reference")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Correction Mode" }));
+
+    expect(await screen.findByRole("heading", { name: "Correction Mode" })).toBeInTheDocument();
+    expect(screen.getByText("Context & Reference")).toBeInTheDocument();
+  });
+
   it("applies an active movement action from board source and destination clicks", async () => {
     const state = activeTurnState();
     const firstMove = movementAction(3, 7);
@@ -408,10 +428,10 @@ describe("App board action integration", () => {
 
     expect(await screen.findByText("Game created.")).toBeInTheDocument();
     expect((await screen.findAllByText("Daylight / Daylight Actions")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Choose what you want to do next.")).toBeInTheDocument();
 
-    const loadActionButtons = screen.getAllByRole("button", { name: /Load Actions/i });
-    fireEvent.click(loadActionButtons[loadActionButtons.length - 1]);
     fireEvent.click(await screen.findByRole("button", { name: /Move.*Pieces changed clearings/i }));
+    expect(await screen.findByText("Choose a highlighted source clearing, then choose the destination.")).toBeInTheDocument();
 
     const sourceClearing = screen.getByRole("button", { name: "Clearing 3" });
     await waitFor(() => expect(sourceClearing).toHaveClass("highlight-source"));
@@ -437,12 +457,10 @@ describe("App board action integration", () => {
 
     expect(await screen.findByText("Game created.")).toBeInTheDocument();
 
-    const loadActionButtons = screen.getAllByRole("button", { name: /Load Actions/i });
-    fireEvent.click(loadActionButtons[loadActionButtons.length - 1]);
     fireEvent.click(await screen.findByRole("button", { name: /Build \/ Recruit.*Pieces, wood, or buildings/i }));
+    expect(await screen.findByText("Choose the clearing where this step happens.")).toBeInTheDocument();
 
     const buildClearing = screen.getByRole("button", { name: "Clearing 7" });
-    await waitFor(() => expect(buildClearing).toHaveClass("highlight-affected"));
     fireEvent.click(buildClearing);
 
     await waitFor(() => expect(appliedActions).toEqual([action]));
@@ -461,8 +479,6 @@ describe("App board action integration", () => {
 
     expect(await screen.findByText("Game created.")).toBeInTheDocument();
 
-    const loadActionButtons = screen.getAllByRole("button", { name: /Load Actions/i });
-    fireEvent.click(loadActionButtons[loadActionButtons.length - 1]);
     fireEvent.click(await screen.findByRole("button", { name: /Faction Action.*faction-specific public step/i }));
 
     const factionActionClearing = screen.getByRole("button", { name: "Clearing 9" });
@@ -487,8 +503,6 @@ describe("App board action integration", () => {
     expect(await screen.findByText("Game created.")).toBeInTheDocument();
     expect((await screen.findAllByText("Daylight / Daylight Actions")).length).toBeGreaterThan(0);
 
-    const loadActionButtons = screen.getAllByRole("button", { name: /Load Actions/i });
-    fireEvent.click(loadActionButtons[loadActionButtons.length - 1]);
     fireEvent.click(await screen.findByRole("button", { name: /Card Effect.*persistent effect/i }));
     const directStandAndDeliverButton = screen.queryByRole("button", { name: /Use Stand and Deliver! on Eyrie/i });
     fireEvent.click(directStandAndDeliverButton ?? screen.getByRole("button", { name: "Apply" }));
@@ -530,8 +544,6 @@ describe("App board action integration", () => {
     expect(await screen.findByText("Game created.")).toBeInTheDocument();
     expect((await screen.findAllByText("Daylight / Daylight Actions")).length).toBeGreaterThan(0);
 
-    const loadActionButtons = screen.getAllByRole("button", { name: /Load Actions/i });
-    fireEvent.click(loadActionButtons[loadActionButtons.length - 1]);
     fireEvent.click(await screen.findByRole("button", { name: /Card Effect.*persistent effect/i }));
     const directStandAndDeliverButton = screen.queryByRole("button", { name: /Use Stand and Deliver! on Eyrie/i });
     fireEvent.click(directStandAndDeliverButton ?? screen.getByRole("button", { name: "Apply" }));
@@ -584,6 +596,37 @@ describe("App multiplayer integration", () => {
     expect(savedMultiplayer.joinCode).toBe("ROOT42");
   });
 
+  it("keeps the same websocket client alive across lobby.update messages", async () => {
+    const self = lobbyPlayer("Alice", { isHost: true, isReady: false, faction: 0, hasFaction: true });
+    const createdLobby = lobby([self]);
+    const updatedSelf = { ...self, isReady: true, faction: 2 };
+    const updatedLobby = lobby([updatedSelf], { factions: [2] });
+    mockCreateLobbyApi(createdLobby, self, "token-1");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Online Play/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create Lobby" }));
+    fireEvent.change(await screen.findByPlaceholderText("Enter your name"), { target: { value: "Alice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Lobby" }));
+
+    expect(await screen.findByText("Join Code ROOT42")).toBeInTheDocument();
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+
+    act(() => {
+      FakeWebSocket.instances[0].open();
+    });
+    expect(await screen.findByText("Live")).toBeInTheDocument();
+
+    act(() => {
+      FakeWebSocket.instances[0].emit({ type: "lobby.update", lobby: updatedLobby, self: updatedSelf });
+    });
+
+    expect(await screen.findByText("Ready")).toBeInTheDocument();
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+  });
+
   it("moves from lobby to board workspace on websocket game start", async () => {
     const self = lobbyPlayer("Alice", { isHost: true, isReady: true });
     const createdLobby = lobby([self]);
@@ -619,6 +662,43 @@ describe("App multiplayer integration", () => {
       };
       expect(savedMultiplayer.gameID).toBe("game-123");
     });
+  });
+
+  it("loads Marquise setup targets when multiplayer game start enters setup", async () => {
+    const self = lobbyPlayer("Alice", { isHost: true, isReady: true, faction: 0, hasFaction: true });
+    const createdLobby = lobby([self]);
+    const startedState = setupState();
+    mockCreateLobbyApi(createdLobby, self, "token-1", {
+      validActions: [
+        marquiseSetupAction(1, 5, 10, 9),
+        marquiseSetupAction(2, 6, 10, 5),
+        marquiseSetupAction(3, 6, 9, 5),
+        marquiseSetupAction(4, 9, 5, 10)
+      ]
+    });
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Online Play/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create Lobby" }));
+    fireEvent.change(await screen.findByPlaceholderText("Enter your name"), { target: { value: "Alice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Lobby" }));
+
+    expect(await screen.findByText("Join Code ROOT42")).toBeInTheDocument();
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+
+    act(() => {
+      FakeWebSocket.instances[0].emit({
+        type: "game.start",
+        gameID: "game-123",
+        revision: 7,
+        state: startedState
+      });
+    });
+
+    expect(await screen.findByText("Choose the Keep corner")).toBeInTheDocument();
+    expect(await screen.findByText("4 legal choices")).toBeInTheDocument();
   });
 
   it("resumes a saved multiplayer game into the board workspace", async () => {
@@ -854,10 +934,10 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
 
     act(() => {
-      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].emit({
+      FakeWebSocket.instances[0].emit({
         type: "game.state",
         gameID: "game-123",
         revision: 8,
@@ -865,7 +945,8 @@ describe("App multiplayer integration", () => {
       });
     });
 
-    expect(await screen.findByText("Loaded 1 action(s).")).toBeInTheDocument();
+    expect(await screen.findByText("Choose your next move.")).toBeInTheDocument();
+    expect(await screen.findByText("Choose what you want to do next.")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/actions/valid"), expect.anything()));
     const savedMultiplayer = JSON.parse(window.localStorage.getItem("rootbuddy_multiplayer_session_v1") ?? "{}") as {
       gameID?: string;
@@ -901,10 +982,10 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
 
     act(() => {
-      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].emit({
+      FakeWebSocket.instances[0].emit({
         type: "battle.prompt",
         prompt: {
           gameID: "game-123",
@@ -994,10 +1075,10 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
 
     act(() => {
-      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].emit({ type: "battle.prompt", prompt: initialPrompt });
+      FakeWebSocket.instances[0].emit({ type: "battle.prompt", prompt: initialPrompt });
     });
 
     const submitResponseButton = await screen.findByRole("button", { name: /Submit Response/i });
@@ -1077,10 +1158,10 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
 
     act(() => {
-      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].emit({ type: "battle.prompt", prompt });
+      FakeWebSocket.instances[0].emit({ type: "battle.prompt", prompt });
     });
 
     const resolveButton = await screen.findByRole("button", { name: /Resolve and Apply/i });

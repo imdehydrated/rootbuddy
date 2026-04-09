@@ -9,3 +9,4 @@ frontend/dist/
 .gocache/
 .rootbuddy-saves/
 LOCAL-ARCHITECTURE-GUIDE.md
+.claude/

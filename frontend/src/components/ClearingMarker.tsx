@@ -113,7 +113,6 @@ export function ClearingMarker({
   onClick,
   onHover
 }: ClearingMarkerProps) {
-  const baseOccupiedSlots = usedBuildSlots(clearing);
   const marquiseWarriors = clearing.warriors["0"] ?? 0;
   const allianceWarriors = clearing.warriors["1"] ?? 0;
   const eyrieWarriors = clearing.warriors["2"] ?? 0;
@@ -125,6 +124,7 @@ export function ClearingMarker({
   const sympathy = countTokens(clearing.tokens, 1, 1);
   const previewStructureKinds = new Set<TokenChipProps["kind"]>(["sawmill", "workshop", "recruiter", "roost", "base", "sympathy", "keep", "ruins"]);
   const previewBuildingKinds = new Set<TokenChipProps["kind"]>(["sawmill", "workshop", "recruiter", "roost", "base"]);
+  const baseOccupiedSlots = usedBuildSlots(clearing);
   const previewStructureChips = previewPieces.filter((piece) => previewStructureKinds.has(piece.kind));
   const previewPieceChips = previewPieces.filter((piece) => !previewStructureKinds.has(piece.kind));
   const previewBuildSlotCount = previewPieces
@@ -206,7 +206,6 @@ export function ClearingMarker({
           : null}
       </span>
       <span className="marker-footer">
-        <span>{clearing.adj.length} paths</span>
         <span>{occupiedSlots}/{clearing.buildSlots} slots</span>
       </span>
     </button>

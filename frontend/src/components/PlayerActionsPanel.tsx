@@ -22,6 +22,10 @@ type PlayerActionsPanelProps = {
   state: GameState;
   actions: Action[];
   isMultiplayer: boolean;
+  surface?: "sidebar" | "tray";
+  showFallbackDrawer?: boolean;
+  showRefreshButton?: boolean;
+  onPromptChange?: (prompt: string | null) => void;
   onApply: (action: Action) => Promise<void>;
   onGenerateActions: () => Promise<void>;
   onOpenBattle: (actionIndex: number) => void;
@@ -35,6 +39,10 @@ export function PlayerActionsPanel({
   state,
   actions,
   isMultiplayer,
+  surface = "sidebar",
+  showFallbackDrawer = true,
+  showRefreshButton = true,
+  onPromptChange,
   onApply,
   onGenerateActions,
   onOpenBattle,
@@ -113,6 +121,28 @@ export function PlayerActionsPanel({
       : [];
   const drawAdvanceChoices = selectedGroup?.key === "draw_advance" ? selectedGroup.actions : [];
   const cardEffectChoices = selectedGroup?.key === "card_effect" ? selectedGroup.actions : [];
+  const currentPrompt =
+    visibleActions.length === 0
+      ? "Preparing your turn options."
+      : selectedGroup?.key === "movement"
+        ? "Choose a highlighted source clearing, then choose the destination."
+        : selectedGroup?.key === "battle"
+          ? "Choose the clearing and defender you want to battle."
+          : selectedGroup?.key === "build_recruit"
+            ? "Choose the clearing where this step happens."
+            : selectedGroup?.key === "craft"
+              ? selectedCraftChoice
+                ? "Choose which workshop route to use."
+                : "Choose the card you want to craft."
+              : selectedGroup?.key === "faction"
+                ? "Choose the faction action or target that matches what you want to do."
+                : selectedGroup?.key === "draw_advance"
+                  ? "Choose how to advance or finish this part of the turn."
+                  : selectedGroup?.key === "card_effect"
+                    ? "Choose the card or persistent effect you want to use."
+                    : selectedGroup
+                      ? "Choose the exact move you want to make."
+                      : "Choose what you want to do next.";
 
   useEffect(() => {
     onMovementCandidatesChange?.(movementCandidates);
@@ -129,25 +159,33 @@ export function PlayerActionsPanel({
     return () => onFactionSpatialCandidatesChange?.([]);
   }, [factionSpatialCandidateKey, onFactionSpatialCandidatesChange]);
 
+  useEffect(() => {
+    onPromptChange?.(currentPrompt);
+    return () => onPromptChange?.(null);
+  }, [currentPrompt, onPromptChange]);
+
   return (
-    <section className="panel sidebar-panel">
-      <p className="eyebrow">Player Turn</p>
+    <section className={`panel ${surface === "tray" ? "board-action-panel board-action-panel-tray player-actions-tray" : "sidebar-panel"}`}>
+      <p className="eyebrow">Your Turn</p>
       <div className="summary-stack">
         <span className="summary-label">{phaseLabel}</span>
         <span className="summary-line">
           {visibleActions.length > 0
-            ? `Choose your intent, then choose the matching legal action.`
+            ? `Choose your intent, then follow the board or prompt to carry it out.`
             : isMultiplayer
-              ? "Actions refresh automatically when the server hands you priority."
-              : "No loaded actions yet."}
+              ? "Preparing board-ready options for your turn."
+              : "Preparing board-ready options for this turn."}
         </span>
       </div>
 
       {visibleActions.length === 0 ? (
         <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
-          <button type="button" onClick={() => void onGenerateActions()}>
-            Load Actions
-          </button>
+          <span className="summary-line">The tray will populate as soon as the current turn options are ready.</span>
+          {showRefreshButton ? (
+            <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
+              Refresh Turn
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
@@ -165,13 +203,13 @@ export function PlayerActionsPanel({
 
           {selectedGroup ? (
             <div className="summary-stack player-action-choice-stack">
-              <span className="summary-label">{selectedGroup.label} Options</span>
+              <span className="summary-label">{selectedGroup.label}</span>
               <span className="summary-line">
-                Choose the legal action that matches what you want to do. Hover or focus an option to preview its board footprint.
+                Choose the target, card, or route that matches the move you want to make. Hover or focus an entry to preview it on the board.
               </span>
               {selectedGroup.key === "battle" ? (
                 <>
-                  <span className="summary-line">Choose the battle target first. This opens Battle Flow directly when the defender choice maps to one legal battle.</span>
+                  <span className="summary-line">Choose the battle target first. If only one exact fight matches, battle opens immediately.</span>
                   <div className="assist-choice-grid">
                     {battleTargetChoices.map((choice) => (
                       <button
@@ -184,22 +222,22 @@ export function PlayerActionsPanel({
                             if (actionIndex >= 0) {
                               setChoiceMessage("");
                               onOpenBattle(actionIndex);
-                              return;
-                            }
-                          }
-                          setShowAllActions(true);
-                          setChoiceMessage(`${choice.label} still maps to ${choice.actions.length} legal battle options. Choose the exact battle from the fallback list.`);
+                          return;
+                        }
+                      }
+                      setShowAllActions(true);
+                          setChoiceMessage(`${choice.label} still has ${choice.actions.length} possible battle paths. Open the audit drawer and choose the exact one.`);
                         }}
                       >
                         <strong>{choice.label}</strong>
-                        <span>{choice.actions.length === 1 ? "Open Battle Flow" : `${choice.actions.length} battle options`}</span>
+                        <span>{choice.actions.length === 1 ? "Open battle" : `${choice.actions.length} battle paths`}</span>
                       </button>
                     ))}
                   </div>
                 </>
               ) : selectedGroup.key === "craft" ? (
                 <>
-                  <span className="summary-line">Choose the card to craft first. If multiple workshop routes are legal, choose the route next.</span>
+                  <span className="summary-line">Choose the card to craft first. If more than one workshop route can make it, choose the route next.</span>
                   <div className="assist-choice-grid">
                     {craftChoices.map((choice) => (
                       <button
@@ -214,11 +252,11 @@ export function PlayerActionsPanel({
                             return;
                           }
                           setSelectedCraftCardID(choice.cardID);
-                          setChoiceMessage(`${describeKnownCardID(choice.cardID)} has ${choice.actions.length} legal craft routes. Choose the workshop route.`);
+                          setChoiceMessage(`${describeKnownCardID(choice.cardID)} has ${choice.actions.length} possible workshop routes. Choose the one you want to use.`);
                         }}
                       >
                         <strong>{describeKnownCardID(choice.cardID)}</strong>
-                        <span>{choice.actions.length === 1 ? "Apply exact craft" : `${choice.actions.length} craft routes`}</span>
+                        <span>{choice.actions.length === 1 ? "Craft this card" : `${choice.actions.length} workshop routes`}</span>
                       </button>
                     ))}
                   </div>
@@ -244,7 +282,7 @@ export function PlayerActionsPanel({
                 </>
               ) : selectedGroup.key === "faction" && factionChoiceActions.length > 0 ? (
                 <>
-                  <span className="summary-line">Choose the faction-specific option directly. Board-based faction actions still use the generic choices for now.</span>
+                  <span className="summary-line">Choose the faction-specific move directly. Board-based faction actions still use the board first.</span>
                   <div className="assist-choice-grid">
                     {factionChoiceActions.map((choice, actionIndex) => (
                       <button
@@ -264,7 +302,7 @@ export function PlayerActionsPanel({
                 </>
               ) : selectedGroup.key === "draw_advance" ? (
                 <>
-                  <span className="summary-line">Choose the turn bookkeeping directly. These actions do not need the exact legal-action browser first.</span>
+                  <span className="summary-line">Choose the turn bookkeeping directly. These steps do not need the audit drawer first.</span>
                   <div className="assist-choice-grid">
                     {drawAdvanceChoices.map((action, actionIndex) => (
                       <button
@@ -327,30 +365,34 @@ export function PlayerActionsPanel({
           ) : (
             <div className="flow-step-card waiting assist-selection-empty">
               <strong>Select an intent above.</strong>
-              <span className="summary-line">The matching legal options will appear here.</span>
+              <span className="summary-line">The matching turn prompt will appear here.</span>
             </div>
           )}
 
-          <ExactActionDrawer
-            title="Exact Legal Actions"
-            summary="Use this only when you need to audit or apply from the raw generated action list."
-            open={showAllActions}
-            actions={visibleActions}
-            allActions={actions}
-            state={state}
-            onToggle={setShowAllActions}
-            onApply={onApply}
-            onOpenBattle={onOpenBattle}
-            onPreviewAction={onPreviewAction}
-          />
+          {showFallbackDrawer ? (
+            <ExactActionDrawer
+              title="Action Audit"
+              summary="Open this only when you need the exact rule-backed move list."
+              open={showAllActions}
+              actions={visibleActions}
+              allActions={actions}
+              state={state}
+              onToggle={setShowAllActions}
+              onApply={onApply}
+              onOpenBattle={onOpenBattle}
+              onPreviewAction={onPreviewAction}
+            />
+          ) : null}
         </div>
       )}
 
-      <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
-        <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
-          Refresh
-        </button>
-      </div>
+      {showRefreshButton ? (
+        <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
+          <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
+            Refresh Turn
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

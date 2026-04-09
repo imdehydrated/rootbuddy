@@ -31,6 +31,7 @@ function renderPanel(options: {
   onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
+  onPromptChange?: (prompt: string | null) => void;
 } = {}) {
   return render(
     <PlayerActionsPanel
@@ -44,6 +45,7 @@ function renderPanel(options: {
       onMovementCandidatesChange={options.onMovementCandidatesChange}
       onBuildRecruitCandidatesChange={options.onBuildRecruitCandidatesChange}
       onFactionSpatialCandidatesChange={options.onFactionSpatialCandidatesChange}
+      onPromptChange={options.onPromptChange}
     />
   );
 }
@@ -103,7 +105,35 @@ describe("PlayerActionsPanel", () => {
     await waitFor(() => expect(onMovementCandidatesChange).toHaveBeenLastCalledWith([{ actionIndex: 0, action: movementAction }]));
   });
 
-  it("keeps exact legal actions closed by default for normal active intents", () => {
+  it("publishes a game-facing tray prompt as the active intent changes", async () => {
+    const movementAction: Action = {
+      type: ACTION_TYPE.MOVEMENT,
+      movement: {
+        faction: 2,
+        count: 1,
+        maxCount: 1,
+        from: 3,
+        to: 7,
+        fromForestID: 0,
+        toForestID: 0,
+        decreeCardID: 0,
+        sourceEffectID: ""
+      }
+    };
+    const onPromptChange = vi.fn();
+
+    renderPanel({ actions: [movementAction], onPromptChange });
+
+    await waitFor(() => expect(onPromptChange).toHaveBeenLastCalledWith("Choose what you want to do next."));
+
+    fireEvent.click(screen.getByRole("button", { name: /Move.*Pieces changed clearings/i }));
+
+    await waitFor(() =>
+      expect(onPromptChange).toHaveBeenLastCalledWith("Choose a highlighted source clearing, then choose the destination.")
+    );
+  });
+
+  it("keeps the action audit closed by default for normal active intents", () => {
     const movementAction: Action = {
       type: ACTION_TYPE.MOVEMENT,
       movement: {
@@ -189,7 +219,7 @@ describe("PlayerActionsPanel", () => {
     expect(onOpenBattle).toHaveBeenCalledWith(0);
   });
 
-  it("keeps ambiguous active-turn battle targets in the exact legal fallback", () => {
+  it("keeps ambiguous active-turn battle targets in the action audit fallback", () => {
     const firstBattle: Action = {
       type: ACTION_TYPE.BATTLE,
       battle: {
@@ -215,11 +245,11 @@ describe("PlayerActionsPanel", () => {
     renderPanel({ actions: [firstBattle, decreeBattle], onOpenBattle });
 
     fireEvent.click(screen.getByRole("button", { name: /Battle.*A battle started/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Clearing 3: Marquise.*2 battle options/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Clearing 3: Marquise.*2 battle paths/i }));
 
     expect(onOpenBattle).not.toHaveBeenCalled();
-    expect(screen.getByText(/still maps to 2 legal battle options/i)).toBeInTheDocument();
-    expect(screen.getByText(/Exact Legal Actions/i)).toBeInTheDocument();
+    expect(screen.getByText(/still has 2 possible battle paths/i)).toBeInTheDocument();
+    expect(screen.getByText(/Action Audit/i)).toBeInTheDocument();
   });
 
   it("applies active-turn craft from a card-first prompt", async () => {
@@ -263,7 +293,7 @@ describe("PlayerActionsPanel", () => {
     renderPanel({ actions: [workshopThree, workshopEleven], onApply });
 
     fireEvent.click(screen.getByRole("button", { name: /Craft.*A known card was crafted/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*2 craft routes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*2 workshop routes/i }));
 
     expect(onApply).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /Workshops 3/i })).toBeInTheDocument();

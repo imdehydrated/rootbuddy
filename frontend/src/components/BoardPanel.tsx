@@ -1,7 +1,6 @@
 import { ClearingMarker, type ClearingPreviewPiece } from "./ClearingMarker";
 import { clearingPosition } from "../gameHelpers";
-import { ACTION_TYPE, factionLabels } from "../labels";
-import { describeAction } from "../actionPresentation";
+import { ACTION_TYPE } from "../labels";
 import { useState } from "react";
 import type { BoardLayout } from "../boardLayouts";
 import type { Action, Clearing, Forest, GameState, HighlightedClearing } from "../types";
@@ -30,6 +29,27 @@ type BoardPanelProps = {
   onSelectForest?: (forestID: number) => void;
 };
 
+type BoardViewport = {
+  x: number;
+  y: number;
+  scale: number;
+};
+
+type DragState = {
+  startX: number;
+  startY: number;
+  originX: number;
+  originY: number;
+} | null;
+
+const MIN_BOARD_SCALE = 1;
+const MAX_BOARD_SCALE = 2.25;
+const BOARD_ZOOM_STEP = 0.12;
+
+function clampBoardScale(nextScale: number) {
+  return Math.min(MAX_BOARD_SCALE, Math.max(MIN_BOARD_SCALE, nextScale));
+}
+
 export function BoardPanel({
   state,
   clearings,
@@ -50,6 +70,8 @@ export function BoardPanel({
   onSelectForest
 }: BoardPanelProps) {
   const [hoveredClearingID, setHoveredClearingID] = useState<number | null>(null);
+  const [viewport, setViewport] = useState<BoardViewport>({ x: 0, y: 0, scale: 1 });
+  const [dragState, setDragState] = useState<DragState>(null);
   const highlightByClearing = new Map(
     highlightedClearings.map((highlight) => [highlight.clearingID, highlight.role])
   );
@@ -112,21 +134,6 @@ export function BoardPanel({
   );
 
   const previewedClearingIDs = new Set(highlightedClearings.map((highlight) => highlight.clearingID));
-  const previewFootprint = highlightedClearings.reduce(
-    (summary, highlight) => {
-      summary.total += 1;
-      if (highlight.role === "source") {
-        summary.source += 1;
-      } else if (highlight.role === "target") {
-        summary.target += 1;
-      } else {
-        summary.affected += 1;
-      }
-      return summary;
-    },
-    { source: 0, target: 0, affected: 0, total: 0 }
-  );
-
   const clearingBoardPosition = (clearingID: number) => {
     const known = boardLayout.clearingPositions[clearingID];
     if (known) {
@@ -144,52 +151,6 @@ export function BoardPanel({
       top: Number.parseFloat(fallback.top)
     };
   };
-
-  const previewOverlayTitle = (() => {
-    if (!previewedAction) {
-      return null;
-    }
-
-    switch (previewedAction.type) {
-      case ACTION_TYPE.MOVEMENT:
-      case ACTION_TYPE.SLIP:
-        return "Route Preview";
-      case ACTION_TYPE.BATTLE:
-      case ACTION_TYPE.BATTLE_RESOLUTION:
-        return "Conflict Preview";
-      case ACTION_TYPE.BUILD:
-        return "Build Preview";
-      case ACTION_TYPE.CRAFT:
-        return "Craft Preview";
-      case ACTION_TYPE.RECRUIT:
-        return "Recruit Preview";
-      default:
-        return "Action Preview";
-    }
-  })();
-
-  const previewOverlayDetail = (() => {
-    if (!previewedAction) {
-      return null;
-    }
-
-    switch (previewedAction.type) {
-      case ACTION_TYPE.MOVEMENT:
-        return `Moving from clearing ${previewedAction.movement?.from ?? "?"} to clearing ${previewedAction.movement?.to ?? "?"}.`;
-      case ACTION_TYPE.SLIP:
-        return `Slipping from ${previewedAction.slip?.fromForestID ? `forest ${previewedAction.slip.fromForestID}` : `clearing ${previewedAction.slip?.from ?? "?"}`} to ${previewedAction.slip?.toForestID ? `forest ${previewedAction.slip.toForestID}` : `clearing ${previewedAction.slip?.to ?? "?"}`}.`;
-      case ACTION_TYPE.BATTLE:
-        return `${factionLabels[previewedAction.battle?.faction ?? 0] ?? "Unknown"} initiates battle against ${factionLabels[previewedAction.battle?.targetFaction ?? 0] ?? "Unknown"} in clearing ${previewedAction.battle?.clearingID ?? "?"}.`;
-      case ACTION_TYPE.BUILD:
-        return `Building in clearing ${previewedAction.build?.clearingID ?? "?"} using ${previewedAction.build?.woodSources?.length ?? 0} wood source(s).`;
-      case ACTION_TYPE.CRAFT:
-        return `Crafting uses workshop access from ${(previewedAction.craft?.usedWorkshopClearings ?? []).join(", ") || "no"} clearings.`;
-      case ACTION_TYPE.RECRUIT:
-        return `Recruit affects ${(previewedAction.recruit?.clearingIDs ?? []).length} clearing(s).`;
-      default:
-        return describeAction(previewedAction, state);
-    }
-  })();
 
   const previewRoutes =
     !previewedAction
@@ -237,63 +198,61 @@ export function BoardPanel({
           }
         })();
 
-  const previewAnnotations =
-    !previewedAction
-      ? []
-      : highlightedClearings
-          .map((highlight) => {
-            const position = clearingBoardPosition(highlight.clearingID);
-            if (!position) {
-              return null;
-            }
+  function handleBoardMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button")) {
+      return;
+    }
+    setDragState({
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: viewport.x,
+      originY: viewport.y
+    });
+  }
 
-            let label = highlight.role === "source" ? "Source" : highlight.role === "target" ? "Target" : "Affected";
-            let detail = "";
+  function handleBoardMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+    if (!dragState) {
+      return;
+    }
+    setViewport((current) => ({
+      ...current,
+      x: dragState.originX + (event.clientX - dragState.startX),
+      y: dragState.originY + (event.clientY - dragState.startY)
+    }));
+  }
 
-            switch (previewedAction.type) {
-              case ACTION_TYPE.MOVEMENT:
-              case ACTION_TYPE.SLIP:
-                label = highlight.role === "source" ? "From" : highlight.role === "target" ? "To" : label;
-                detail = `Clearing ${highlight.clearingID}`;
-                break;
-              case ACTION_TYPE.BUILD: {
-                const woodSource = previewedAction.build?.woodSources?.find((source) => source.clearingID === highlight.clearingID);
-                label = woodSource ? "Wood Source" : "Build Site";
-                detail = woodSource ? `${woodSource.amount} wood` : `Clearing ${highlight.clearingID}`;
-                break;
-              }
-              case ACTION_TYPE.BATTLE:
-              case ACTION_TYPE.BATTLE_RESOLUTION:
-                label = "Battle Site";
-                detail = `${factionLabels[previewedAction.battle?.targetFaction ?? previewedAction.battleResolution?.targetFaction ?? 0] ?? "Unknown"} targeted`;
-                break;
-              case ACTION_TYPE.CRAFT:
-                label = "Workshop";
-                detail = `Craft support`;
-                break;
-              case ACTION_TYPE.RECRUIT:
-                label = "Recruit";
-                detail = `Clearing ${highlight.clearingID}`;
-                break;
-              default:
-                detail = `Clearing ${highlight.clearingID}`;
-                break;
-            }
+  function handleBoardMouseUp() {
+    setDragState(null);
+  }
 
-            return {
-              key: `${highlight.clearingID}-${highlight.role}`,
-              left: position.left,
-              top: position.top,
-              role: highlight.role,
-              label,
-              detail
-            };
-          })
-          .filter((annotation): annotation is NonNullable<typeof annotation> => annotation !== null);
+  function handleBoardWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setViewport((current) => ({
+      ...current,
+      scale: clampBoardScale(current.scale + (event.deltaY < 0 ? BOARD_ZOOM_STEP : -BOARD_ZOOM_STEP))
+    }));
+  }
+
   return (
     <section className="board-panel">
-      <div className={`board-canvas ${previewedAction ? "preview-active" : ""}`}>
-        <div className="board-view">
+      <div
+        className={`board-canvas ${previewedAction ? "preview-active" : ""} ${dragState ? "dragging" : "pannable"}`}
+        data-testid="board-canvas"
+        onMouseDown={handleBoardMouseDown}
+        onMouseMove={handleBoardMouseMove}
+        onMouseUp={handleBoardMouseUp}
+        onMouseLeave={handleBoardMouseUp}
+        onWheel={handleBoardWheel}
+      >
+        <div
+          className="board-view"
+          data-testid="board-view"
+          style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}
+        >
           <img
             className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
             src={boardLayout.imagePath}
@@ -340,19 +299,9 @@ export function BoardPanel({
                       y2={segment.y2}
                       className="connected-to-focus"
                     />
-                ))}
+                  ))}
               </svg>
             )}
-            {previewAnnotations.map((annotation) => (
-              <div
-                key={annotation.key}
-                className={`board-preview-badge ${annotation.role}`}
-                style={{ left: `${annotation.left}%`, top: `${annotation.top}%` }}
-              >
-                <strong>{annotation.label}</strong>
-                <span>{annotation.detail}</span>
-              </div>
-            ))}
             {clearings.map((clearing, index) => (
               <ClearingMarker
                 key={clearing.id}
@@ -403,23 +352,6 @@ export function BoardPanel({
             })}
           </div>
         </div>
-        {previewedAction && previewOverlayTitle ? (
-          <div className="board-preview-overlay">
-            <div className="board-preview-card">
-              <p className="board-kicker">{previewOverlayTitle}</p>
-              <strong>{describeAction(previewedAction, state)}</strong>
-              {previewOverlayDetail ? <span>{previewOverlayDetail}</span> : null}
-              {previewFootprint.total > 0 ? (
-                <div className="board-preview-summary">
-                  <span>{previewFootprint.total} touched</span>
-                  {previewFootprint.source > 0 ? <span>{previewFootprint.source} source</span> : null}
-                  {previewFootprint.target > 0 ? <span>{previewFootprint.target} target</span> : null}
-                  {previewFootprint.affected > 0 ? <span>{previewFootprint.affected} affected</span> : null}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
       </div>
     </section>
   );

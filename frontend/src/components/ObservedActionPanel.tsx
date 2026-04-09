@@ -508,8 +508,8 @@ export function ObservedActionPanel({
 
       <p className="message">
         {embedded
-          ? "Record the current faction's public actions without leaving the main board flow."
-          : "Record public table observations for factions whose full hands are hidden in assist mode. Use the battle template for observed public battle outcomes and effect usage."}
+          ? "Record what the current faction did on the physical board without leaving the main board flow."
+          : "Record public table observations when assist mode cannot infer the event cleanly. Use the battle template for public battle outcomes and visible effect usage."}
       </p>
 
       <div className="observed-panel-grid">
@@ -784,7 +784,7 @@ export function ObservedActionPanel({
       <details className="secondary-drawer observed-preview-drawer">
         <summary className="panel-summary">
           <span className="summary-label">Raw Action Preview</span>
-          <span className="summary-line">Audit the generated payload when troubleshooting assist bookkeeping.</span>
+          <span className="summary-line">Audit the generated payload only when troubleshooting assist recordkeeping.</span>
         </summary>
         <textarea className="state-editor observed-preview" value={actionPreview} readOnly spellCheck={false} />
       </details>

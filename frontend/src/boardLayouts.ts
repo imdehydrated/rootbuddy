@@ -32,13 +32,13 @@ const autumnBoardLayout: BoardLayout = {
     3: { left: 85, top: 86 }
   },
   forestPositions: {
-    1: { left: 30, top: 11 },
-    2: { left: 66, top: 22 },
-    3: { left: 79, top: 53 },
-    4: { left: 56, top: 84 },
-    5: { left: 30, top: 73 },
-    6: { left: 8, top: 57 },
-    7: { left: 54, top: 43 }
+    1: { left: 29.2, top: 13.2 },
+    2: { left: 71.6, top: 21.7 },
+    3: { left: 78.7, top: 56.7 },
+    4: { left: 53.5, top: 82.9 },
+    5: { left: 25.6, top: 73.8 },
+    6: { left: 7.4, top: 57.8 },
+    7: { left: 50.6, top: 46.7 }
   }
 };
 

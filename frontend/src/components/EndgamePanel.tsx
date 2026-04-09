@@ -4,6 +4,7 @@ import type { GameState } from "../types";
 
 type EndgamePanelProps = {
   state: GameState;
+  surface?: "sidebar" | "modal";
   hasSavedSession: boolean;
   serverGameID: string | null;
   onNewGame: () => void;
@@ -63,6 +64,7 @@ function victorySummary(state: GameState): { title: string; detail: string } {
 
 export function EndgamePanel({
   state,
+  surface = "sidebar",
   hasSavedSession,
   serverGameID,
   onNewGame,
@@ -82,7 +84,7 @@ export function EndgamePanel({
   const coalitionWinners = winningCoalitionSet(state);
 
   return (
-    <section className="panel sidebar-panel endgame-panel">
+    <section className={`panel endgame-panel ${surface === "modal" ? "endgame-event-panel" : "sidebar-panel"}`}>
       <p className="eyebrow">Game Over</p>
       <div className="endgame-hero">
         <span className="summary-label">{summary.title}</span>

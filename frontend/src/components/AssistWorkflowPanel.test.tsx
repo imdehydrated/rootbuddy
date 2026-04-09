@@ -23,6 +23,7 @@ function observedState(overrides: Partial<GameState> = {}): GameState {
 function renderPanel(options: {
   state?: GameState;
   actions?: Action[];
+  surface?: "sidebar" | "tray";
   onApply?: (action: Action) => Promise<void>;
   onGenerateActions?: () => Promise<void>;
   onOpenTurnState?: () => void;
@@ -36,6 +37,7 @@ function renderPanel(options: {
     <AssistWorkflowPanel
       state={options.state ?? observedState()}
       actions={options.actions ?? []}
+      surface={options.surface}
       onApply={options.onApply ?? vi.fn(async () => undefined)}
       onGenerateActions={options.onGenerateActions ?? vi.fn(async () => undefined)}
       onOpenTurnState={options.onOpenTurnState ?? vi.fn()}
@@ -54,8 +56,31 @@ describe("AssistWorkflowPanel", () => {
 
     renderPanel({ actions: [], onGenerateActions });
 
-    expect(screen.getByText(/Public candidates are loading/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Reading the public board state/i)).toHaveLength(2);
     await waitFor(() => expect(onGenerateActions).toHaveBeenCalledTimes(1));
+  });
+
+  it("uses a compact tray summary with secondary table-notes controls in tray mode", () => {
+    const moveAction: Action = {
+      type: ACTION_TYPE.MOVEMENT,
+      movement: {
+        faction: 2,
+        count: 1,
+        maxCount: 1,
+        from: 3,
+        to: 7,
+        fromForestID: 0,
+        toForestID: 0,
+        decreeCardID: 0,
+        sourceEffectID: ""
+      }
+    };
+
+    renderPanel({ surface: "tray", actions: [moveAction] });
+
+    expect(screen.getByText(/Record what happened on the table/i)).toBeInTheDocument();
+    expect(screen.getByText(/Table Notes & Hidden Info/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^Assist Workflow$/i)).not.toBeInTheDocument();
   });
 
   it("uses a craft choice prompt instead of applying from a raw candidate list", async () => {
@@ -101,7 +126,7 @@ describe("AssistWorkflowPanel", () => {
     renderPanel({ actions: [workshopThree, workshopEleven], onApply });
 
     fireEvent.click(screen.getByRole("button", { name: /Craft/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*2 craft routes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*2 workshop paths/i }));
 
     expect(onApply).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /Workshops 3/i })).toBeInTheDocument();
@@ -303,7 +328,7 @@ describe("AssistWorkflowPanel", () => {
     renderPanel({ actions: [addToRecruit, addToMove], onApply });
 
     fireEvent.click(screen.getByRole("button", { name: /Faction Action/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*column assignments/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Royal Claim.*column choices/i }));
 
     expect(onApply).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /Royal Claim.*Recruit/i })).toBeInTheDocument();

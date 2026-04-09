@@ -55,15 +55,15 @@ export function LobbyScreen({
       <section className="panel modal-panel multiplayer-screen entry-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Multiplayer Lobby</p>
+            <p className="eyebrow">Online Table</p>
             <h2>Join Code {lobby.joinCode}</h2>
           </div>
           <span className={`connection-pill ${connectionStatus}`}>{connectionLabel(connectionStatus)}</span>
         </div>
 
-        <div className="lobby-hero">
+        <div className="lobby-hero pregame-table-hero">
           <div className="summary-stack">
-            <span className="summary-label">Players</span>
+            <span className="summary-label">Table Status</span>
             <span className="summary-line">
               {lobby.players.length} / {lobby.factions.length} seats filled
             </span>
@@ -75,8 +75,8 @@ export function LobbyScreen({
         </div>
 
         <div className="summary-stack">
-          <span className="summary-label">Claim A Faction</span>
-          <div className="multiplayer-choice-grid">
+          <span className="summary-label">Claim A Seat</span>
+          <div className="pregame-seat-grid">
             {lobby.factions.map((faction) => {
               const claimedBy = claimedByFaction(lobby, faction);
               const selected = currentFaction === faction;
@@ -84,12 +84,14 @@ export function LobbyScreen({
                 <button
                   key={faction}
                   type="button"
-                  className={selected ? "multiplayer-choice selected" : "multiplayer-choice secondary"}
+                  className={`pregame-seat-card faction-seat-card ${selected ? "selected" : ""}`}
                   disabled={submitting || (!!claimedBy && !selected)}
                   onClick={() => void onClaimFaction(selected ? null : faction)}
                 >
+                  <span className="summary-label">Faction Seat</span>
                   <strong>{factionLabels[faction]}</strong>
-                  <span>{claimedBy ? claimedBy.displayName : "Open"}</span>
+                  <span className="summary-line">{claimedBy ? claimedBy.displayName : "Open seat"}</span>
+                  <span className="summary-line">{selected ? "You are sitting here." : claimedBy ? "Already claimed." : "Available to claim."}</span>
                 </button>
               );
             })}
@@ -97,7 +99,7 @@ export function LobbyScreen({
         </div>
 
         <div className="summary-stack">
-          <span className="summary-label">Lobby Players</span>
+          <span className="summary-label">Players At The Table</span>
           <div className="lobby-player-list">
             {lobby.players.map((player, index) => (
               <article key={`${index}-${player.displayName}-${player.isHost}`} className="lobby-player-card">

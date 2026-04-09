@@ -28,6 +28,9 @@ import { useEffect, useRef, useState } from "react";
 type AssistWorkflowPanelProps = {
   state: GameState;
   actions: Action[];
+  surface?: "sidebar" | "tray";
+  showFallbackDrawer?: boolean;
+  showCorrectionControls?: boolean;
   onApply: (action: Action) => Promise<void>;
   onGenerateActions: () => Promise<void>;
   onOpenTurnState: () => void;
@@ -41,6 +44,9 @@ type AssistWorkflowPanelProps = {
 export function AssistWorkflowPanel({
   state,
   actions,
+  surface = "sidebar",
+  showFallbackDrawer = true,
+  showCorrectionControls = true,
   onApply,
   onGenerateActions,
   onOpenTurnState,
@@ -54,16 +60,19 @@ export function AssistWorkflowPanel({
   const [showAllGeneratedActions, setShowAllGeneratedActions] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<AssistIntentKey | null>(null);
   const [manualCaptureOpen, setManualCaptureOpen] = useState(false);
+  const [observedNotesOpen, setObservedNotesOpen] = useState(false);
   const [choiceMessage, setChoiceMessage] = useState("");
   const [selectedCraftCardID, setSelectedCraftCardID] = useState<number | null>(null);
   const [selectedDecreeCardKey, setSelectedDecreeCardKey] = useState<string | null>(null);
   const autoLoadKey = useRef("");
+  const traySurface = surface === "tray";
 
   useEffect(() => {
     setPreferredTemplate(null);
     setShowAllGeneratedActions(false);
     setSelectedIntent(null);
     setManualCaptureOpen(false);
+    setObservedNotesOpen(false);
     setChoiceMessage("");
     setSelectedCraftCardID(null);
     setSelectedDecreeCardKey(null);
@@ -164,8 +173,8 @@ export function AssistWorkflowPanel({
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
   const nextAssistSummary =
     actions.length > 0
-      ? `Choose what ${actorLabel} just did, then apply the matching public action candidate.`
-      : `Loading public candidates for ${actorLabel}. If the action involved hidden information, use Other observed event.`;
+      ? `Choose what ${actorLabel} just did on the physical board, then record the matching guided step.`
+      : `Reading the public board state for ${actorLabel}. If hidden information mattered, use Other observed event.`;
 
   useEffect(() => {
     onBattleCandidatesChange?.(battleCandidates);
@@ -191,35 +200,68 @@ export function AssistWorkflowPanel({
     return null;
   }
 
-  return (
-    <section className="panel sidebar-panel assist-workflow-panel">
-      <p className="eyebrow">Observed Turn</p>
-      <div className="flow-guide-hero">
-        <span className="summary-label">
-          {actorLabel}: {phaseLabel} / {stepLabels[state.currentStep] ?? "Unknown"}
-        </span>
-        <strong>Assist Workflow</strong>
-        <span className="summary-line">{nextAssistSummary}</span>
-      </div>
+  const hiddenObservedControls = (
+    <div className="shortcut-grid">
+      {observedPromptTemplates(state).map((prompt) => (
+        <button
+          key={prompt.label}
+          type="button"
+          className="secondary"
+          onClick={() => {
+            setPreferredTemplate(prompt.template);
+            setManualCaptureOpen(true);
+            setObservedNotesOpen(true);
+            setSelectedIntent(null);
+            setChoiceMessage("");
+            setSelectedCraftCardID(null);
+            setSelectedDecreeCardKey(null);
+          }}
+        >
+          {prompt.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="secondary"
+          onClick={() => {
+            setPreferredTemplate(null);
+            setManualCaptureOpen((current) => !current);
+            setObservedNotesOpen(true);
+            setSelectedIntent(null);
+            setChoiceMessage("");
+          setSelectedCraftCardID(null);
+          setSelectedDecreeCardKey(null);
+        }}
+      >
+        Other Observed Event
+      </button>
+    </div>
+  );
 
-      <div className="assist-director-stack">
-        <div className="flow-step-card active">
-          <strong>What did {actorLabel} do?</strong>
-          <span className="summary-line">
-            Pick the public intent first. This keeps assist mode close to Root Digital: one observed decision, then one matching action.
-          </span>
+  return (
+    <section className={`panel assist-workflow-panel ${surface === "tray" ? "board-action-panel board-action-panel-tray assist-workflow-tray" : "sidebar-panel"}`}>
+      {traySurface ? (
+        <>
+          <div className="summary-stack assist-tray-summary">
+            <p className="eyebrow">Observed Turn</p>
+            <span className="summary-label">
+              {actorLabel}: {phaseLabel} / {stepLabels[state.currentStep] ?? "Unknown"}
+            </span>
+            <strong>Record what happened on the table.</strong>
+            <span className="summary-line">{nextAssistSummary}</span>
+          </div>
           {actions.length === 0 ? (
             <div className="summary-stack assist-loading-card">
-              <span className="summary-line">Public candidates are loading for this observed turn.</span>
+              <span className="summary-line">Reading the public board state for this observed turn.</span>
               <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
-                Refresh Public Candidates
+                Refresh Table View
               </button>
             </div>
           ) : (
             <IntentGrid
               groups={actionGroups}
               selectedIntent={selectedIntent}
-              countLabel="candidate(s)"
+              countLabel="option(s)"
               onSelect={(intent) => {
                 setSelectedIntent(intent);
                 setShowAllGeneratedActions(false);
@@ -230,68 +272,89 @@ export function AssistWorkflowPanel({
               }}
             />
           )}
-        </div>
-
-        <div className="flow-step-card note">
-          <strong>Hidden or uncaptured event?</strong>
-          <span className="summary-line">
-            Use this only when the public candidates do not represent the observed table event or the event involved unknown cards.
-          </span>
-          <div className="shortcut-grid" style={{ marginTop: "0.5rem" }}>
-            {observedPromptTemplates(state).map((prompt) => (
-              <button
-                key={prompt.label}
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setPreferredTemplate(prompt.template);
-                  setManualCaptureOpen(true);
-                  setSelectedIntent(null);
-                  setChoiceMessage("");
-                  setSelectedCraftCardID(null);
-                  setSelectedDecreeCardKey(null);
-                }}
-              >
-                {prompt.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                setPreferredTemplate(null);
-                setManualCaptureOpen((current) => !current);
-                setSelectedIntent(null);
-                setChoiceMessage("");
-                setSelectedCraftCardID(null);
-                setSelectedDecreeCardKey(null);
-              }}
-            >
-              Other Observed Event
-            </button>
+          <details
+            className="secondary-drawer assist-observed-notes-drawer"
+            open={manualCaptureOpen || observedNotesOpen}
+            onToggle={(event) => setObservedNotesOpen(event.currentTarget.open)}
+          >
+            <summary className="panel-summary">
+              <span className="summary-label">Table Notes & Hidden Info</span>
+              <span className="summary-line">Use this only when the board-first recorded steps do not fully match what happened at the physical table.</span>
+            </summary>
+            <div className="assist-observed-notes-body">{hiddenObservedControls}</div>
+          </details>
+        </>
+      ) : (
+        <>
+          <p className="eyebrow">Observed Turn</p>
+          <div className="flow-guide-hero">
+            <span className="summary-label">
+              {actorLabel}: {phaseLabel} / {stepLabels[state.currentStep] ?? "Unknown"}
+            </span>
+            <strong>Assist Workflow</strong>
+            <span className="summary-line">{nextAssistSummary}</span>
           </div>
-        </div>
-      </div>
+
+          <div className="assist-director-stack">
+            <div className="flow-step-card active">
+              <strong>What did {actorLabel} do?</strong>
+              <span className="summary-line">
+                Pick the public intent first, then record what happened on the table one step at a time.
+              </span>
+              {actions.length === 0 ? (
+                <div className="summary-stack assist-loading-card">
+                  <span className="summary-line">Reading the public board state for this observed turn.</span>
+                  <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
+                    Refresh Table View
+                  </button>
+                </div>
+              ) : (
+                <IntentGrid
+                  groups={actionGroups}
+                  selectedIntent={selectedIntent}
+                  countLabel="option(s)"
+                  onSelect={(intent) => {
+                    setSelectedIntent(intent);
+                    setShowAllGeneratedActions(false);
+                    setManualCaptureOpen(false);
+                    setChoiceMessage("");
+                    setSelectedCraftCardID(null);
+                    setSelectedDecreeCardKey(null);
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="flow-step-card note">
+              <strong>Hidden or uncaptured event?</strong>
+              <span className="summary-line">
+                Use this only when the guided public options do not match what happened on the table or when unknown cards matter.
+              </span>
+              <div style={{ marginTop: "0.5rem" }}>{hiddenObservedControls}</div>
+            </div>
+          </div>
+        </>
+      )}
 
       {selectedGroup ? (
         <div className="summary-stack assist-candidate-list">
-          <span className="summary-label">{selectedGroup.label} Candidates</span>
+          <span className="summary-label">{selectedGroup.label}</span>
           <span className="summary-line">{selectedGroup.detail}</span>
           {selectedGroup.key === "movement" ? (
-            <span className="summary-line">Use the board first: choose a highlighted source clearing, then a highlighted destination. Use the list only if multiple candidates share the same route.</span>
+            <span className="summary-line">Use the board first: choose a highlighted source clearing, then a highlighted destination. Only use the record list if the same route could mean more than one move.</span>
           ) : null}
           {selectedGroup.key === "battle" ? (
-            <span className="summary-line">Use the board first: choose a highlighted battle clearing. If multiple defenders are possible there, choose the observed defender here.</span>
+            <span className="summary-line">Use the board first: choose a highlighted battle clearing. If that clearing could have more than one defender, choose the observed defender here.</span>
           ) : null}
           {selectedGroup.key === "build_recruit" ? (
-            <span className="summary-line">Use the board first: choose a highlighted build, recruit, or overwork clearing. Use the list when one click would match multiple candidates.</span>
+            <span className="summary-line">Use the board first: choose a highlighted build, recruit, or overwork clearing. Use the record list only when one clearing could match more than one step.</span>
           ) : null}
           {selectedGroup.key === "faction" ? (
-            <span className="summary-line">Use the board first for clearing-based faction actions like sympathy, revolt, organize, explore, aid, or strike. Use the list for card, item, or leader choices.</span>
+            <span className="summary-line">Use the board first for clearing-based faction actions like sympathy, revolt, organize, explore, aid, or strike. Use the record cards here for card, item, or leader choices.</span>
           ) : null}
           {selectedGroup.key === "faction" && factionChoiceActions.length > 0 ? (
             <>
-              <span className="summary-line">For non-spatial faction choices, choose the observed option directly instead of opening exact generated candidates.</span>
+              <span className="summary-line">For non-spatial faction choices, record the observed step directly instead of opening the audit drawer.</span>
               <div className="assist-choice-grid">
                 {factionChoiceActions.map((choice, actionIndex) => (
                   <button
@@ -313,7 +376,7 @@ export function AssistWorkflowPanel({
           {selectedGroup.key === "faction" && factionSpatialChoiceActions.length > 0 ? (
             <>
               <span className="summary-line">
-                For clearing-based faction actions, use the board first or choose the exact observed card, item, or target option here.
+                For clearing-based faction actions, use the board first or choose the matching observed card, item, or target here.
               </span>
               <div className="assist-choice-grid">
                 {factionSpatialChoiceActions.map((choice, actionIndex) => (
@@ -355,7 +418,7 @@ export function AssistWorkflowPanel({
                     }}
                   >
                     <strong>{decreeCardLabel(choice.cardIDs)}</strong>
-                    <span>{choice.actions.length === 1 ? "Apply exact decree add" : `${choice.actions.length} column assignments`}</span>
+                    <span>{choice.actions.length === 1 ? "Record this decree add" : `${choice.actions.length} column choices`}</span>
                   </button>
                 ))}
               </div>
@@ -373,7 +436,7 @@ export function AssistWorkflowPanel({
                       }}
                     >
                       <strong>{decreeColumnAssignmentLabel(action)}</strong>
-                      <span>Apply this decree assignment</span>
+                      <span>Record this decree choice</span>
                     </button>
                   ))}
                 </div>
@@ -382,7 +445,7 @@ export function AssistWorkflowPanel({
           ) : null}
           {selectedGroup.key === "battle" ? (
             <>
-              <span className="summary-line">Choose the observed battle target. This opens Battle Flow directly when the defender choice maps to one legal battle.</span>
+              <span className="summary-line">Choose the observed battle target. This opens the battle event immediately when the defender choice maps to one matching fight.</span>
               <div className="assist-choice-grid">
                 {battleTargetChoices.map((choice) => (
                   <button
@@ -392,18 +455,18 @@ export function AssistWorkflowPanel({
                     onClick={() => {
                       if (choice.actions.length === 1) {
                         const actionIndex = actions.indexOf(choice.actions[0]);
-                        if (actionIndex >= 0) {
-                          setChoiceMessage("");
-                          onOpenBattle(actionIndex);
-                          return;
-                        }
+                      if (actionIndex >= 0) {
+                        setChoiceMessage("");
+                        onOpenBattle(actionIndex);
+                        return;
                       }
-                      setShowAllGeneratedActions(true);
-                      setChoiceMessage(`${choice.label} still maps to ${choice.actions.length} generated battle candidates. Choose the exact battle from the fallback list.`);
+                    }
+                    setShowAllGeneratedActions(true);
+                      setChoiceMessage(`${choice.label} could still mean ${choice.actions.length} different battle records. Open the audit drawer and choose the matching one.`);
                     }}
                   >
                     <strong>{choice.label}</strong>
-                    <span>{choice.actions.length === 1 ? "Open Battle Flow" : `${choice.actions.length} battle candidates`}</span>
+                    <span>{choice.actions.length === 1 ? "Open Battle" : `${choice.actions.length} battle records`}</span>
                   </button>
                 ))}
               </div>
@@ -426,11 +489,11 @@ export function AssistWorkflowPanel({
                         return;
                       }
                       setSelectedCraftCardID(choice.cardID);
-                      setChoiceMessage(`${describeKnownCardID(choice.cardID)} has ${choice.actions.length} legal craft routes. Choose the observed workshop route.`);
+                      setChoiceMessage(`${describeKnownCardID(choice.cardID)} could be crafted through ${choice.actions.length} workshop paths. Choose the observed workshop route.`);
                     }}
                   >
                     <strong>{describeKnownCardID(choice.cardID)}</strong>
-                    <span>{choice.actions.length === 1 ? "Apply exact craft" : `${choice.actions.length} craft routes`}</span>
+                    <span>{choice.actions.length === 1 ? "Record this craft" : `${choice.actions.length} workshop paths`}</span>
                   </button>
                 ))}
               </div>
@@ -448,7 +511,7 @@ export function AssistWorkflowPanel({
                       }}
                     >
                       <strong>{craftRouteLabel(action)}</strong>
-                      <span>Apply this craft route</span>
+                      <span>Record this workshop route</span>
                     </button>
                   ))}
                 </div>
@@ -457,7 +520,7 @@ export function AssistWorkflowPanel({
           ) : null}
           {selectedGroup.key === "draw_advance" ? (
             <>
-              <span className="summary-line">Choose the observed turn bookkeeping directly. These are low-ambiguity flow actions, so they do not need the full candidate browser first.</span>
+              <span className="summary-line">Choose the observed turn bookkeeping directly. These are straightforward table-state steps, so they do not need the full record drawer first.</span>
               <div className="assist-choice-grid">
                 {drawAdvanceChoices.map((action, actionIndex) => (
                   <button
@@ -498,22 +561,24 @@ export function AssistWorkflowPanel({
             </>
           ) : null}
           {choiceMessage ? <span className="message">{choiceMessage}</span> : null}
-          <ExactActionDrawer
-            title="Exact Generated Candidates"
-            summary="Open only when the guided prompt is ambiguous or you need to audit the rules-engine candidates."
-            open={exactCandidateDrawerOpen}
-            actions={observedGeneratedActions}
-            allActions={actions}
-            state={state}
-            onToggle={setShowAllGeneratedActions}
-            onApply={onApply}
-            onOpenBattle={onOpenBattle}
-          />
+          {showFallbackDrawer ? (
+            <ExactActionDrawer
+              title="Observed Record Audit"
+              summary="Open only when the guided prompt is ambiguous or you need to inspect the exact rule-backed record choices."
+              open={exactCandidateDrawerOpen}
+              actions={observedGeneratedActions}
+              allActions={actions}
+              state={state}
+              onToggle={setShowAllGeneratedActions}
+              onApply={onApply}
+              onOpenBattle={onOpenBattle}
+            />
+          ) : null}
         </div>
       ) : actions.length > 0 && !manualCaptureOpen ? (
         <div className="flow-step-card waiting assist-selection-empty">
           <strong>Select an intent above.</strong>
-          <span className="summary-line">The matching public candidates will appear here after you choose what happened on the physical board.</span>
+          <span className="summary-line">The matching guided record choices will appear here after you choose what happened on the physical board.</span>
         </div>
       ) : null}
 
@@ -529,20 +594,22 @@ export function AssistWorkflowPanel({
       </div>
       ) : null}
 
-      <details className="secondary-drawer assist-correction-drawer">
-        <summary className="panel-summary">
-          <span className="summary-label">Correction Mode</span>
-          <span className="summary-line">Use only when the guided observed-turn flow cannot recover the table state.</span>
-        </summary>
-        <div className="sidebar-actions" style={{ marginTop: "0.8rem" }}>
-          <button type="button" className="secondary" onClick={onOpenTurnState}>
-            Advanced Turn
-          </button>
-          <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
-            Refresh Candidates
-          </button>
-        </div>
-      </details>
+      {showCorrectionControls ? (
+        <details className="secondary-drawer assist-correction-drawer">
+          <summary className="panel-summary">
+            <span className="summary-label">Correction Mode</span>
+            <span className="summary-line">Use only when the guided observed-turn flow cannot cleanly match the real table state.</span>
+          </summary>
+          <div className="sidebar-actions" style={{ marginTop: "0.8rem" }}>
+            <button type="button" className="secondary" onClick={onOpenTurnState}>
+              Advanced Turn
+            </button>
+            <button type="button" className="secondary" onClick={() => void onGenerateActions()}>
+              Refresh Table View
+            </button>
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

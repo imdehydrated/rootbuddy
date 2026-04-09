@@ -2,6 +2,7 @@ import { factionLabels } from "../labels";
 import type { Action, BattleContext, BattleModifiers, BattlePrompt } from "../types";
 
 type BattleFlowPanelProps = {
+  surface?: "sidebar" | "modal";
   selectedBattleIndex: number | null;
   selectedBattleAction: Action | null;
   multiplayerBattlePrompt: BattlePrompt | null;
@@ -35,6 +36,7 @@ type EffectOption = {
 };
 
 export function BattleFlowPanel({
+  surface = "sidebar",
   selectedBattleIndex,
   selectedBattleAction,
   multiplayerBattlePrompt,
@@ -192,20 +194,29 @@ export function BattleFlowPanel({
   const chosenEffects = effectOptions.filter((effect) => effect.selected);
 
   return (
-    <section className="panel sidebar-panel">
-      <p className="eyebrow">Battle Flow</p>
-      <div className="summary-stack">
-        <span className="summary-label">
-          {factionLabels[attackerFaction] ?? "Unknown"} vs {factionLabels[defenderFaction] ?? "Unknown"}
-        </span>
+    <section className={`panel ${surface === "modal" ? "battle-event-panel" : "sidebar-panel"}`}>
+      <p className="eyebrow">Battle Event</p>
+      <div className="battle-event-hero">
+        <div className="battle-event-header">
+          <div className="summary-stack">
+            <span className="summary-label">Battle</span>
+            <strong>
+              {factionLabels[attackerFaction] ?? "Unknown"} vs {factionLabels[defenderFaction] ?? "Unknown"}
+            </strong>
+          </div>
+          <span className="battle-clearing-pill">
+            Clearing {battleAction.battle.clearingID}
+            {selectedBattleIndex !== null ? ` • Action ${selectedBattleIndex + 1}` : ""}
+          </span>
+        </div>
         <span className="summary-line">
-          Clearing {battleAction.battle.clearingID} {selectedBattleIndex !== null ? `- Action ${selectedBattleIndex + 1}` : ""}
+          Resolve the confrontation here, then return to the board flow.
         </span>
       </div>
 
       {effectOptions.length > 0 ? (
-        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
-          <span className="summary-label">Battle Effect Cards</span>
+        <div className="summary-stack battle-section">
+          <span className="summary-label">Effect Cards</span>
           <div className="battle-effect-grid">
             {effectOptions.map((effect) => (
               <button
@@ -225,7 +236,7 @@ export function BattleFlowPanel({
       ) : null}
 
       {multiplayerBattlePrompt ? (
-        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+        <div className="summary-stack battle-section battle-prompt-card">
           <span className="summary-label">Multiplayer Prompt</span>
           {isWaitingPrompt ? (
             <span className="summary-line">Waiting on {multiplayerWaitingLabel} to respond.</span>
@@ -254,7 +265,7 @@ export function BattleFlowPanel({
           ) : null}
         </div>
       ) : (
-        <div className="resolve-grid" style={{ marginTop: "0.9rem" }}>
+        <div className="resolve-grid battle-section battle-roll-grid">
           <label>
             <span>Attacker Roll</span>
             <input type="number" min="0" max="3" value={attackerRoll} onChange={(event) => onSetAttackerRoll(event.target.value)} />
@@ -267,7 +278,7 @@ export function BattleFlowPanel({
       )}
 
       {assistDefenderAmbushPromptRequired && !multiplayerBattlePrompt ? (
-        <div className="summary-stack" style={{ marginTop: "1rem" }}>
+        <div className="summary-stack battle-section battle-prompt-card">
           <span className="summary-label">Assist Prompt</span>
           <span className="summary-line">Did {factionLabels[defenderFaction] ?? "the defender"} play an Ambush?</span>
           <div className="sidebar-actions">
@@ -300,12 +311,12 @@ export function BattleFlowPanel({
       ) : null}
 
       {attackerHasScoutingParty ? (
-        <p className="message" style={{ marginTop: "0.8rem" }}>
+        <p className="message battle-inline-note">
           Attacker has Scouting Party, so defender ambushes are ignored.
         </p>
       ) : null}
 
-      <div className="sidebar-actions footer" style={{ marginTop: "0.9rem" }}>
+      <div className="sidebar-actions footer battle-event-actions">
         {multiplayerBattlePrompt ? (
           <>
             {(isDefenderPrompt || isAttackerPrompt) && localPlayerOwnsPrompt ? (
