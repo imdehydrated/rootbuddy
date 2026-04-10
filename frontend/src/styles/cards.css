@@ -1,1 +1,227 @@
 ﻿
+.board-card-tray-shell {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 6;
+  transform: translateX(-50%);
+  width: min(56rem, calc(100% - 2rem));
+  pointer-events: none;
+}
+
+.board-card-tray-shell.with-action-tray {
+  bottom: 14rem;
+}
+
+.card-hand-tray {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem 0.85rem;
+  border-radius: 22px;
+  background: rgba(255, 249, 240, 0.78);
+  border: 1px solid rgba(213, 195, 169, 0.92);
+  box-shadow: 0 16px 32px rgba(44, 31, 18, 0.14);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.card-hand-tray-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.card-hand-tray-header strong {
+  font-size: 1rem;
+}
+
+.card-hand-strip,
+.card-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.card-hand-strip {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(12rem, 15rem);
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.card-hand-item {
+  min-width: 0;
+}
+
+.card-hand-empty {
+  padding: 0.2rem 0.1rem 0;
+}
+
+.card-component {
+  position: relative;
+  width: 100%;
+  min-height: 10.75rem;
+  display: grid;
+  grid-template-columns: 0.42rem minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(124, 97, 65, 0.2);
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(245, 234, 214, 0.94));
+  box-shadow: 0 10px 22px rgba(50, 34, 18, 0.1);
+  text-align: left;
+}
+
+.card-component.compact {
+  min-height: 8.6rem;
+}
+
+.card-component.selected {
+  border-color: rgba(39, 72, 60, 0.42);
+  box-shadow: 0 14px 28px rgba(39, 72, 60, 0.16);
+}
+
+button.card-component {
+  cursor: pointer;
+}
+
+.card-component-body {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem 0.85rem 0.9rem;
+}
+
+.card-component.compact .card-component-body {
+  gap: 0.3rem;
+  padding: 0.65rem 0.72rem 0.72rem;
+}
+
+.card-component-accent {
+  display: block;
+  height: 100%;
+}
+
+.card-component-accent.fox,
+.card-suit-tag.fox {
+  background: linear-gradient(180deg, #d77f4b, #a54f31);
+}
+
+.card-component-accent.rabbit,
+.card-suit-tag.rabbit {
+  background: linear-gradient(180deg, #d2b46e, #a9873f);
+}
+
+.card-component-accent.mouse,
+.card-suit-tag.mouse {
+  background: linear-gradient(180deg, #6f88c0, #4c6495);
+}
+
+.card-component-accent.bird,
+.card-suit-tag.bird {
+  background: linear-gradient(180deg, #7b8896, #58636f);
+}
+
+.card-component-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.card-suit-tag,
+.card-zone-tag,
+.known-card-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.card-suit-tag {
+  color: #fff8ef;
+}
+
+.card-zone-tag {
+  background: rgba(80, 64, 44, 0.08);
+  color: rgba(58, 42, 25, 0.82);
+  border: 1px solid rgba(124, 97, 65, 0.16);
+}
+
+.card-title {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.card-component.compact .card-title {
+  font-size: 0.92rem;
+}
+
+.card-component-meta {
+  display: grid;
+  gap: 0.16rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.card-component.compact .card-component-meta {
+  font-size: 0.74rem;
+}
+
+.card-cost-line {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.known-card-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.known-card-pill {
+  background: rgba(255, 249, 240, 0.88);
+  color: rgba(58, 42, 25, 0.88);
+  border: 1px solid rgba(124, 97, 65, 0.16);
+}
+
+.card-zone-summary-grid,
+.card-count-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.card-count-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.card-zone-summary-card,
+.card-count-card,
+.card-zone-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.card-count-card {
+  padding: 0.72rem 0.82rem;
+  border-radius: 18px;
+  border: 1px solid rgba(124, 97, 65, 0.12);
+  background: rgba(255, 249, 240, 0.62);
+}
+
+.card-zone-row {
+  padding: 0.72rem 0.82rem;
+  border-radius: 18px;
+  border: 1px solid rgba(124, 97, 65, 0.12);
+  background: rgba(255, 249, 240, 0.62);
+}
+
+.card-zone-row-label {
+  font-weight: 700;
+}

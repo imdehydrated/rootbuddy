@@ -3,6 +3,7 @@ import { boardLayoutForState } from "./boardLayouts";
 import { describeKnownCardID } from "./cardCatalog";
 import { AssistWorkflowPanel } from "./components/AssistWorkflowPanel";
 import { BattleFlowPanel } from "./components/BattleFlowPanel";
+import { CardHandTray } from "./components/CardHandTray";
 import { BoardPanel } from "./components/BoardPanel";
 import { CardVisibilityPanel } from "./components/CardVisibilityPanel";
 import { EndgamePanel } from "./components/EndgamePanel";
@@ -19,7 +20,7 @@ import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
 import { VPTracker } from "./components/VPTracker";
 import { rulerOfClearing, usedBuildSlots } from "./gameHelpers";
-import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels, suitLabels } from "./labels";
+import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels, suitLabels } from "./labels";
 import { clearSavedSession } from "./localSession";
 import { gameOverHeadline, initialState, useGameState } from "./hooks/useGameState";
 import { emptyBattleModifiers, useBattleFlow } from "./hooks/useBattleFlow";
@@ -251,14 +252,12 @@ export default function App() {
   }, [showPrimaryPlayerFlow]);
 
   const setupPrompt = showPrimarySetupFlow ? setupBoardPrompt(parsedState.setupStage, board.marquiseSetupDraft) : null;
-  /*
   const phaseStatusLabel =
     parsedState.gamePhase === 0
       ? setupStageLabels[parsedState.setupStage] ?? "Setup"
       : parsedState.gamePhase === 2
         ? gameOverHeadline(parsedState)
         : `${factionLabels[parsedState.factionTurn] ?? "Unknown"} • ${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`;
-  */
   const connectionStatusLabel = multiplayerToken
     ? multiplayer.multiplayerConnectionStatus === "connected"
       ? "Live"
@@ -530,6 +529,9 @@ export default function App() {
           onSelectClearing={board.handleSetupClearingClick}
           onSelectForest={board.handleSetupForestClick}
         />
+        <div className={`board-card-tray-shell ${showPrimaryPlayerFlow || showPrimaryAssistFlow ? "with-action-tray" : ""}`}>
+          <CardHandTray state={parsedState} />
+        </div>
         {showPrimaryPlayerFlow ? (
           <div className="board-action-tray" aria-label="Live action tray">
             <PlayerActionsPanel
