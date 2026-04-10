@@ -10,16 +10,18 @@ import { GuideHelpPanel } from "./components/GuideHelpPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { JoinScreen } from "./components/JoinScreen";
 import { LobbyScreen } from "./components/LobbyScreen";
+import { PhaseBar } from "./components/PhaseBar";
 import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
 import { SessionStatusPanel } from "./components/SessionStatusPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnFlowPanel } from "./components/TurnFlowPanel";
 import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
+import { VPTracker } from "./components/VPTracker";
 import { rulerOfClearing, usedBuildSlots } from "./gameHelpers";
-import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels, suitLabels } from "./labels";
+import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels, suitLabels } from "./labels";
 import { clearSavedSession } from "./localSession";
-import { initialState, gameOverHeadline, useGameState } from "./hooks/useGameState";
+import { gameOverHeadline, initialState, useGameState } from "./hooks/useGameState";
 import { emptyBattleModifiers, useBattleFlow } from "./hooks/useBattleFlow";
 import { setupBoardPrompt, useBoardInteraction } from "./hooks/useBoardInteraction";
 import { useMultiplayer } from "./hooks/useMultiplayer";
@@ -249,12 +251,14 @@ export default function App() {
   }, [showPrimaryPlayerFlow]);
 
   const setupPrompt = showPrimarySetupFlow ? setupBoardPrompt(parsedState.setupStage, board.marquiseSetupDraft) : null;
+  /*
   const phaseStatusLabel =
     parsedState.gamePhase === 0
       ? setupStageLabels[parsedState.setupStage] ?? "Setup"
       : parsedState.gamePhase === 2
         ? gameOverHeadline(parsedState)
         : `${factionLabels[parsedState.factionTurn] ?? "Unknown"} • ${phaseLabels[parsedState.currentPhase] ?? "Unknown"} / ${stepLabels[parsedState.currentStep] ?? "Unknown"}`;
+  */
   const connectionStatusLabel = multiplayerToken
     ? multiplayer.multiplayerConnectionStatus === "connected"
       ? "Live"
@@ -426,11 +430,25 @@ export default function App() {
   return (
     <main className="app-shell workspace-shell">
       <div className="board-stage">
+        <div className="board-phase-stack">
+          <PhaseBar
+            gamePhase={parsedState.gamePhase}
+            currentPhase={parsedState.currentPhase}
+            currentStep={parsedState.currentStep}
+            setupStage={parsedState.setupStage}
+            factionTurn={parsedState.factionTurn}
+            roundNumber={parsedState.roundNumber}
+          />
+          <VPTracker
+            victoryPoints={parsedState.victoryPoints}
+            turnOrder={parsedState.turnOrder}
+            dominance={parsedState.activeDominance}
+            coalitionActive={parsedState.coalitionActive}
+            coalitionPartner={parsedState.coalitionPartner}
+          />
+        </div>
         {setupPrompt ? (
           <>
-            <div className="board-phase-banner">
-              <span>{setupPrompt.title}</span>
-            </div>
             <div className="board-setup-prompt">
               <p className="eyebrow">Setup</p>
               <strong>{setupPrompt.instruction}</strong>
@@ -457,9 +475,6 @@ export default function App() {
           </>
         ) : (
           <>
-            <div className="board-phase-banner board-phase-banner-live">
-              <span>{phaseStatusLabel}</span>
-            </div>
             <div className="board-top-hud">
               <section className="panel board-status-hud">
                 <p className="eyebrow">RootBuddy</p>
