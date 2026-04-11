@@ -7,6 +7,7 @@ import { CardHandTray } from "./components/CardHandTray";
 import { BoardPanel } from "./components/BoardPanel";
 import { CardVisibilityPanel } from "./components/CardVisibilityPanel";
 import { EndgamePanel } from "./components/EndgamePanel";
+import { GameLogPanel } from "./components/GameLogPanel";
 import { GuideHelpPanel } from "./components/GuideHelpPanel";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { JoinScreen } from "./components/JoinScreen";
@@ -529,6 +530,11 @@ export default function App() {
           onSelectClearing={board.handleSetupClearingClick}
           onSelectForest={board.handleSetupForestClick}
         />
+        {multiplayer.multiplayerToken ? (
+          <div className="board-log-shell">
+            <GameLogPanel entries={multiplayer.actionLog} factionTurn={parsedState.factionTurn} />
+          </div>
+        ) : null}
         <div className={`board-card-tray-shell ${showPrimaryPlayerFlow || showPrimaryAssistFlow ? "with-action-tray" : ""}`}>
           <CardHandTray state={parsedState} />
         </div>

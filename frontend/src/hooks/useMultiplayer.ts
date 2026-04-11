@@ -19,7 +19,7 @@ import {
 import type { MultiplayerConnectionStatus, MultiplayerSession, SetupScreen } from "../multiplayer";
 import { RootBuddyWebSocketClient } from "../wsClient";
 import { gameOverStatusMessage } from "./useGameState";
-import type { Action, BattlePrompt, GameState, Lobby, LobbyPlayer } from "../types";
+import type { Action, ActionLogEntry, BattlePrompt, GameState, Lobby, LobbyPlayer } from "../types";
 
 type MultiplayerNotice = {
   level: "warning" | "error";
@@ -77,6 +77,7 @@ export function useMultiplayer({
   const [multiplayerSubmitting, setMultiplayerSubmitting] = useState(false);
   const [multiplayerBattlePrompt, setMultiplayerBattlePrompt] = useState<BattlePrompt | null>(null);
   const [multiplayerNotice, setMultiplayerNotice] = useState<MultiplayerNotice>(null);
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   const multiplayerSelfRef = useRef<LobbyPlayer | null>(null);
   const loadActionsForStateRef = useRef(loadActionsForState);
   const syncStateRef = useRef(syncState);
@@ -197,6 +198,7 @@ export function useMultiplayer({
       onMessage: (message) => {
         if (message.type === "lobby.update") {
           setMultiplayerNotice(null);
+          setActionLog([]);
           setMultiplayerLobby(message.lobby);
           setMultiplayerSelf(message.self);
           setShowSetup(true);
@@ -214,6 +216,9 @@ export function useMultiplayer({
 
         if (message.type === "game.start" || message.type === "game.state" || message.type === "conflict") {
           setMultiplayerBattlePrompt(null);
+          if ((message.type === "game.start" || message.type === "game.state") && Array.isArray(message.actionLog)) {
+            setActionLog(message.actionLog);
+          }
           setMultiplayerLobby((current) =>
             current
               ? {
@@ -360,6 +365,7 @@ export function useMultiplayer({
     setMultiplayerSelf(null);
     setMultiplayerBattlePrompt(null);
     setMultiplayerNotice(null);
+    setActionLog([]);
     setMultiplayerConnectionStatus("disconnected");
     setSetupScreen("wizard");
   }
@@ -507,6 +513,7 @@ export function useMultiplayer({
     multiplayerSubmitting,
     multiplayerBattlePrompt,
     multiplayerNotice,
+    actionLog,
     multiplayerToken,
     perspectiveFaction,
     setMultiplayerBattlePrompt,

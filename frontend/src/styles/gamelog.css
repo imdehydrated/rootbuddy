@@ -1,0 +1,119 @@
+.board-log-shell {
+  position: absolute;
+  top: 8.9rem;
+  right: 1rem;
+  z-index: 7;
+  width: min(20rem, calc(100% - 2rem));
+  pointer-events: none;
+}
+
+.game-log-panel {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 22px;
+  background: rgba(255, 249, 240, 0.82);
+  border: 1px solid rgba(213, 195, 169, 0.92);
+  box-shadow: 0 16px 30px rgba(44, 31, 18, 0.14);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.game-log-panel.collapsed {
+  gap: 0.35rem;
+}
+
+.game-log-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.game-log-toggle {
+  flex-shrink: 0;
+}
+
+.game-log-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: min(22rem, 42vh);
+  overflow: auto;
+  padding-right: 0.1rem;
+}
+
+.game-log-entry,
+.game-log-empty {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 18px;
+  border: 1px solid rgba(124, 97, 65, 0.14);
+  background: rgba(255, 252, 246, 0.88);
+}
+
+.game-log-entry.marquise {
+  border-left: 4px solid #b14d36;
+}
+
+.game-log-entry.alliance {
+  border-left: 4px solid #4c7a45;
+}
+
+.game-log-entry.eyrie {
+  border-left: 4px solid #496aa0;
+}
+
+.game-log-entry.vagabond {
+  border-left: 4px solid #8a6842;
+}
+
+.game-log-entry-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.game-log-faction-badge,
+.game-log-round,
+.game-log-time {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.48rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.game-log-faction-badge {
+  color: #fff8ef;
+}
+
+.game-log-faction-badge.marquise {
+  background: #b14d36;
+}
+
+.game-log-faction-badge.alliance {
+  background: #4c7a45;
+}
+
+.game-log-faction-badge.eyrie {
+  background: #496aa0;
+}
+
+.game-log-faction-badge.vagabond {
+  background: #8a6842;
+}
+
+.game-log-round,
+.game-log-time {
+  background: rgba(80, 64, 44, 0.08);
+  color: rgba(58, 42, 25, 0.82);
+}
+
+.game-log-summary {
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
