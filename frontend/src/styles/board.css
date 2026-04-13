@@ -21,6 +21,13 @@
   pointer-events: none;
 }
 
+.board-status-stack {
+  display: grid;
+  gap: 0.55rem;
+  width: min(24rem, calc(100% - 8rem));
+  min-width: 0;
+}
+
 .board-status-hud,
 .board-notice-panel,
 .board-action-tray,
@@ -31,7 +38,7 @@
 }
 
 .board-status-hud {
-  width: min(20rem, calc(100% - 8rem));
+  width: 100%;
   padding: 0.7rem 0.8rem;
   border-radius: 20px;
   background: rgba(255, 249, 240, 0.68);

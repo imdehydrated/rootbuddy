@@ -198,10 +198,12 @@ export function useMultiplayer({
       onMessage: (message) => {
         if (message.type === "lobby.update") {
           setMultiplayerNotice(null);
-          setActionLog([]);
           setMultiplayerLobby(message.lobby);
           setMultiplayerSelf(message.self);
-          setShowSetup(true);
+          if (!message.lobby.gameID) {
+            setActionLog([]);
+            setShowSetup(true);
+          }
           setMultiplayerSession((current) =>
             current
               ? {

@@ -955,6 +955,56 @@ describe("App multiplayer integration", () => {
     expect(savedMultiplayer.gameID).toBe("game-123");
   });
 
+  it("keeps the board visible and updates player presence on lobby.update during gameplay", async () => {
+    const self = lobbyPlayer("Alice", { isHost: true, isReady: true, faction: 0, hasFaction: true });
+    const bob = lobbyPlayer("Bob", { isHost: false, isReady: true, faction: 2, hasFaction: true });
+    const createdLobby = lobby([self, bob], { state: 0 });
+    const updatedLobby = lobby(
+      [
+        self,
+        {
+          ...bob,
+          connected: false
+        }
+      ],
+      { state: 1, gameID: "game-123" }
+    );
+    const startedState = activeTurnState({ gameMode: 0, playerFaction: 0, factionTurn: 2 });
+    mockCreateLobbyApi(createdLobby, self, "token-1");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Online Play/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create Lobby" }));
+    fireEvent.change(await screen.findByPlaceholderText("Enter your name"), { target: { value: "Alice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Lobby" }));
+
+    expect(await screen.findByText("Join Code ROOT42")).toBeInTheDocument();
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+
+    act(() => {
+      FakeWebSocket.instances[0].emit({
+        type: "game.start",
+        gameID: "game-123",
+        revision: 7,
+        state: startedState
+      });
+    });
+
+    expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Player presence bar")).toBeInTheDocument();
+    expect(screen.getAllByText("Bob").length).toBeGreaterThan(0);
+
+    act(() => {
+      FakeWebSocket.instances[0].emit({ type: "lobby.update", lobby: updatedLobby, self });
+    });
+
+    expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
+    expect(screen.queryByText("Join Code ROOT42")).not.toBeInTheDocument();
+    expect(await screen.findByText("Away")).toBeInTheDocument();
+  });
+
   it("renders websocket action log entries on the board during multiplayer play", async () => {
     const self = lobbyPlayer("Alice", { isHost: true, isReady: true });
     const createdLobby = lobby([self]);

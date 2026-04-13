@@ -14,6 +14,7 @@ import { JoinScreen } from "./components/JoinScreen";
 import { LobbyScreen } from "./components/LobbyScreen";
 import { PhaseBar } from "./components/PhaseBar";
 import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
+import { PlayerPresenceBar } from "./components/PlayerPresenceBar";
 import { SessionStatusPanel } from "./components/SessionStatusPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnFlowPanel } from "./components/TurnFlowPanel";
@@ -476,18 +477,27 @@ export default function App() {
         ) : (
           <>
             <div className="board-top-hud">
-              <section className="panel board-status-hud">
-                <p className="eyebrow">RootBuddy</p>
-                <div className="status-block">
-                  <div className="status-block-main">
-                    <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
-                    <span>{phaseLabels[parsedState.currentPhase] ?? "Unknown"} / {stepLabels[parsedState.currentStep] ?? "Unknown"}</span>
+              <div className="board-status-stack">
+                <section className="panel board-status-hud">
+                  <p className="eyebrow">RootBuddy</p>
+                  <div className="status-block">
+                    <div className="status-block-main">
+                      <strong>{factionLabels[parsedState.factionTurn] ?? "Unknown"}</strong>
+                      <span>{phaseLabels[parsedState.currentPhase] ?? "Unknown"} / {stepLabels[parsedState.currentStep] ?? "Unknown"}</span>
+                    </div>
+                    {connectionStatusLabel ? (
+                      <span className={`connection-pill compact ${multiplayer.multiplayerConnectionStatus}`}>{connectionStatusLabel}</span>
+                    ) : null}
                   </div>
-                  {connectionStatusLabel ? (
-                    <span className={`connection-pill compact ${multiplayer.multiplayerConnectionStatus}`}>{connectionStatusLabel}</span>
-                  ) : null}
-                </div>
-              </section>
+                </section>
+                {isMultiplayerGame && multiplayer.multiplayerLobby ? (
+                  <PlayerPresenceBar
+                    players={multiplayer.multiplayerLobby.players}
+                    factionTurn={parsedState.factionTurn}
+                    perspectiveFaction={multiplayer.perspectiveFaction}
+                  />
+                ) : null}
+              </div>
               <div className="board-utility-hud">
                 {multiplayer.multiplayerNotice ? (
                   <section className={`panel notice-panel board-notice-panel ${multiplayer.multiplayerNotice.level}`}>
