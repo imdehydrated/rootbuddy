@@ -5,9 +5,10 @@ import { CardComponent } from "./CardComponent";
 
 type CardHandTrayProps = {
   state: GameState;
+  compactCards?: boolean;
 };
 
-export function CardHandTray({ state }: CardHandTrayProps) {
+export function CardHandTray({ state, compactCards = false }: CardHandTrayProps) {
   if (state.gamePhase !== 1) {
     return null;
   }
@@ -28,7 +29,7 @@ export function CardHandTray({ state }: CardHandTrayProps) {
         <div className="card-hand-strip">
           {hand.map((card) => (
             <div key={card.id} className="card-hand-item">
-              <CardComponent card={card} zoneLabel="Hand" />
+              <CardComponent card={card} zoneLabel="Hand" compact={compactCards} />
             </div>
           ))}
         </div>

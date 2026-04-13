@@ -15,6 +15,7 @@ import { LobbyScreen } from "./components/LobbyScreen";
 import { PhaseBar } from "./components/PhaseBar";
 import { PlayerActionsPanel } from "./components/PlayerActionsPanel";
 import { PlayerPresenceBar } from "./components/PlayerPresenceBar";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { SessionStatusPanel } from "./components/SessionStatusPanel";
 import { SetupWizard } from "./components/SetupWizard";
 import { TurnFlowPanel } from "./components/TurnFlowPanel";
@@ -28,10 +29,10 @@ import { gameOverHeadline, initialState, useGameState } from "./hooks/useGameSta
 import { emptyBattleModifiers, useBattleFlow } from "./hooks/useBattleFlow";
 import { setupBoardPrompt, useBoardInteraction } from "./hooks/useBoardInteraction";
 import { useMultiplayer } from "./hooks/useMultiplayer";
+import { useSettings } from "./hooks/useSettings";
 import { useSessionPersistence } from "./hooks/useSessionPersistence";
+import type { ActiveModal } from "./modalState";
 import type { Action } from "./types";
-
-type ActiveModal = "correction" | "json" | "standAndDeliver" | null;
 
 export default function App() {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -46,6 +47,7 @@ export default function App() {
   const [playerTrayPrompt, setPlayerTrayPrompt] = useState<string | null>(null);
   const autoLoadedActionKey = useRef("");
   const previousGamePhase = useRef(initialState.gamePhase);
+  const { settings, updateSetting, resetSettings } = useSettings();
 
   function getMultiplayerToken() {
     return multiplayer.multiplayerToken;
@@ -339,7 +341,6 @@ export default function App() {
     }
     return "Use this area for the active workflow before opening any secondary tools.";
   })();
-
   if (session.showSetup) {
     if (multiplayer.multiplayerLobby) {
       return (
@@ -440,13 +441,15 @@ export default function App() {
             factionTurn={parsedState.factionTurn}
             roundNumber={parsedState.roundNumber}
           />
-          <VPTracker
-            victoryPoints={parsedState.victoryPoints}
-            turnOrder={parsedState.turnOrder}
-            dominance={parsedState.activeDominance}
-            coalitionActive={parsedState.coalitionActive}
-            coalitionPartner={parsedState.coalitionPartner}
-          />
+          {settings.showVPTracker ? (
+            <VPTracker
+              victoryPoints={parsedState.victoryPoints}
+              turnOrder={parsedState.turnOrder}
+              dominance={parsedState.activeDominance}
+              coalitionActive={parsedState.coalitionActive}
+              coalitionPartner={parsedState.coalitionPartner}
+            />
+          ) : null}
         </div>
         {setupPrompt ? (
           <>
@@ -505,9 +508,14 @@ export default function App() {
                     <span className="summary-line">{multiplayer.multiplayerNotice.detail}</span>
                   </section>
                 ) : null}
-                <button type="button" className="secondary correction-mode-toggle" onClick={() => setActiveModal("correction")}>
-                  Correction Mode
-                </button>
+                <div className="board-utility-actions">
+                  <button type="button" className="secondary correction-mode-toggle" onClick={() => setActiveModal("settings")}>
+                    Settings
+                  </button>
+                  <button type="button" className="secondary correction-mode-toggle" onClick={() => setActiveModal("correction")}>
+                    Correction Mode
+                  </button>
+                </div>
               </div>
             </div>
             <div className="board-prompt-strip">
@@ -540,14 +548,16 @@ export default function App() {
           onSelectClearing={board.handleSetupClearingClick}
           onSelectForest={board.handleSetupForestClick}
         />
-        {multiplayer.multiplayerToken ? (
+        {multiplayer.multiplayerToken && settings.showGameLog ? (
           <div className="board-log-shell">
             <GameLogPanel entries={multiplayer.actionLog} factionTurn={parsedState.factionTurn} />
           </div>
         ) : null}
-        <div className={`board-card-tray-shell ${showPrimaryPlayerFlow || showPrimaryAssistFlow ? "with-action-tray" : ""}`}>
-          <CardHandTray state={parsedState} />
-        </div>
+        {settings.showCardTray ? (
+          <div className={`board-card-tray-shell ${showPrimaryPlayerFlow || showPrimaryAssistFlow ? "with-action-tray" : ""}`}>
+            <CardHandTray state={parsedState} compactCards={settings.compactCards} />
+          </div>
+        ) : null}
         {showPrimaryPlayerFlow ? (
           <div className="board-action-tray" aria-label="Live action tray">
             <PlayerActionsPanel
@@ -853,6 +863,15 @@ export default function App() {
                   spellCheck={false}
                 />
               </section>
+            ) : null}
+
+            {activeModal === "settings" ? (
+              <SettingsPanel
+                settings={settings}
+                onChange={updateSetting}
+                onReset={resetSettings}
+                onClose={() => setActiveModal(null)}
+              />
             ) : null}
 
             {activeModal === "standAndDeliver" && pendingStandAndDeliverAction?.usePersistentEffect ? (

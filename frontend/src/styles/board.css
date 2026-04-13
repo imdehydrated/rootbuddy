@@ -52,6 +52,13 @@
   pointer-events: auto;
 }
 
+.board-utility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .board-notice-panel {
   width: min(16rem, 100%);
   padding: 0.65rem 0.8rem;
@@ -473,6 +480,7 @@
   line-height: 1.22;
   font-size: 0.82rem;
 }
+
 
 .board-event-shell {
   position: absolute;

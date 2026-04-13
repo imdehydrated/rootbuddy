@@ -10,6 +10,7 @@ import { actionHeadline } from "../actionPresentation";
 import type { ClearingPreviewPiece } from "../components/ClearingMarker";
 import { affectedClearings } from "../gameHelpers";
 import { ACTION_TYPE } from "../labels";
+import type { ActiveModal } from "../modalState";
 import type { Action, GameState } from "../types";
 
 export type MarquiseSetupDraft = {
@@ -105,7 +106,7 @@ export function setupBoardPrompt(stage: number, draft: MarquiseSetupDraft): { ti
 
 type UseBoardInteractionOptions = {
   actions: Action[];
-  activeModal: "correction" | "json" | "standAndDeliver" | null;
+  activeModal: ActiveModal;
   multiplayerToken: string | null;
   parsedState: GameState;
   previewedAction: Action | null;

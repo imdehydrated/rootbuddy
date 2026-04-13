@@ -10,6 +10,7 @@ import {
   observedPromptTemplates,
   type AssistActionCandidateRef
 } from "../assistDirector";
+import { actionExplanation } from "../assist/explanations";
 import { ACTION_TYPE, factionLabels, phaseLabels, stepLabels } from "../labels";
 import { describeAction } from "../actionPresentation";
 import { describeKnownCardID } from "../cardCatalog";
@@ -322,6 +323,7 @@ export function AssistWorkflowPanel({
                     key={`${choice.action.type}-${choice.label}-${actionIndex}`}
                     type="button"
                     className="assist-choice-card"
+                    title={actionExplanation(choice.action, state)}
                     onClick={() => {
                       setChoiceMessage("");
                       void onApply(choice.action);
@@ -345,6 +347,7 @@ export function AssistWorkflowPanel({
                     key={`${choice.action.type}-${choice.label}-${choice.detail}-${actionIndex}`}
                     type="button"
                     className="assist-choice-card"
+                    title={actionExplanation(choice.action, state)}
                     onClick={() => {
                       setChoiceMessage("");
                       void onApply(choice.action);
@@ -366,6 +369,11 @@ export function AssistWorkflowPanel({
                     key={choice.key}
                     type="button"
                     className={`assist-choice-card ${selectedDecreeCardKey === choice.key ? "selected" : ""}`}
+                    title={
+                      choice.actions.length === 1
+                        ? actionExplanation(choice.actions[0], state)
+                        : "Multiple decree columns fit this card set. Choose the exact observed column assignment next."
+                    }
                     onClick={() => {
                       if (choice.actions.length === 1) {
                         setChoiceMessage("");
@@ -390,6 +398,7 @@ export function AssistWorkflowPanel({
                       key={`${selectedDecreeCardChoice.key}-${actionIndex}`}
                       type="button"
                       className="assist-choice-card"
+                      title={actionExplanation(action, state)}
                       onClick={() => {
                         setChoiceMessage("");
                         setSelectedDecreeCardKey(null);
@@ -413,6 +422,11 @@ export function AssistWorkflowPanel({
                     key={choice.key}
                     type="button"
                     className="assist-choice-card"
+                    title={
+                      choice.actions.length === 1
+                        ? actionExplanation(choice.actions[0], state)
+                        : "Multiple legal battle records share this target. Open the audit drawer if you need the exact observed record."
+                    }
                     onClick={() => {
                       if (choice.actions.length === 1) {
                         const actionIndex = actions.indexOf(choice.actions[0]);
@@ -442,6 +456,11 @@ export function AssistWorkflowPanel({
                     key={choice.cardID}
                     type="button"
                     className={`assist-choice-card ${selectedCraftCardID === choice.cardID ? "selected" : ""}`}
+                    title={
+                      choice.actions.length === 1
+                        ? actionExplanation(choice.actions[0], state)
+                        : "Multiple workshop paths can produce this craft. Choose the route that matches the observed board."
+                    }
                     onClick={() => {
                       if (choice.actions.length === 1) {
                         setChoiceMessage("");
@@ -465,6 +484,7 @@ export function AssistWorkflowPanel({
                       key={`${selectedCraftChoice.cardID}-${craftRouteLabel(action)}-${actionIndex}`}
                       type="button"
                       className="assist-choice-card"
+                      title={actionExplanation(action, state)}
                       onClick={() => {
                         setChoiceMessage("");
                         setSelectedCraftCardID(null);
@@ -488,6 +508,7 @@ export function AssistWorkflowPanel({
                     key={`${action.type}-${actionIndex}`}
                     type="button"
                     className="assist-choice-card"
+                    title={actionExplanation(action, state)}
                     onClick={() => {
                       setChoiceMessage("");
                       void onApply(action);
@@ -509,6 +530,7 @@ export function AssistWorkflowPanel({
                     key={`${action.type}-${actionIndex}`}
                     type="button"
                     className="assist-choice-card"
+                    title={actionExplanation(action, state)}
                     onClick={() => {
                       setChoiceMessage("");
                       void onApply(action);

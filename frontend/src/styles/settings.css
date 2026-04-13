@@ -1,0 +1,32 @@
+.settings-panel {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.settings-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 20px;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background: rgba(255, 249, 240, 0.78);
+}
+
+.settings-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.settings-row input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.25rem;
+  accent-color: var(--accent);
+}

@@ -6,6 +6,7 @@ import {
   drawAdvanceChoiceLabel,
   type AssistActionCandidateRef
 } from "../assistDirector";
+import { actionExplanation } from "../assist/explanations";
 import { describeAction } from "../actionPresentation";
 import { describeKnownCardID } from "../cardCatalog";
 import { useIntentSelection } from "../hooks/useIntentSelection";
@@ -180,6 +181,11 @@ export function PlayerActionsPanel({
                         key={choice.key}
                         type="button"
                         className="assist-choice-card player-action-choice-card"
+                        title={
+                          choice.actions.length === 1
+                            ? actionExplanation(choice.actions[0], state)
+                            : "Multiple legal battle records share this defender. Use the audit drawer if you need the exact rule-backed fight."
+                        }
                         onClick={() => {
                           if (choice.actions.length === 1) {
                             const actionIndex = actions.indexOf(choice.actions[0]);
@@ -208,6 +214,11 @@ export function PlayerActionsPanel({
                         key={choice.cardID}
                         type="button"
                         className={`assist-choice-card player-action-choice-card ${selectedCraftCardID === choice.cardID ? "selected" : ""}`}
+                        title={
+                          choice.actions.length === 1
+                            ? actionExplanation(choice.actions[0], state)
+                            : "Multiple workshop routes can craft this card. Choose the route that matches the board before applying it."
+                        }
                         onClick={() => {
                           if (choice.actions.length === 1) {
                             setChoiceMessage("");
@@ -231,6 +242,7 @@ export function PlayerActionsPanel({
                           key={`${selectedCraftChoice.cardID}-${craftRouteLabel(action)}-${actionIndex}`}
                           type="button"
                           className="assist-choice-card player-action-choice-card"
+                          title={actionExplanation(action, state)}
                           onClick={() => {
                             setChoiceMessage("");
                             setSelectedCraftCardID(null);
@@ -253,6 +265,7 @@ export function PlayerActionsPanel({
                         key={`${choice.action.type}-${choice.label}-${actionIndex}`}
                         type="button"
                         className="assist-choice-card player-action-choice-card"
+                        title={actionExplanation(choice.action, state)}
                         onClick={() => {
                           setChoiceMessage("");
                           void onApply(choice.action);
@@ -273,6 +286,7 @@ export function PlayerActionsPanel({
                         key={`${action.type}-${actionIndex}`}
                         type="button"
                         className="assist-choice-card player-action-choice-card"
+                        title={actionExplanation(action, state)}
                         onClick={() => {
                           setChoiceMessage("");
                           void onApply(action);
@@ -293,6 +307,7 @@ export function PlayerActionsPanel({
                         key={`${action.type}-${actionIndex}`}
                         type="button"
                         className="assist-choice-card player-action-choice-card"
+                        title={actionExplanation(action, state)}
                         onClick={() => {
                           setChoiceMessage("");
                           void onApply(action);

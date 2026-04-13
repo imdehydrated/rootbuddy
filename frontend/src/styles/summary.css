@@ -104,6 +104,12 @@
   border-color: rgba(97, 112, 141, 0.16);
   background: linear-gradient(180deg, rgba(97, 112, 141, 0.08), rgba(97, 112, 141, 0.03));
 }
+
+.flow-step-card.warning {
+  border-color: rgba(189, 107, 47, 0.22);
+  background: linear-gradient(180deg, rgba(189, 107, 47, 0.1), rgba(189, 107, 47, 0.03));
+}
+
 .notice-panel.warning {
   border-color: rgba(189, 107, 47, 0.28);
   background: linear-gradient(180deg, rgba(189, 107, 47, 0.1), rgba(189, 107, 47, 0.03));

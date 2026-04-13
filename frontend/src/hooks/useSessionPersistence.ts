@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { clearSavedSession, loadSavedSession, saveSavedSession, type SavedSession } from "../localSession";
+import type { ActiveModal } from "../modalState";
 import type { Action, GameState } from "../types";
 import type { SetupScreen } from "../multiplayer";
 
@@ -10,7 +11,7 @@ type UseSessionPersistenceOptions = {
   parsedState: GameState;
   serverGameID: string | null;
   serverRevision: number | null;
-  setActiveModal: (value: null) => void;
+  setActiveModal: Dispatch<SetStateAction<ActiveModal>>;
   setServerGameID: (value: string | null) => void;
   setServerRevision: (value: number | null) => void;
   setShowAdvancedTurnPanel: (value: boolean) => void;

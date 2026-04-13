@@ -1,5 +1,6 @@
 import { ACTION_TYPE } from "../labels";
 import { actionCardReferences, actionContextTags, actionHeadline, createVisibleCardLookup, describeAction, formatCardReferenceLabel } from "../actionPresentation";
+import { actionExplanation } from "../assist/explanations";
 import type { AssistIntentGroup, AssistIntentKey } from "../assistDirector";
 import type { Action, GameState } from "../types";
 
@@ -19,6 +20,7 @@ type ActionOptionCardProps = {
   onOpenBattle: (actionIndex: number) => void;
   onPreviewAction?: (actionIndex: number | null) => void;
   choiceClassName?: string;
+  explanation?: string;
 };
 
 type ExactActionDrawerProps = {
@@ -63,16 +65,19 @@ export function ActionOptionCard({
   onApply,
   onOpenBattle,
   onPreviewAction,
-  choiceClassName = "assist-choice-card"
+  choiceClassName = "assist-choice-card",
+  explanation
 }: ActionOptionCardProps) {
   const visibleCardLookup = createVisibleCardLookup(state);
   const Element = variant === "choice" ? "button" : "article";
   const cardClass = variant === "choice" ? choiceClassName : "embedded-action-card";
+  const explanationText = explanation ?? actionExplanation(action, state);
 
   return (
     <Element
       type={variant === "choice" ? "button" : undefined}
       className={cardClass}
+      title={explanationText}
       onMouseEnter={() => onPreviewAction?.(actionIndex)}
       onMouseLeave={() => onPreviewAction?.(null)}
       onFocus={() => onPreviewAction?.(actionIndex)}
