@@ -1,16 +1,16 @@
 # RootBuddy
 
-RootBuddy is a Go backend and React frontend for tracking, validating, and playing through game states for the board game Root.
+RootBuddy is a Go backend and React frontend for tracking, validating, and playing through Root game states.
 
-The project is built around deterministic state transitions, explicit rule logic, and a clean split between domain modeling, engine behavior, transport, and UI. It supports local play tools, assist tooling for observed turns, and lobby-backed multiplayer with server authority.
+The project is built around deterministic state transitions, explicit rule logic, and a clean split between domain modeling, engine behavior, transport, and UI. It supports local play tools, assist workflows, and lobby-backed multiplayer with server authority and WebSocket updates.
 
 ## What It Does
 
 - Models Root game state across the base factions, map, cards, items, quests, effects, and turn progress
 - Generates legal actions and applies chosen actions for Marquise, Eyrie, Woodland Alliance, and Vagabond play
-- Handles setup flow, battle resolution, crafting, scoring, dominance, and faction-specific turn logic
+- Handles staged setup, battle context, multiplayer battle prompts, battle resolution, crafting, scoring, and dominance
 - Exposes the engine through a JSON API and a browser frontend
-- Supports lobby-backed multiplayer with websocket updates, reconnects, battle prompts, and an action log
+- Supports lobby-backed multiplayer with join codes, faction claims, readiness, reconnect handling, action logs, and live redacted game updates
 
 ## Current Scope
 
@@ -19,16 +19,16 @@ The current implementation includes:
 - Autumn map support
 - Base deck, quest deck, item supply, and dominance card support
 - Rule generation and action application for the main base-game faction workflows
-- Local setup, load, and play flows through the API and frontend
-- Assist tooling for observed turns and public-action tracking
-- Multiplayer lobbies with join codes, readiness, faction claims, reconnect handling, and live game updates
-- Server-authoritative multiplayer validation for turns, battle responses, and hidden-information checks
+- Local setup, load, play, and assist-mode flows through the API and frontend
+- Multiplayer lobbies with WebSocket updates, reconnect handling, battle prompt coordination, and server-authoritative state
+- A board-first frontend with setup, lobby, gameplay, assist, HUD, and correction-mode surfaces
 
-Planned next:
+Current focus:
 
-- Continued rule coverage and rules polish
-- More frontend polish and quality-of-life improvements
-- Broader multiplayer and persistence refinement
+- UI polish
+- board interaction reliability
+- responsive/layout work
+- ongoing rules-compliance auditing
 
 ## Architecture
 
@@ -36,13 +36,13 @@ The project is organized into a few clear layers:
 
 - `game/`: shared domain types
 - `mapdata/`: static board data
-- `carddata/`: static card catalog data
-- `rules/`: pure rule-generation functions
-- `engine/`: action sequencing, state transitions, and battle resolution
-- `server/`: HTTP handlers and request/response DTOs
-- `frontend/`: React + TypeScript client for setup, board state, action flow, assist mode, and multiplayer
+- `carddata/`: static card and quest data
+- `rules/`: pure legal-action generation
+- `engine/`: deterministic state transitions and battle resolution
+- `server/`: HTTP, multiplayer authority, persistence, redaction, battle sessions, and WebSocket fanout
+- `frontend/`: React + TypeScript client for setup, board play, assist mode, lobby flow, and multiplayer UI
 
-The rules layer is intentionally pure: given a state, it returns legal actions without mutating anything. The engine layer is responsible for applying chosen actions and moving the game state forward.
+The rules layer is intentionally pure: given a state, it returns legal actions without mutating anything. The engine applies chosen actions and produces the next state. The server wraps that deterministic core with persistence, player perspective, multiplayer coordination, and transport.
 
 ## Running Locally
 
@@ -51,7 +51,7 @@ Requirements:
 - Go 1.26+
 - Node.js 20+
 
-Start the server:
+Start the backend:
 
 ```bash
 go run .
@@ -69,13 +69,6 @@ npm run dev
 
 The frontend runs on `http://localhost:5173`.
 
-Build the frontend:
-
-```bash
-cd frontend
-npm run build
-```
-
 ## API
 
 Current endpoints:
@@ -86,12 +79,12 @@ Current endpoints:
 - `POST /api/actions/valid`
 - `POST /actions/apply`
 - `POST /api/actions/apply`
-- `POST /battles/resolve`
-- `POST /api/battles/resolve`
 - `POST /battles/context`
 - `POST /api/battles/context`
 - `POST /battles/open`
 - `POST /api/battles/open`
+- `POST /battles/resolve`
+- `POST /api/battles/resolve`
 - `GET /battles/session`
 - `GET /api/battles/session`
 - `POST /battles/respond`
@@ -119,35 +112,25 @@ Current endpoints:
 - `GET /ws`
 - `GET /api/ws`
 
-Example usage:
+Typical flow:
 
-- send a `GameState` to `/api/actions/valid` to get the legal next actions
+- send a `GameState` to `/api/actions/valid` to get legal next actions
 - send a `GameState` plus one chosen `Action` to `/api/actions/apply` to get the next state
-- use `/api/game/setup` to create a new game and `/api/game/load` to load a saved one
-- use the `/api/lobby/*` endpoints plus `/api/ws` for multiplayer lobby and game sessions
-- use the `/api/battles/*` endpoints for battle previews, multiplayer response flow, and battle resolution
+- use `/api/battles/*` for battle previews, multiplayer prompt flow, and battle resolution
+- use `/api/lobby/*` plus `/api/ws` for multiplayer lobby and live game updates
 
 ## Testing
 
-The codebase includes unit and integration-style tests for:
-
-- domain modeling
-- map and card data
-- rules logic
-- engine state transitions
-- HTTP handlers
-
-The frontend lives under `frontend/` as a separate React + TypeScript app.
-
-Run the test suite with:
+Backend:
 
 ```bash
 go test ./...
 ```
 
-Run the frontend build/typecheck with:
+Frontend:
 
 ```bash
 cd frontend
+npm run test
 npm run build
 ```
