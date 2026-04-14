@@ -183,32 +183,71 @@ export function SetupWizard({
         {selectedMode === null ? (
           <>
             <div className="landing-hero pregame-hero">
-              <p className="eyebrow">RootBuddy</p>
-              <h1 className="landing-title">Root board state, multiplayer lobbies, and assist flow in one workspace.</h1>
-              <p className="landing-copy">Choose how you want to begin. Online Play is the normal browser multiplayer path. Assist Mode keeps the adjudication companion flow.</p>
+              <div className="landing-hero-copy">
+                <p className="eyebrow">Woodland Command Desk</p>
+                <span className="landing-kicker">RootBuddy</span>
+                <h1 className="landing-title">Take your seat at the woodland table.</h1>
+                <p className="landing-copy">
+                  Run a live browser match, reopen a suspended board, or use the adjudication companion for shared-table play.
+                  RootBuddy keeps the map, turns, and setup flow in one place instead of scattering them across notes and chat.
+                </p>
+              </div>
+              <div className="landing-feature-row" aria-label="Available entry points">
+                <article className="landing-feature">
+                  <span className="summary-label">Online Tables</span>
+                  <strong>Live lobby flow</strong>
+                  <span>Host a match, pass around a join code, and keep every faction on the same stateful board.</span>
+                </article>
+                <article className="landing-feature">
+                  <span className="summary-label">Assist Play</span>
+                  <strong>Shared reference</strong>
+                  <span>Guide setup, action resolution, and board corrections when the physical game needs a rules-aware companion.</span>
+                </article>
+                <article className="landing-feature">
+                  <span className="summary-label">Saved Boards</span>
+                  <strong>Resume without guesswork</strong>
+                  <span>Return to unfinished setups and finished results with the same perspective and turn context intact.</span>
+                </article>
+              </div>
             </div>
 
             <div className="landing-grid pregame-mode-grid">
-              <button type="button" className="mode-choice-card pregame-mode-card" onClick={() => setSelectedMode(0)} disabled={submitting}>
-                <span className="summary-label">Digital Match</span>
+              <button type="button" className="mode-choice-card pregame-mode-card online-mode-card" onClick={() => setSelectedMode(0)} disabled={submitting}>
+                <span className="mode-choice-ribbon">Digital Match</span>
                 <strong>Online Play</strong>
-                <span>Create or join a lobby for a standard in-browser multiplayer match.</span>
+                <span className="mode-choice-flavor">Open a browser-native Root table for remote players.</span>
+                <div className="mode-choice-details">
+                  <span>Lobby hosting and join codes</span>
+                  <span>Seat claiming, ready checks, and shared board state</span>
+                </div>
               </button>
-              <button type="button" className="mode-choice-card secondary pregame-mode-card" onClick={() => setSelectedMode(1)} disabled={submitting}>
-                <span className="summary-label">Table Companion</span>
+              <button type="button" className="mode-choice-card secondary pregame-mode-card assist-mode-card" onClick={() => setSelectedMode(1)} disabled={submitting}>
+                <span className="mode-choice-ribbon">Table Companion</span>
                 <strong>Assist Mode</strong>
-                <span>Use guided Root adjudication for in-person or shared-reference play.</span>
+                <span className="mode-choice-flavor">Keep the board honest during in-person or shared-reference play.</span>
+                <div className="mode-choice-details">
+                  <span>Faction setup and action prompting</span>
+                  <span>Guided resolution when the table needs a neutral rules helper</span>
+                </div>
               </button>
             </div>
 
             {canResume && savedSessionInfo ? (
               <div className="saved-session-card pregame-saved-card">
-                <span className="summary-label">{savedSessionTitle(savedSessionInfo)}</span>
-                {savedSessionDetail(savedSessionInfo).map((line) => (
-                  <span key={line} className="summary-line">
-                    {line}
-                  </span>
-                ))}
+                <div className="saved-session-head">
+                  <div>
+                    <span className="summary-label">Saved Chronicle</span>
+                    <strong>{savedSessionTitle(savedSessionInfo)}</strong>
+                  </div>
+                  <span className="saved-session-badge">{savedFinishedResult ? "Review" : "Resume"}</span>
+                </div>
+                <div className="saved-session-details">
+                  {savedSessionDetail(savedSessionInfo).map((line) => (
+                    <span key={line} className="summary-line">
+                      {line}
+                    </span>
+                  ))}
+                </div>
                 {savedFinishedResult ? (
                   <span className="summary-line">Use review to inspect the finished board, or start fresh to replace it.</span>
                 ) : null}
@@ -223,7 +262,7 @@ export function SetupWizard({
               </div>
             ) : null}
 
-            <div className="sidebar-actions footer">
+            <div className="sidebar-actions footer landing-utility-actions">
               <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
                 Use Sample State
               </button>
