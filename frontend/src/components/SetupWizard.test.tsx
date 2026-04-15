@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SetupWizard } from "./SetupWizard";
+import { sampleState } from "../sampleState";
 
 function renderWizard() {
   return render(
@@ -39,5 +40,37 @@ describe("SetupWizard", () => {
     expect(await screen.findByText("Factions In Game")).toBeInTheDocument();
     expect(screen.getByText("My Faction")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start Assist Game" })).toBeInTheDocument();
+  });
+
+  it("does not show local saved-game resume controls on the landing screen", () => {
+    render(
+      <SetupWizard
+        onStart={vi.fn()}
+        onUseSample={vi.fn()}
+        onResume={vi.fn(async () => undefined)}
+        onClearSavedSession={vi.fn()}
+        onOpenCreateLobby={vi.fn()}
+        onOpenJoinLobby={vi.fn()}
+        canResume={true}
+        savedSessionInfo={{
+          state: sampleState,
+          gameID: null,
+          revision: null,
+          savedAt: "2026-04-15T00:00:00Z"
+        }}
+      />
+    );
+
+    expect(screen.queryByText("Saved Chronicle")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Resume Saved Game/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Clear Saved Game/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the landing screen reduced to the two primary mode buttons", () => {
+    renderWizard();
+
+    expect(screen.getByRole("button", { name: "Online Play" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assist Mode" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Use Sample State/i })).not.toBeInTheDocument();
   });
 });

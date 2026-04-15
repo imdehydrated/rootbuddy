@@ -27,6 +27,14 @@ export const emptyMarquiseSetupDraft: MarquiseSetupDraft = {
   recruiterClearingID: null
 };
 
+function filterMarquiseSetupActions(actions: Action[], draft: MarquiseSetupDraft): Action[] {
+  return actions.filter((action) => marquiseSetupMatches(action, draft));
+}
+
+function distinctPositiveIDs(values: Array<number | null | undefined>): number[] {
+  return Array.from(new Set(values)).filter((value): value is number => typeof value === "number" && value > 0);
+}
+
 function marquiseSetupMatches(action: Action, draft: MarquiseSetupDraft): boolean {
   const payload = action.marquiseSetup;
   if (!payload) {
@@ -41,7 +49,7 @@ function marquiseSetupMatches(action: Action, draft: MarquiseSetupDraft): boolea
   if (draft.workshopClearingID !== null && payload.workshopClearingID !== draft.workshopClearingID) {
     return false;
   }
-  if (draft.recruiterClearingID !== undefined && draft.recruiterClearingID !== null && payload.recruiterClearingID !== draft.recruiterClearingID) {
+  if (draft.recruiterClearingID !== null && payload.recruiterClearingID !== draft.recruiterClearingID) {
     return false;
   }
   return true;
@@ -188,32 +196,22 @@ export function useBoardInteraction({
       : parsedState.setupStage === 1
         ? (() => {
             if (marquiseSetupDraft.keepClearingID === null) {
-              return Array.from(new Set(marquiseSetupActions.map((action) => action.marquiseSetup?.keepClearingID ?? 0))).filter(
-                (value) => value > 0
-              );
+              return distinctPositiveIDs(marquiseSetupActions.map((action) => action.marquiseSetup?.keepClearingID));
             }
-            const filteredByKeep = marquiseSetupActions.filter((action) => marquiseSetupMatches(action, marquiseSetupDraft));
+            const filteredByKeep = filterMarquiseSetupActions(marquiseSetupActions, marquiseSetupDraft);
             if (marquiseSetupDraft.sawmillClearingID === null) {
-              return Array.from(new Set(filteredByKeep.map((action) => action.marquiseSetup?.sawmillClearingID ?? 0))).filter(
-                (value) => value > 0
-              );
+              return distinctPositiveIDs(filteredByKeep.map((action) => action.marquiseSetup?.sawmillClearingID));
             }
-            const filteredBySawmill = filteredByKeep.filter((action) => marquiseSetupMatches(action, marquiseSetupDraft));
+            const filteredBySawmill = filterMarquiseSetupActions(filteredByKeep, marquiseSetupDraft);
             if (marquiseSetupDraft.workshopClearingID === null) {
-              return Array.from(new Set(filteredBySawmill.map((action) => action.marquiseSetup?.workshopClearingID ?? 0))).filter(
-                (value) => value > 0
-              );
+              return distinctPositiveIDs(filteredBySawmill.map((action) => action.marquiseSetup?.workshopClearingID));
             }
-            return Array.from(
-              new Set(
-                filteredBySawmill
-                  .filter((action) => marquiseSetupMatches(action, marquiseSetupDraft))
-                  .map((action) => action.marquiseSetup?.recruiterClearingID ?? 0)
-              )
-            ).filter((value) => value > 0);
+            return distinctPositiveIDs(
+              filterMarquiseSetupActions(filteredBySawmill, marquiseSetupDraft).map((action) => action.marquiseSetup?.recruiterClearingID)
+            );
           })()
         : parsedState.setupStage === 2
-          ? eyrieSetupActions.map((action) => action.eyrieSetup?.clearingID ?? 0).filter((value) => value > 0)
+          ? distinctPositiveIDs(eyrieSetupActions.map((action) => action.eyrieSetup?.clearingID))
           : [];
 
   const selectedSetupClearingIDs =

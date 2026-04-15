@@ -85,6 +85,19 @@ export function PlayerActionsPanel({
   const buildRecruitCandidateKey = candidateKey(buildRecruitCandidates);
   const factionSpatialCandidateKey = candidateKey(factionSpatialCandidates);
   const visibleActions = showAllActions ? actions : actions.slice(0, 6);
+  const previewPropsForAction = (action: Action) => {
+    const actionIndex = actions.indexOf(action);
+    if (!onPreviewAction || actionIndex < 0) {
+      return {};
+    }
+
+    return {
+      onMouseEnter: () => onPreviewAction(actionIndex),
+      onMouseLeave: () => onPreviewAction(null),
+      onFocus: () => onPreviewAction(actionIndex),
+      onBlur: () => onPreviewAction(null)
+    };
+  };
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
   const currentPrompt =
     visibleActions.length === 0
@@ -128,6 +141,8 @@ export function PlayerActionsPanel({
     onPromptChange?.(currentPrompt);
     return () => onPromptChange?.(null);
   }, [currentPrompt, onPromptChange]);
+
+  useEffect(() => () => onPreviewAction?.(null), [onPreviewAction]);
 
   return (
     <section className={`panel ${surface === "tray" ? "board-action-panel board-action-panel-tray player-actions-tray" : "sidebar-panel"}`}>
@@ -195,9 +210,10 @@ export function PlayerActionsPanel({
                           return;
                         }
                       }
-                      setShowAllActions(true);
+                          setShowAllActions(true);
                           setChoiceMessage(`${choice.label} still has ${choice.actions.length} possible battle paths. Open the audit drawer and choose the exact one.`);
                         }}
+                        {...previewPropsForAction(choice.actions[0])}
                       >
                         <strong>{choice.label}</strong>
                         <span>{choice.actions.length === 1 ? "Open battle" : `${choice.actions.length} battle paths`}</span>
@@ -229,6 +245,7 @@ export function PlayerActionsPanel({
                           setSelectedCraftCardID(choice.cardID);
                           setChoiceMessage(`${describeKnownCardID(choice.cardID)} has ${choice.actions.length} possible workshop routes. Choose the one you want to use.`);
                         }}
+                        {...previewPropsForAction(choice.actions[0])}
                       >
                         <strong>{describeKnownCardID(choice.cardID)}</strong>
                         <span>{choice.actions.length === 1 ? "Craft this card" : `${choice.actions.length} workshop routes`}</span>
@@ -248,6 +265,7 @@ export function PlayerActionsPanel({
                             setSelectedCraftCardID(null);
                             void onApply(action);
                           }}
+                          {...previewPropsForAction(action)}
                         >
                           <strong>{craftRouteLabel(action)}</strong>
                           <span>Apply this craft route</span>
@@ -270,6 +288,7 @@ export function PlayerActionsPanel({
                           setChoiceMessage("");
                           void onApply(choice.action);
                         }}
+                        {...previewPropsForAction(choice.action)}
                       >
                         <strong>{choice.label}</strong>
                         <span>{choice.detail}</span>
@@ -291,6 +310,7 @@ export function PlayerActionsPanel({
                           setChoiceMessage("");
                           void onApply(action);
                         }}
+                        {...previewPropsForAction(action)}
                       >
                         <strong>{drawAdvanceChoiceLabel(action)}</strong>
                         <span>{describeAction(action, state)}</span>
@@ -312,6 +332,7 @@ export function PlayerActionsPanel({
                           setChoiceMessage("");
                           void onApply(action);
                         }}
+                        {...previewPropsForAction(action)}
                       >
                         <strong>{cardEffectChoiceLabel(action)}</strong>
                         <span>{describeAction(action, state)}</span>

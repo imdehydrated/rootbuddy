@@ -587,6 +587,7 @@ export default function App() {
               onGenerateActions={gameState.refreshActions}
               onOpenTurnState={() => setActiveModal("correction")}
               onOpenBattle={battle.openBattleForActionIndex}
+              onPreviewAction={gameState.setHoveredActionIndex}
               onBattleCandidatesChange={board.handleAssistBattleCandidatesChange}
               onMovementCandidatesChange={board.handleAssistMovementCandidatesChange}
               onBuildRecruitCandidatesChange={board.handleAssistBuildRecruitCandidatesChange}

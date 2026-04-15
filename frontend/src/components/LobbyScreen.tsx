@@ -65,8 +65,8 @@ export function LobbyScreen({
 
   return (
     <main className="app-shell entry-shell">
-      <section className="panel modal-panel multiplayer-screen entry-panel">
-        <div className="panel-header">
+      <section className="panel modal-panel multiplayer-screen lobby-digital-shell wide-entry-panel entry-panel">
+        <div className="panel-header lobby-panel-header">
           <div>
             <p className="eyebrow">Online Table</p>
             <h2>Join Code {lobby.joinCode}</h2>
@@ -81,6 +81,11 @@ export function LobbyScreen({
             <p className="lobby-copy">
               Claim a faction, confirm readiness, and let the host begin once every occupied seat is settled.
             </p>
+            <div className="lobby-hero-badges">
+              <span className="lobby-hero-badge">Room {lobby.joinCode}</span>
+              <span className="lobby-hero-badge">{lobby.players.length} players seated</span>
+              <span className="lobby-hero-badge">{readyCount} ready</span>
+            </div>
           </div>
           <div className="lobby-overview-grid">
             <article className="lobby-overview-card">
@@ -101,95 +106,114 @@ export function LobbyScreen({
           </div>
         </div>
 
-        <div className="summary-stack lobby-section">
-          <span className="summary-label">Claim A Seat</span>
-          <div className="lobby-seat-grid">
-            {lobby.factions.map((faction) => {
-              const claimedBy = claimedByFaction(lobby, faction);
-              const selected = currentFaction === faction;
-              const style = {
-                "--faction-color": factionAccentColor(faction)
-              } as CSSProperties;
-              return (
-                <button
-                  key={faction}
-                  type="button"
-                  className={`lobby-seat-card faction-seat-card ${selected ? "selected" : ""} ${claimedBy ? "claimed" : "open"}`}
-                  disabled={submitting || (!!claimedBy && !selected)}
-                  onClick={() => void onClaimFaction(selected ? null : faction)}
-                  style={style}
+        <div className="lobby-command-grid">
+          <div className="summary-stack lobby-section lobby-seat-section">
+            <div className="lobby-section-header">
+              <div>
+                <span className="summary-label">Claim A Seat</span>
+                <h3 className="lobby-section-title">Choose your faction position at the table.</h3>
+              </div>
+              <span className="lobby-inline-status">{currentFaction === null ? "No faction claimed yet" : "Seat selected"}</span>
+            </div>
+            <div className="lobby-seat-grid">
+              {lobby.factions.map((faction) => {
+                const claimedBy = claimedByFaction(lobby, faction);
+                const selected = currentFaction === faction;
+                const style = {
+                  "--faction-color": factionAccentColor(faction)
+                } as CSSProperties;
+                return (
+                  <button
+                    key={faction}
+                    type="button"
+                    className={`lobby-seat-card faction-seat-card ${selected ? "selected" : ""} ${claimedBy ? "claimed" : "open"}`}
+                    disabled={submitting || (!!claimedBy && !selected)}
+                    onClick={() => void onClaimFaction(selected ? null : faction)}
+                    style={style}
+                  >
+                    <div className="lobby-seat-card-top">
+                      <span className="summary-label">Faction Seat</span>
+                      <span className={`lobby-seat-status ${selected ? "selected" : claimedBy ? "claimed" : "open"}`}>
+                        {selected ? "Your seat" : claimedBy ? "Claimed" : "Open"}
+                      </span>
+                    </div>
+                    <strong>{factionLabels[faction]}</strong>
+                    <span className="summary-line">{claimedBy ? claimedBy.displayName : "Open seat"}</span>
+                    <span className="summary-line">
+                      {selected ? "You are sitting here." : claimedBy ? "Already claimed." : "Available to claim."}
+                    </span>
+                    <span className="lobby-seat-note">
+                      {selected ? "Click again to leave this faction seat." : claimedBy ? "Wait for this player to release the seat." : "Select this faction to take the seat."}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="summary-stack lobby-section lobby-roster-section">
+            <div className="lobby-section-header">
+              <div>
+                <span className="summary-label">Players At The Table</span>
+                <h3 className="lobby-section-title">Track the room before the match begins.</h3>
+              </div>
+              <span className="lobby-inline-status">{readyCount} ready / {lobby.players.length} seated</span>
+            </div>
+            <div className="lobby-player-list">
+              {lobby.players.map((player, index) => (
+                <article
+                  key={`${index}-${player.displayName}-${player.isHost}`}
+                  className={`lobby-player-card ${player.isHost ? "host" : "guest"} ${player.isReady ? "ready" : "staging"} ${player.connected ? "connected" : "disconnected"}`}
+                  style={player.hasFaction ? ({ "--faction-color": factionAccentColor(player.faction) } as CSSProperties) : undefined}
                 >
-                  <div className="lobby-seat-card-top">
-                    <span className="summary-label">Faction Seat</span>
-                    <span className={`lobby-seat-status ${selected ? "selected" : claimedBy ? "claimed" : "open"}`}>
-                      {selected ? "Your seat" : claimedBy ? "Claimed" : "Open"}
+                  <div className="lobby-player-card-top">
+                    <strong>{lobbyPlayerLabel(player)}</strong>
+                    <span className={`presence-pill ${player.connected ? "connected" : "disconnected"}`}>
+                      {player.connected ? "Connected" : "Away"}
                     </span>
                   </div>
-                  <strong>{factionLabels[faction]}</strong>
-                  <span className="summary-line">{claimedBy ? claimedBy.displayName : "Open seat"}</span>
+                  <div className="lobby-player-meta">
+                    <span className={`lobby-role-pill ${player.isHost ? "host" : "guest"}`}>{player.isHost ? "Host" : "Guest"}</span>
+                    <span className={`lobby-ready-pill ${player.isReady ? "ready" : "staging"}`}>{player.isReady ? "Ready" : "Not ready"}</span>
+                  </div>
                   <span className="summary-line">
-                    {selected ? "You are sitting here." : claimedBy ? "Already claimed." : "Available to claim."}
+                    {player.hasFaction ? factionLabels[player.faction] ?? `Faction ${player.faction}` : "No faction claimed"}
                   </span>
-                  <span className="lobby-seat-note">
-                    {selected ? "Click again to leave this faction seat." : claimedBy ? "Wait for this player to release the seat." : "Select this faction to take the seat."}
+                  <span className="summary-line">
+                    {player.hasFaction ? "Faction seat locked in for this table." : "Seat claim still pending."}
                   </span>
-                </button>
-              );
-            })}
+                </article>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="summary-stack lobby-section">
-          <span className="summary-label">Players At The Table</span>
-          <div className="lobby-player-list">
-            {lobby.players.map((player, index) => (
-              <article
-                key={`${index}-${player.displayName}-${player.isHost}`}
-                className={`lobby-player-card ${player.isHost ? "host" : "guest"} ${player.isReady ? "ready" : "staging"} ${player.connected ? "connected" : "disconnected"}`}
-                style={player.hasFaction ? ({ "--faction-color": factionAccentColor(player.faction) } as CSSProperties) : undefined}
-              >
-                <div className="lobby-player-card-top">
-                  <strong>{lobbyPlayerLabel(player)}</strong>
-                  <span className={`presence-pill ${player.connected ? "connected" : "disconnected"}`}>
-                    {player.connected ? "Connected" : "Away"}
-                  </span>
-                </div>
-                <div className="lobby-player-meta">
-                  <span className={`lobby-role-pill ${player.isHost ? "host" : "guest"}`}>{player.isHost ? "Host" : "Guest"}</span>
-                  <span className={`lobby-ready-pill ${player.isReady ? "ready" : "staging"}`}>{player.isReady ? "Ready" : "Not ready"}</span>
-                </div>
-                <span className="summary-line">
-                  {player.hasFaction ? factionLabels[player.faction] ?? `Faction ${player.faction}` : "No faction claimed"}
-                </span>
-                <span className="summary-line">
-                  {player.hasFaction ? "Faction seat locked in for this table." : "Seat claim still pending."}
-                </span>
-              </article>
-            ))}
+        <div className="lobby-control-bar">
+          <div className="lobby-control-copy">
+            <span className="summary-label">Table Controls</span>
+            <span className="summary-line">
+              {status || (readyToStart ? "Everyone is ready. Host can start." : "Claim a faction and ready up to begin.")}
+            </span>
           </div>
-        </div>
-
-        <div className="sidebar-actions footer lobby-actions">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => void onReady(!(self?.isReady ?? false))}
-            disabled={submitting || !self?.hasFaction}
-          >
-            {self?.isReady ? "Unready" : "Ready Up"}
-          </button>
-          {self?.isHost ? (
-            <button type="button" onClick={() => void onStart()} disabled={submitting || !readyToStart}>
-              Start Game
+          <div className="sidebar-actions footer lobby-actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void onReady(!(self?.isReady ?? false))}
+              disabled={submitting || !self?.hasFaction}
+            >
+              {self?.isReady ? "Unready" : "Ready Up"}
             </button>
-          ) : null}
-          <button type="button" className="secondary" onClick={() => void onLeave()} disabled={submitting}>
-            Leave Lobby
-          </button>
+            {self?.isHost ? (
+              <button type="button" onClick={() => void onStart()} disabled={submitting || !readyToStart}>
+                Start Game
+              </button>
+            ) : null}
+            <button type="button" className="secondary" onClick={() => void onLeave()} disabled={submitting}>
+              Leave Lobby
+            </button>
+          </div>
         </div>
-        <span className="message">
-          {status || (readyToStart ? "Everyone is ready. Host can start." : "Claim a faction and ready up to begin.")}
-        </span>
       </section>
     </main>
   );

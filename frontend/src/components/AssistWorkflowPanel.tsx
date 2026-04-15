@@ -30,6 +30,7 @@ type AssistWorkflowPanelProps = {
   onGenerateActions: () => Promise<void>;
   onOpenTurnState: () => void;
   onOpenBattle: (actionIndex: number) => void;
+  onPreviewAction?: (actionIndex: number | null) => void;
   onBattleCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
@@ -46,6 +47,7 @@ export function AssistWorkflowPanel({
   onGenerateActions,
   onOpenTurnState,
   onOpenBattle,
+  onPreviewAction,
   onBattleCandidatesChange,
   onMovementCandidatesChange,
   onBuildRecruitCandidatesChange,
@@ -132,6 +134,19 @@ export function AssistWorkflowPanel({
   const buildRecruitCandidateKey = candidateKey(buildRecruitCandidates);
   const factionSpatialCandidateKey = candidateKey(factionSpatialCandidates);
   const actorLabel = factionLabels[state.factionTurn] ?? "Unknown";
+  const previewPropsForAction = (action: Action) => {
+    const actionIndex = actions.indexOf(action);
+    if (!onPreviewAction || actionIndex < 0) {
+      return {};
+    }
+
+    return {
+      onMouseEnter: () => onPreviewAction(actionIndex),
+      onMouseLeave: () => onPreviewAction(null),
+      onFocus: () => onPreviewAction(actionIndex),
+      onBlur: () => onPreviewAction(null)
+    };
+  };
   const phaseLabel = phaseLabels[state.currentPhase] ?? "Unknown";
   const nextAssistSummary =
     actions.length > 0
@@ -157,6 +172,8 @@ export function AssistWorkflowPanel({
     onFactionSpatialCandidatesChange?.(factionSpatialCandidates);
     return () => onFactionSpatialCandidatesChange?.([]);
   }, [factionSpatialCandidateKey, onFactionSpatialCandidatesChange]);
+
+  useEffect(() => () => onPreviewAction?.(null), [onPreviewAction]);
 
   if (state.gameMode !== 1 || state.gamePhase !== 1 || state.factionTurn === state.playerFaction) {
     return null;
@@ -328,6 +345,7 @@ export function AssistWorkflowPanel({
                       setChoiceMessage("");
                       void onApply(choice.action);
                     }}
+                    {...previewPropsForAction(choice.action)}
                   >
                     <strong>{choice.label}</strong>
                     <span>{choice.detail}</span>
@@ -352,6 +370,7 @@ export function AssistWorkflowPanel({
                       setChoiceMessage("");
                       void onApply(choice.action);
                     }}
+                    {...previewPropsForAction(choice.action)}
                   >
                     <strong>{choice.label}</strong>
                     <span>{choice.detail}</span>
@@ -385,6 +404,7 @@ export function AssistWorkflowPanel({
                       setShowAllGeneratedActions(true);
                       setChoiceMessage(`${decreeCardLabel(choice.cardIDs)} can be added to multiple decree columns. Choose the observed column assignment.`);
                     }}
+                    {...previewPropsForAction(choice.actions[0])}
                   >
                     <strong>{decreeCardLabel(choice.cardIDs)}</strong>
                     <span>{choice.actions.length === 1 ? "Record this decree add" : `${choice.actions.length} column choices`}</span>
@@ -404,6 +424,7 @@ export function AssistWorkflowPanel({
                         setSelectedDecreeCardKey(null);
                         void onApply(action);
                       }}
+                      {...previewPropsForAction(action)}
                     >
                       <strong>{decreeColumnAssignmentLabel(action)}</strong>
                       <span>Record this decree choice</span>
@@ -439,6 +460,7 @@ export function AssistWorkflowPanel({
                     setShowAllGeneratedActions(true);
                       setChoiceMessage(`${choice.label} could still mean ${choice.actions.length} different battle records. Open the audit drawer and choose the matching one.`);
                     }}
+                    {...previewPropsForAction(choice.actions[0])}
                   >
                     <strong>{choice.label}</strong>
                     <span>{choice.actions.length === 1 ? "Open Battle" : `${choice.actions.length} battle records`}</span>
@@ -471,6 +493,7 @@ export function AssistWorkflowPanel({
                       setSelectedCraftCardID(choice.cardID);
                       setChoiceMessage(`${describeKnownCardID(choice.cardID)} could be crafted through ${choice.actions.length} workshop paths. Choose the observed workshop route.`);
                     }}
+                    {...previewPropsForAction(choice.actions[0])}
                   >
                     <strong>{describeKnownCardID(choice.cardID)}</strong>
                     <span>{choice.actions.length === 1 ? "Record this craft" : `${choice.actions.length} workshop paths`}</span>
@@ -490,6 +513,7 @@ export function AssistWorkflowPanel({
                         setSelectedCraftCardID(null);
                         void onApply(action);
                       }}
+                      {...previewPropsForAction(action)}
                     >
                       <strong>{craftRouteLabel(action)}</strong>
                       <span>Record this workshop route</span>
@@ -513,6 +537,7 @@ export function AssistWorkflowPanel({
                       setChoiceMessage("");
                       void onApply(action);
                     }}
+                    {...previewPropsForAction(action)}
                   >
                     <strong>{drawAdvanceChoiceLabel(action)}</strong>
                     <span>{describeAction(action, state)}</span>
@@ -535,6 +560,7 @@ export function AssistWorkflowPanel({
                       setChoiceMessage("");
                       void onApply(action);
                     }}
+                    {...previewPropsForAction(action)}
                   >
                     <strong>{cardEffectChoiceLabel(action)}</strong>
                     <span>{describeAction(action, state)}</span>
@@ -555,6 +581,7 @@ export function AssistWorkflowPanel({
               onToggle={setShowAllGeneratedActions}
               onApply={onApply}
               onOpenBattle={onOpenBattle}
+              onPreviewAction={onPreviewAction}
             />
           ) : null}
         </div>

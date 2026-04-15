@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { setupGame } from "../api";
-import { eyrieLeaderLabels, factionLabels, phaseLabels, setupStageLabels, vagabondCharacterLabels } from "../labels";
+import { eyrieLeaderLabels, factionLabels, vagabondCharacterLabels } from "../labels";
 import type { SavedSession } from "../localSession";
 import type { GameState } from "../types";
 
@@ -16,74 +16,7 @@ type SetupWizardProps = {
 };
 
 const allFactions = [0, 2, 1, 3];
-
-function formatSavedAt(savedAt: string | undefined): string {
-  if (!savedAt) {
-    return "";
-  }
-
-  const parsed = new Date(savedAt);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toLocaleString();
-}
-
-function savedSessionTitle(savedSession: SavedSession | null): string {
-  if (!savedSession) {
-    return "";
-  }
-
-  if (savedSession.state.gamePhase === 2) {
-    return "Finished result ready to review";
-  }
-  if (savedSession.state.gamePhase === 0) {
-    return "Setup in progress";
-  }
-  return "Active saved game";
-}
-
-function resumeButtonLabel(savedSession: SavedSession | null): string {
-  if (!savedSession) {
-    return "Resume Saved Game";
-  }
-
-  if (savedSession.state.gamePhase === 2) {
-    return "Review Finished Game";
-  }
-  if (savedSession.state.gamePhase === 0) {
-    return "Resume Setup";
-  }
-  return "Resume Saved Game";
-}
-
-function savedSessionDetail(savedSession: SavedSession | null): string[] {
-  if (!savedSession) {
-    return [];
-  }
-
-  const modeLabel = savedSession.state.gameMode === 0 ? "Online" : "Assist";
-  const lines = [
-    `Mode: ${modeLabel}`,
-    `Perspective: ${factionLabels[savedSession.state.playerFaction] ?? "Unknown"}`
-  ];
-
-  if (savedSession.state.gamePhase === 2) {
-    lines.push(`Winner: ${factionLabels[savedSession.state.winner] ?? "Unknown"}`);
-  } else if (savedSession.state.gamePhase === 0) {
-    lines.push(`Stage: ${setupStageLabels[savedSession.state.setupStage] ?? "Setup"}`);
-  } else {
-    lines.push(`Turn: ${factionLabels[savedSession.state.factionTurn] ?? "Unknown"} - ${phaseLabels[savedSession.state.currentPhase] ?? "Unknown"}`);
-  }
-
-  const savedAt = formatSavedAt(savedSession.savedAt);
-  if (savedAt) {
-    lines.push(`Saved: ${savedAt}`);
-  }
-
-  return lines;
-}
+const factionAccentColors = ["#b14d36", "#496aa0", "#4c7a45", "#8a6842"];
 
 export function SetupWizard({
   onStart,
@@ -102,7 +35,7 @@ export function SetupWizard({
   const [eyrieLeader, setEyrieLeader] = useState(0);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const savedFinishedResult = savedSessionInfo?.state.gamePhase === 2;
+  const selectedFactionLabels = factions.map((faction) => factionLabels[faction]);
 
   function toggleFaction(faction: number) {
     setFactions((current) => {
@@ -179,222 +112,220 @@ export function SetupWizard({
 
   return (
     <main className="app-shell entry-shell">
-      <section className="panel modal-panel entry-panel" style={{ maxWidth: 720 }}>
+      <section
+        className={`${selectedMode === null ? "landing-screen-panel" : "panel modal-panel pregame-modal-panel wide-entry-panel"} entry-panel`}
+      >
         {selectedMode === null ? (
-          <>
-            <div className="landing-hero pregame-hero">
-              <div className="landing-hero-copy">
-                <p className="eyebrow">Woodland Command Desk</p>
-                <span className="landing-kicker">RootBuddy</span>
-                <h1 className="landing-title">Take your seat at the woodland table.</h1>
-                <p className="landing-copy">
-                  Run a live browser match, reopen a suspended board, or use the adjudication companion for shared-table play.
-                  RootBuddy keeps the map, turns, and setup flow in one place instead of scattering them across notes and chat.
-                </p>
-              </div>
-              <div className="landing-feature-row" aria-label="Available entry points">
-                <article className="landing-feature">
-                  <span className="summary-label">Online Tables</span>
-                  <strong>Live lobby flow</strong>
-                  <span>Host a match, pass around a join code, and keep every faction on the same stateful board.</span>
-                </article>
-                <article className="landing-feature">
-                  <span className="summary-label">Assist Play</span>
-                  <strong>Shared reference</strong>
-                  <span>Guide setup, action resolution, and board corrections when the physical game needs a rules-aware companion.</span>
-                </article>
-                <article className="landing-feature">
-                  <span className="summary-label">Saved Boards</span>
-                  <strong>Resume without guesswork</strong>
-                  <span>Return to unfinished setups and finished results with the same perspective and turn context intact.</span>
-                </article>
-              </div>
-            </div>
-
-            <div className="landing-grid pregame-mode-grid">
-              <button type="button" className="mode-choice-card pregame-mode-card online-mode-card" onClick={() => setSelectedMode(0)} disabled={submitting}>
-                <span className="mode-choice-ribbon">Digital Match</span>
-                <strong>Online Play</strong>
-                <span className="mode-choice-flavor">Open a browser-native Root table for remote players.</span>
-                <div className="mode-choice-details">
-                  <span>Lobby hosting and join codes</span>
-                  <span>Seat claiming, ready checks, and shared board state</span>
-                </div>
-              </button>
-              <button type="button" className="mode-choice-card secondary pregame-mode-card assist-mode-card" onClick={() => setSelectedMode(1)} disabled={submitting}>
-                <span className="mode-choice-ribbon">Table Companion</span>
-                <strong>Assist Mode</strong>
-                <span className="mode-choice-flavor">Keep the board honest during in-person or shared-reference play.</span>
-                <div className="mode-choice-details">
-                  <span>Faction setup and action prompting</span>
-                  <span>Guided resolution when the table needs a neutral rules helper</span>
-                </div>
-              </button>
-            </div>
-
-            {canResume && savedSessionInfo ? (
-              <div className="saved-session-card pregame-saved-card">
-                <div className="saved-session-head">
-                  <div>
-                    <span className="summary-label">Saved Chronicle</span>
-                    <strong>{savedSessionTitle(savedSessionInfo)}</strong>
+          <div className="landing-stack">
+            <div className="landing-backdrop" aria-label="Landing screen">
+              <div className="landing-backdrop-overlay">
+                <div className="landing-command-shell">
+                  <div className="landing-hero-copy">
+                    <span className="landing-kicker">RootBuddy</span>
+                    <h1 className="landing-title">Choose how you want to begin.</h1>
+                    <p className="landing-copy">
+                      Start an online lobby for remote play or launch assist mode for shared-table adjudication.
+                    </p>
                   </div>
-                  <span className="saved-session-badge">{savedFinishedResult ? "Review" : "Resume"}</span>
-                </div>
-                <div className="saved-session-details">
-                  {savedSessionDetail(savedSessionInfo).map((line) => (
-                    <span key={line} className="summary-line">
-                      {line}
-                    </span>
-                  ))}
-                </div>
-                {savedFinishedResult ? (
-                  <span className="summary-line">Use review to inspect the finished board, or start fresh to replace it.</span>
-                ) : null}
-                <div className="sidebar-actions footer">
-                  <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
-                    {resumeButtonLabel(savedSessionInfo)}
-                  </button>
-                  <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
-                    Clear Saved Game
-                  </button>
+
+                  <div className="landing-grid pregame-mode-grid">
+                    <button type="button" className="mode-choice-card pregame-mode-card online-mode-card" onClick={() => setSelectedMode(0)} disabled={submitting}>
+                      Online Play
+                    </button>
+                    <button type="button" className="mode-choice-card secondary pregame-mode-card assist-mode-card" onClick={() => setSelectedMode(1)} disabled={submitting}>
+                      Assist Mode
+                    </button>
+                  </div>
+
+                  <span className="message landing-message">{status || "Choose Online Play or Assist Mode to continue."}</span>
                 </div>
               </div>
-            ) : null}
-
-            <div className="sidebar-actions footer landing-utility-actions">
-              <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
-                Use Sample State
-              </button>
             </div>
-            <span className="message">{status || "Choose Online Play or Assist Mode to continue."}</span>
-          </>
+          </div>
         ) : (
           <>
-            <div className="panel-header">
+            <div className="panel-header pregame-panel-header">
               <div>
                 <p className="eyebrow">Pregame</p>
-                <h2>{savedFinishedResult ? "Review or Start New Game" : modeLabel}</h2>
+                <h2>{modeLabel}</h2>
               </div>
               <button type="button" className="secondary" onClick={() => setSelectedMode(null)} disabled={submitting}>
                 Back
               </button>
             </div>
 
-            <div className="flow-guide-hero pregame-selected-mode">
-              <span className="summary-label">Selected Mode</span>
-              <span className="summary-line">{modeDescription}</span>
+            <div className={`pregame-command-surface ${selectedMode === 1 ? "assist" : "online"}`}>
+              <div className="pregame-command-hero">
+                <div className="pregame-command-copy">
+                  <span className="summary-label">Selected Mode</span>
+                  <h3 className="pregame-command-title">{modeLabel}</h3>
+                  <p className="pregame-command-copyline">{modeDescription}</p>
+                </div>
+                <div className="pregame-command-meta">
+                  {selectedMode === 0 ? (
+                    <>
+                      <article className="pregame-meta-card">
+                        <span className="summary-label">Flow</span>
+                        <strong>Lobby-first</strong>
+                        <span className="summary-line">Create a table, share the code, and claim faction seats before starting.</span>
+                      </article>
+                      <article className="pregame-meta-card">
+                        <span className="summary-label">Reconnect</span>
+                        <strong>Session-safe</strong>
+                        <span className="summary-line">Players can rejoin multiplayer tables after disconnecting without local save-state setup.</span>
+                      </article>
+                    </>
+                  ) : (
+                    <>
+                      <article className="pregame-meta-card">
+                        <span className="summary-label">Factions Ready</span>
+                        <strong>{factions.length} in the woodland</strong>
+                        <span className="summary-line">{selectedFactionLabels.join(" / ")}</span>
+                      </article>
+                      <article className="pregame-meta-card">
+                        <span className="summary-label">Perspective</span>
+                        <strong>{factionLabels[playerFaction]}</strong>
+                        <span className="summary-line">Configure the player seat and any faction-specific setup before launch.</span>
+                      </article>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {selectedMode === 0 ? (
+                <div className="pregame-lobby-shell">
+                  <div className="pregame-table-ribbon">
+                    <span className="summary-label">Online Table</span>
+                    <span className="summary-line">Choose whether you are opening the room or arriving with a code from the host.</span>
+                  </div>
+                  <div className="pregame-seat-grid">
+                    <article className="pregame-seat-card host-seat">
+                      <span className="summary-label">Host A Match</span>
+                      <strong>Create Lobby</strong>
+                      <span className="summary-line">Open a new online table, share the join code, and start when every seat is ready.</span>
+                      <span className="pregame-seat-note">Best when you are organizing the table and want RootBuddy to generate the room code.</span>
+                      <button type="button" className="secondary" onClick={onOpenCreateLobby} disabled={submitting}>
+                        Create Lobby
+                      </button>
+                    </article>
+                    <article className="pregame-seat-card join-seat">
+                      <span className="summary-label">Join A Match</span>
+                      <strong>Join Lobby</strong>
+                      <span className="summary-line">Enter a join code to sit at an existing table and claim a faction.</span>
+                      <span className="pregame-seat-note">Best when a host has already opened the room and you are taking a seat at their table.</span>
+                      <button type="button" className="secondary" onClick={onOpenJoinLobby} disabled={submitting}>
+                        Join Lobby
+                      </button>
+                    </article>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedMode === 1 ? (
+                <>
+                  <div className="pregame-selection-strip">
+                    <span className="pregame-selection-pill">{factions.length} factions selected</span>
+                    <span className="pregame-selection-pill">Perspective: {factionLabels[playerFaction]}</span>
+                    <span className="pregame-selection-pill">Map: Autumn</span>
+                  </div>
+
+                  <div className="pregame-assist-grid">
+                    <section className="summary-stack pregame-assist-config pregame-config-card">
+                      <span className="summary-label">Factions In Game</span>
+                      <div className="pregame-faction-grid">
+                        {allFactions.map((faction) => {
+                          const included = factions.includes(faction);
+                          const style = {
+                            "--faction-color": factionAccentColors[faction] ?? "#7a6045"
+                          } as CSSProperties;
+
+                          return (
+                            <label
+                              key={faction}
+                              className={`pregame-faction-card ${included ? "selected" : ""}`}
+                              style={style}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={included}
+                                onChange={() => toggleFaction(faction)}
+                              />
+                              <span className="pregame-faction-card-name">{factionLabels[faction]}</span>
+                              <span className="pregame-faction-card-state">{included ? "Included" : "Not in game"}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="summary-stack pregame-assist-config pregame-config-card">
+                      <span className="summary-label">My Faction</span>
+                      <select
+                        value={playerFaction}
+                        onChange={(event) => setPlayerFaction(Number(event.target.value))}
+                      >
+                        {factions.map((faction) => (
+                          <option key={faction} value={faction}>
+                            {factionLabels[faction]}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="summary-line">Set the point-of-view faction so RootBuddy can present the right prompts first.</span>
+                    </section>
+
+                    {factions.includes(2) ? (
+                      <section className="summary-stack pregame-assist-config pregame-config-card">
+                        <span className="summary-label">Eyrie Leader</span>
+                        <select
+                          value={eyrieLeader}
+                          onChange={(event) => setEyrieLeader(Number(event.target.value))}
+                        >
+                          {eyrieLeaderLabels.map((label, index) => (
+                            <option key={label} value={index}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="summary-line">Choose the initial Eyrie leader so decree guidance starts from the right posture.</span>
+                      </section>
+                    ) : null}
+
+                    {factions.includes(3) ? (
+                      <section className="summary-stack pregame-assist-config pregame-config-card">
+                        <span className="summary-label">Vagabond Character</span>
+                        <select
+                          value={vagabondCharacter}
+                          onChange={(event) => setVagabondCharacter(Number(event.target.value))}
+                        >
+                          {vagabondCharacterLabels.map((label, index) => (
+                            <option key={label} value={index}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="summary-line">Pick the starting Vagabond so item prompts and quests line up with the chosen character.</span>
+                      </section>
+                    ) : null}
+                  </div>
+
+                  <div className="pregame-action-strip">
+                    <span className="summary-line">Choose the factions at the table, set any faction-specific setup choices, and then launch directly into assist mode.</span>
+                    <div className="sidebar-actions footer">
+                      <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
+                        Use Sample State
+                      </button>
+                      <button type="button" onClick={handleStart} disabled={submitting}>
+                        Start Assist Game
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <span className="message pregame-status-message">{status || "Choose Create Lobby or Join Lobby to continue."}</span>
+              )}
             </div>
 
-            {selectedMode === 0 ? (
-              <div className="pregame-lobby-shell">
-                <div className="pregame-seat-grid">
-                  <article className="pregame-seat-card host-seat">
-                    <span className="summary-label">Host A Match</span>
-                    <strong>Create Lobby</strong>
-                    <span className="summary-line">Open a new online table, share the join code, and start when every seat is ready.</span>
-                    <button type="button" className="secondary" onClick={onOpenCreateLobby} disabled={submitting}>
-                      Create Lobby
-                    </button>
-                  </article>
-                  <article className="pregame-seat-card join-seat">
-                    <span className="summary-label">Join A Match</span>
-                    <strong>Join Lobby</strong>
-                    <span className="summary-line">Enter a join code to sit at an existing table and claim a faction.</span>
-                    <button type="button" className="secondary" onClick={onOpenJoinLobby} disabled={submitting}>
-                      Join Lobby
-                    </button>
-                  </article>
-                </div>
-                <span className="summary-line">Online play is lobby-based. Create a table or join one that already exists.</span>
-              </div>
-            ) : null}
-
-            {selectedMode === 1 ? (
-              <>
-                <div className="summary-stack pregame-assist-config">
-                  <span className="summary-label">Factions In Game</span>
-                  {allFactions.map((faction) => (
-                    <label key={faction}>
-                      <input
-                        type="checkbox"
-                        checked={factions.includes(faction)}
-                        onChange={() => toggleFaction(faction)}
-                      />
-                      <span> {factionLabels[faction]}</span>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="summary-stack pregame-assist-config">
-                  <span className="summary-label">My Faction</span>
-                  <select
-                    value={playerFaction}
-                    onChange={(event) => setPlayerFaction(Number(event.target.value))}
-                  >
-                    {factions.map((faction) => (
-                      <option key={faction} value={faction}>
-                        {factionLabels[faction]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {factions.includes(2) ? (
-                  <div className="summary-stack pregame-assist-config">
-                    <span className="summary-label">Eyrie Leader</span>
-                    <select
-                      value={eyrieLeader}
-                      onChange={(event) => setEyrieLeader(Number(event.target.value))}
-                    >
-                      {eyrieLeaderLabels.map((label, index) => (
-                        <option key={label} value={index}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-
-                {factions.includes(3) ? (
-                  <div className="summary-stack pregame-assist-config">
-                    <span className="summary-label">Vagabond Character</span>
-                    <select
-                      value={vagabondCharacter}
-                      onChange={(event) => setVagabondCharacter(Number(event.target.value))}
-                    >
-                      {vagabondCharacterLabels.map((label, index) => (
-                        <option key={label} value={index}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-
-                <div className="sidebar-actions footer">
-                  {canResume ? (
-                    <button type="button" className="secondary" onClick={handleResume} disabled={submitting}>
-                      {resumeButtonLabel(savedSessionInfo)}
-                    </button>
-                  ) : null}
-                  {canResume ? (
-                    <button type="button" className="secondary" onClick={onClearSavedSession} disabled={submitting}>
-                      Clear Saved Game
-                    </button>
-                  ) : null}
-                  <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
-                    Use Sample State
-                  </button>
-                  <button type="button" onClick={handleStart} disabled={submitting}>
-                    Start Assist Game
-                  </button>
-                </div>
-                <span className="message">{status || "Choose factions and continue."}</span>
-              </>
-            ) : (
-              <span className="message">{status || "Choose Create Lobby or Join Lobby to continue."}</span>
-            )}
+            {selectedMode === 1 ? <span className="message pregame-status-message">{status || "Choose factions and continue."}</span> : null}
           </>
         )}
       </section>

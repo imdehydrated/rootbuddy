@@ -366,6 +366,60 @@ describe("App setup integration", () => {
     await waitFor(() => expect(screen.queryByText(/Unhandled test URL/i)).not.toBeInTheDocument());
   });
 
+  it("updates Marquise setup legal highlights for each staged placement", async () => {
+    const state = setupState();
+    mockSetupApi(state, [
+      marquiseSetupAction(1, 5, 10, 9),
+      marquiseSetupAction(1, 5, 9, 10),
+      marquiseSetupAction(1, 10, 5, 9),
+      marquiseSetupAction(2, 6, 10, 5)
+    ]);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Assist Mode/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Start Assist Game/i }));
+
+    await waitFor(() => expect(screen.getAllByText("Marquise Setup").length).toBeGreaterThan(0));
+
+    const clearing1 = screen.getByRole("button", { name: "Clearing 1" });
+    const clearing2 = screen.getByRole("button", { name: "Clearing 2" });
+    const clearing5 = screen.getByRole("button", { name: "Clearing 5" });
+    const clearing6 = screen.getByRole("button", { name: "Clearing 6" });
+    const clearing9 = screen.getByRole("button", { name: "Clearing 9" });
+    const clearing10 = screen.getByRole("button", { name: "Clearing 10" });
+
+    await waitFor(() => {
+      expect(clearing1).toHaveClass("setup-legal");
+      expect(clearing2).toHaveClass("setup-legal");
+      expect(clearing5).not.toHaveClass("setup-legal");
+    });
+
+    fireEvent.click(clearing1);
+
+    await waitFor(() => {
+      expect(clearing5).toHaveClass("setup-legal");
+      expect(clearing10).toHaveClass("setup-legal");
+      expect(clearing6).not.toHaveClass("setup-legal");
+    });
+
+    fireEvent.click(clearing5);
+
+    await waitFor(() => {
+      expect(clearing9).toHaveClass("setup-legal");
+      expect(clearing10).toHaveClass("setup-legal");
+      expect(clearing6).not.toHaveClass("setup-legal");
+    });
+
+    fireEvent.click(clearing9);
+
+    await waitFor(() => {
+      expect(clearing10).toHaveClass("setup-legal");
+      expect(clearing5).not.toHaveClass("setup-legal");
+      expect(clearing6).not.toHaveClass("setup-legal");
+    });
+  });
+
   it("keeps a chosen Marquise setup clearing highlighted when it remains legal for the next placement", async () => {
     const state = setupState();
     mockSetupApi(state, [

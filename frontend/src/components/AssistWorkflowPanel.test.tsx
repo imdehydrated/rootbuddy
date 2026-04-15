@@ -28,6 +28,7 @@ function renderPanel(options: {
   onGenerateActions?: () => Promise<void>;
   onOpenTurnState?: () => void;
   onOpenBattle?: (actionIndex: number) => void;
+  onPreviewAction?: (actionIndex: number | null) => void;
   onBattleCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onMovementCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
@@ -42,6 +43,7 @@ function renderPanel(options: {
       onGenerateActions={options.onGenerateActions ?? vi.fn(async () => undefined)}
       onOpenTurnState={options.onOpenTurnState ?? vi.fn()}
       onOpenBattle={options.onOpenBattle ?? vi.fn()}
+      onPreviewAction={options.onPreviewAction}
       onBattleCandidatesChange={options.onBattleCandidatesChange}
       onMovementCandidatesChange={options.onMovementCandidatesChange}
       onBuildRecruitCandidatesChange={options.onBuildRecruitCandidatesChange}
@@ -354,6 +356,27 @@ describe("AssistWorkflowPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Advance phase/i }));
 
     await waitFor(() => expect(onApply).toHaveBeenCalledWith(passAction));
+  });
+
+  it("publishes hover previews for direct observed choice cards", async () => {
+    const passAction: Action = {
+      type: ACTION_TYPE.PASS_PHASE,
+      passPhase: {
+        faction: 2
+      }
+    };
+    const onPreviewAction = vi.fn();
+
+    renderPanel({ actions: [passAction], onPreviewAction });
+
+    fireEvent.click(screen.getByRole("button", { name: /Draw \/ Advance/i }));
+    const advanceButton = screen.getByRole("button", { name: /Advance phase/i });
+
+    fireEvent.mouseEnter(advanceButton);
+    await waitFor(() => expect(onPreviewAction).toHaveBeenLastCalledWith(0));
+
+    fireEvent.mouseLeave(advanceButton);
+    await waitFor(() => expect(onPreviewAction).toHaveBeenLastCalledWith(null));
   });
 
   it("applies Card Effect choices from direct choice cards", async () => {

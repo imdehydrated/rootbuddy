@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { clearSavedSession, loadSavedSession, saveSavedSession, type SavedSession } from "../localSession";
+import { clearSavedSession, type SavedSession } from "../localSession";
 import type { ActiveModal } from "../modalState";
 import type { Action, GameState } from "../types";
 import type { SetupScreen } from "../multiplayer";
@@ -43,27 +43,17 @@ export function useSessionPersistence({
   setStatus,
   syncState
 }: UseSessionPersistenceOptions) {
-  const initialSavedSession = loadSavedSession();
   const [showSetup, setShowSetup] = useState(true);
   const [setupScreen, setSetupScreen] = useState<SetupScreen>("wizard");
-  const [hasSavedSession, setHasSavedSession] = useState(() => initialSavedSession !== null);
-  const [savedSessionInfo, setSavedSessionInfo] = useState<SavedSession | null>(initialSavedSession);
+  const [hasSavedSession, setHasSavedSession] = useState(false);
+  const [savedSessionInfo, setSavedSessionInfo] = useState<SavedSession | null>(null);
 
   useEffect(() => {
-    if (showSetup || getMultiplayerToken()) {
-      return;
-    }
-    const session: SavedSession = {
-      state: parsedState,
-      gameID: serverGameID,
-      revision: serverRevision,
-      savedAt: new Date().toISOString()
-    };
-    if (saveSavedSession(session)) {
-      setHasSavedSession(true);
-      setSavedSessionInfo(session);
-    }
-  }, [parsedState, serverGameID, serverRevision, showSetup]);
+    // Local assist/offline autosave is intentionally disabled.
+    clearSavedSession();
+    setHasSavedSession(false);
+    setSavedSessionInfo(null);
+  }, []);
 
   function resetToSetup(options?: { clearSaved?: boolean; status?: string }) {
     if (options?.clearSaved) {
@@ -99,39 +89,7 @@ export function useSessionPersistence({
   }
 
   async function handleResumeSavedGame() {
-    const savedSession = loadSavedSession();
-    if (!savedSession) {
-      throw new Error("No saved game found.");
-    }
-
-    const loaded = await loadSavedGame(savedSession);
-    setSavedSessionInfo({
-      state: loaded.state,
-      gameID: loaded.gameID,
-      revision: loaded.revision,
-      savedAt: savedSession.savedAt
-    });
-    syncState(loaded.state);
-    setServerGameID(loaded.gameID);
-    setServerRevision(loaded.revision);
-    setShowSetup(false);
-    setShowBoardEditor(false);
-    setShowGuideHelp(loaded.state.gamePhase === 1);
-    setStatus(
-      loaded.state.gamePhase === 2
-        ? "Reviewing saved final result."
-        : loaded.state.gamePhase === 0
-          ? "Resumed setup."
-          : "Resumed saved game."
-    );
-
-    if (loaded.state.gamePhase === 0) {
-      try {
-        await loadActionsForState(loaded.state, { successStatus: "Resumed setup. Choose a highlighted setup target." });
-      } catch (err) {
-        setStatus(err instanceof Error ? err.message : "Failed to load resumed setup actions");
-      }
-    }
+    throw new Error("Local saved-game resume is no longer supported. Multiplayer reconnect still resumes automatically in this browser.");
   }
 
   return {

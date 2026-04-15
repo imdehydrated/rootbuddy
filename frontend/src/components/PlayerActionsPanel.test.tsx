@@ -133,6 +133,27 @@ describe("PlayerActionsPanel", () => {
     );
   });
 
+  it("publishes hover previews for direct active-turn choice cards", async () => {
+    const passAction: Action = {
+      type: ACTION_TYPE.PASS_PHASE,
+      passPhase: {
+        faction: 2
+      }
+    };
+    const onPreviewAction = vi.fn();
+
+    renderPanel({ actions: [passAction], onPreviewAction });
+
+    fireEvent.click(screen.getByRole("button", { name: /Draw \/ Advance/i }));
+    const advanceButton = screen.getByRole("button", { name: /Advance phase/i });
+
+    fireEvent.mouseEnter(advanceButton);
+    await waitFor(() => expect(onPreviewAction).toHaveBeenLastCalledWith(0));
+
+    fireEvent.mouseLeave(advanceButton);
+    await waitFor(() => expect(onPreviewAction).toHaveBeenLastCalledWith(null));
+  });
+
   it("keeps the action audit closed by default for normal active intents", () => {
     const movementAction: Action = {
       type: ACTION_TYPE.MOVEMENT,

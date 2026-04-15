@@ -274,6 +274,10 @@ export function useGameState({ getMultiplayerToken, jsonEditorOpen }: UseGameSta
         await loadActionsForState(nextState, { successStatus: "Setup step applied." });
         return;
       }
+      if (!getMultiplayerToken() && nextState.gamePhase === 1) {
+        await loadActionsForState(nextState, { successStatus: effectResult?.message ?? "Action applied." });
+        return;
+      }
       syncState(nextState);
       setStatus(nextState.gamePhase === 2 ? gameOverStatusMessage(nextState) : effectResult?.message ?? "Action applied.");
     } catch (err) {
