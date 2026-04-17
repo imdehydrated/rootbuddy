@@ -69,9 +69,10 @@ export function PhaseBar({
         {phaseLabels.map((label, index) => (
           <span
             key={label}
-            className={`phase-bar-segment ${index === currentPhase ? "active" : ""}`}
+            className={`phase-bar-segment ${index === currentPhase ? "active" : index < currentPhase ? "complete" : "upcoming"}`}
             aria-current={index === currentPhase ? "step" : undefined}
           >
+            <span className="phase-bar-segment-dot" aria-hidden="true" />
             {label}
           </span>
         ))}

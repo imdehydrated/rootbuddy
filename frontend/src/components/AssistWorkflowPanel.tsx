@@ -18,7 +18,7 @@ import { useIntentSelection } from "../hooks/useIntentSelection";
 import type { Action, GameState } from "../types";
 import { ExactActionDrawer, IntentGrid } from "./ActionPromptUi";
 import { ObservedActionPanel, type ObservedTemplateKey } from "./ObservedActionPanel";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type AssistWorkflowPanelProps = {
   state: GameState;
@@ -36,6 +36,12 @@ type AssistWorkflowPanelProps = {
   onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 };
+
+const factionAccentColors = ["#b14d36", "#4c7a45", "#496aa0", "#8a6842"];
+
+function factionAccentColor(faction: number) {
+  return factionAccentColors[faction] ?? "#7a6045";
+}
 
 export function AssistWorkflowPanel({
   state,
@@ -179,6 +185,10 @@ export function AssistWorkflowPanel({
     return null;
   }
 
+  const panelStyle = {
+    "--active-faction-color": factionAccentColor(state.factionTurn)
+  } as CSSProperties;
+
   const hiddenObservedControls = (
     <div className="shortcut-grid">
       {observedPromptTemplates(state).map((prompt) => (
@@ -218,7 +228,10 @@ export function AssistWorkflowPanel({
   );
 
   return (
-    <section className={`panel assist-workflow-panel ${surface === "tray" ? "board-action-panel board-action-panel-tray assist-workflow-tray" : "sidebar-panel"}`}>
+    <section
+      className={`panel action-command-panel assist-workflow-panel ${surface === "tray" ? "board-action-panel board-action-panel-tray assist-workflow-tray" : "sidebar-panel"}`}
+      style={panelStyle}
+    >
       {traySurface ? (
         <>
           <div className="summary-stack assist-tray-summary">

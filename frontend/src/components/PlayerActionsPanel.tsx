@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { phaseLabels } from "../labels";
 import {
   cardEffectChoiceLabel,
@@ -29,6 +29,12 @@ type PlayerActionsPanelProps = {
   onBuildRecruitCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
   onFactionSpatialCandidatesChange?: (candidates: AssistActionCandidateRef[]) => void;
 };
+
+const factionAccentColors = ["#b14d36", "#4c7a45", "#496aa0", "#8a6842"];
+
+function factionAccentColor(faction: number) {
+  return factionAccentColors[faction] ?? "#7a6045";
+}
 
 export function PlayerActionsPanel({
   state,
@@ -144,8 +150,15 @@ export function PlayerActionsPanel({
 
   useEffect(() => () => onPreviewAction?.(null), [onPreviewAction]);
 
+  const panelStyle = {
+    "--active-faction-color": factionAccentColor(state.factionTurn)
+  } as CSSProperties;
+
   return (
-    <section className={`panel ${surface === "tray" ? "board-action-panel board-action-panel-tray player-actions-tray" : "sidebar-panel"}`}>
+    <section
+      className={`panel action-command-panel ${surface === "tray" ? "board-action-panel board-action-panel-tray player-actions-tray" : "sidebar-panel"}`}
+      style={panelStyle}
+    >
       <p className="eyebrow">Your Turn</p>
       <div className="summary-stack">
         <span className="summary-label">{phaseLabel}</span>
