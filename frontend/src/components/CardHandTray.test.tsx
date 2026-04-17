@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { sampleState } from "../sampleState";
@@ -50,6 +50,10 @@ describe("CardHandTray", () => {
     render(<CardHandTray state={state} />);
 
     expect(screen.getByText("Woodland Alliance Hand")).toBeInTheDocument();
+    expect(screen.queryByText("Alliance Plot")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show Hand" }));
+
     expect(screen.getByText("Alliance Plot")).toBeInTheDocument();
     expect(screen.queryByText("Marquise Card")).not.toBeInTheDocument();
   });

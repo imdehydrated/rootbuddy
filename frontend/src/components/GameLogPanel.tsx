@@ -25,7 +25,7 @@ function formatTimestamp(timestamp: number) {
 }
 
 export function GameLogPanel({ entries, factionTurn }: GameLogPanelProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const listRef = useRef<HTMLDivElement | null>(null);
   const orderedEntries = useMemo(() => [...entries].reverse(), [entries]);
 

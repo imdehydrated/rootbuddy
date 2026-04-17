@@ -23,8 +23,8 @@
 
 .board-status-stack {
   display: grid;
-  gap: 0.55rem;
-  width: min(24rem, calc(100% - 8rem));
+  gap: 0.45rem;
+  width: min(19rem, calc(100% - 8rem));
   min-width: 0;
 }
 
@@ -39,10 +39,20 @@
 
 .board-status-hud {
   width: 100%;
-  padding: 0.7rem 0.8rem;
-  border-radius: 20px;
-  background: rgba(255, 249, 240, 0.68);
-  box-shadow: 0 12px 28px rgba(44, 31, 18, 0.12);
+  padding: 0.56rem 0.68rem;
+  border-radius: 18px;
+  background: rgba(255, 249, 240, 0.58);
+  box-shadow: 0 10px 22px rgba(44, 31, 18, 0.1);
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.board-status-hud:hover,
+.board-status-hud:focus-within {
+  background: rgba(255, 249, 240, 0.88);
+  box-shadow: 0 14px 28px rgba(44, 31, 18, 0.14);
 }
 
 .board-utility-hud {
@@ -256,14 +266,21 @@
 
 .board-phase-stack {
   position: absolute;
-  top: 0.95rem;
+  top: 0.75rem;
   left: 50%;
   z-index: 6;
   transform: translateX(-50%);
   pointer-events: none;
-  width: min(38rem, calc(100% - 2rem));
+  width: min(32rem, calc(100% - 2rem));
   display: grid;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  opacity: 0.9;
+  transition: opacity 160ms ease;
+}
+
+.board-phase-stack:hover,
+.board-phase-stack:focus-within {
+  opacity: 1;
 }
 
 .phase-bar,
@@ -274,9 +291,9 @@
 .phase-bar {
   --active-faction-color: #7a6045;
   display: grid;
-  gap: 0.58rem;
-  padding: 0.78rem 0.9rem 0.9rem;
-  border-radius: 22px;
+  gap: 0.46rem;
+  padding: 0.62rem 0.78rem 0.7rem;
+  border-radius: 18px;
   text-align: center;
   color: #2b1d13;
   background:
@@ -296,7 +313,7 @@
 }
 
 .phase-bar-kicker {
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -304,7 +321,7 @@
 }
 
 .phase-bar-header strong {
-  font-size: clamp(1.08rem, 1.8vw, 1.46rem);
+  font-size: clamp(1rem, 1.45vw, 1.26rem);
   font-weight: 800;
   letter-spacing: 0.02em;
   color: color-mix(in srgb, var(--active-faction-color) 72%, #2b1d13);
@@ -335,8 +352,8 @@
   border-radius: 999px;
   border: 1px solid rgba(98, 62, 27, 0.18);
   background: rgba(255, 251, 244, 0.76);
-  padding: 0.48rem 0.6rem;
-  font-size: 0.82rem;
+  padding: 0.4rem 0.52rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   transition:
@@ -385,13 +402,20 @@
 
 .vp-tracker {
   display: grid;
-  gap: 0.45rem;
-  padding: 0.7rem 0.85rem 0.8rem;
-  border-radius: 18px;
+  gap: 0.32rem;
+  padding: 0.5rem 0.62rem 0.56rem;
+  border-radius: 16px;
   color: #2b1d13;
-  background: rgba(255, 249, 240, 0.88);
-  border: 1px solid rgba(98, 62, 27, 0.24);
-  box-shadow: 0 10px 22px rgba(54, 33, 16, 0.12);
+  background: rgba(255, 249, 240, 0.72);
+  border: 1px solid rgba(98, 62, 27, 0.2);
+  box-shadow: 0 8px 18px rgba(54, 33, 16, 0.1);
+  backdrop-filter: blur(14px);
+}
+
+.vp-tracker:hover,
+.vp-tracker:focus-within {
+  background: rgba(255, 249, 240, 0.92);
+  box-shadow: 0 12px 24px rgba(54, 33, 16, 0.14);
 }
 
 .vp-tracker-header {
@@ -401,22 +425,26 @@
 }
 
 .vp-tracker-header strong {
-  font-size: 1rem;
+  font-size: 0.88rem;
+}
+
+.vp-tracker-header span:last-child {
+  display: none;
 }
 
 .vp-tracker-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.32rem;
 }
 
 .vp-tracker-segment {
   --faction-color: #7a6045;
   --vp-progress: 0%;
   display: grid;
-  gap: 0.26rem;
-  padding: 0.55rem 0.6rem 0.62rem;
-  border-radius: 16px;
+  gap: 0.2rem;
+  padding: 0.4rem 0.42rem 0.46rem;
+  border-radius: 13px;
   border: 1px solid color-mix(in srgb, var(--faction-color) 24%, #b89b75);
   background: linear-gradient(180deg, color-mix(in srgb, var(--faction-color) 10%, white), rgba(255, 249, 240, 0.9));
   text-align: left;
@@ -430,20 +458,20 @@
 }
 
 .vp-tracker-label {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   color: color-mix(in srgb, var(--faction-color) 82%, #2b1d13);
 }
 
 .vp-tracker-segment strong {
-  font-size: 1.18rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
 .vp-tracker-progress {
   position: relative;
-  height: 0.46rem;
+  height: 0.34rem;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(70, 49, 25, 0.12);
@@ -465,6 +493,10 @@
   padding: 0.16rem 0.48rem;
   background: rgba(255, 251, 244, 0.8);
   border: 1px solid rgba(98, 62, 27, 0.14);
+}
+
+.vp-tracker-total {
+  display: none;
 }
 
 .board-setup-prompt {

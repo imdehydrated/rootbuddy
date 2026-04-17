@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { factionLabels } from "../labels";
 import { visibleHand } from "../cardPresentation";
 import type { GameState } from "../types";
@@ -9,6 +10,8 @@ type CardHandTrayProps = {
 };
 
 export function CardHandTray({ state, compactCards = false }: CardHandTrayProps) {
+  const [collapsed, setCollapsed] = useState(true);
+
   if (state.gamePhase !== 1) {
     return null;
   }
@@ -17,15 +20,24 @@ export function CardHandTray({ state, compactCards = false }: CardHandTrayProps)
   const perspectiveLabel = factionLabels[state.playerFaction] ?? "Current";
 
   return (
-    <section className="card-hand-tray" aria-label="Current hand tray">
+    <section className={`card-hand-tray ${collapsed && hand.length > 0 ? "collapsed" : ""}`} aria-label="Current hand tray">
       <div className="card-hand-tray-header">
         <div className="summary-stack">
           <span className="summary-label">Hand Tray</span>
           <strong>{perspectiveLabel} Hand</strong>
           <span className="summary-line">{hand.length} visible card{hand.length === 1 ? "" : "s"}</span>
         </div>
+        {hand.length > 0 ? (
+          <button type="button" className="secondary card-hand-toggle" onClick={() => setCollapsed((current) => !current)}>
+            {collapsed ? "Show Hand" : "Hide Hand"}
+          </button>
+        ) : null}
       </div>
-      {hand.length > 0 ? (
+      {hand.length > 0 && collapsed ? (
+        <div className="card-hand-summary-strip">
+          <span className="summary-line">Cards hidden to keep the board visible.</span>
+        </div>
+      ) : hand.length > 0 ? (
         <div className="card-hand-strip">
           {hand.map((card) => (
             <div key={card.id} className="card-hand-item">

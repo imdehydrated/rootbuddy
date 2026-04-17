@@ -709,6 +709,7 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Show Log" }));
     expect(await screen.findByText("No multiplayer actions have been logged yet.")).toBeInTheDocument();
     expect(screen.queryByText("Join Code ROOT42")).not.toBeInTheDocument();
     await waitFor(() => {
@@ -1095,6 +1096,7 @@ describe("App multiplayer integration", () => {
     });
 
     expect(await screen.findByAltText("Autumn board")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Show Log" }));
     expect(await screen.findByText("Eyrie moved from clearing 3 to clearing 7.")).toBeInTheDocument();
     expect(screen.getByText("Round 1")).toBeInTheDocument();
   });

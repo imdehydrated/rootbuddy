@@ -1,26 +1,45 @@
 .board-log-shell {
   position: absolute;
-  top: 8.9rem;
+  top: 6.2rem;
   right: 1rem;
   z-index: 7;
-  width: min(20rem, calc(100% - 2rem));
+  width: min(17rem, calc(100% - 2rem));
   pointer-events: none;
 }
 
 .game-log-panel {
   display: grid;
-  gap: 0.7rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 22px;
-  background: rgba(255, 249, 240, 0.82);
-  border: 1px solid rgba(213, 195, 169, 0.92);
-  box-shadow: 0 16px 30px rgba(44, 31, 18, 0.14);
+  gap: 0.55rem;
+  padding: 0.68rem 0.75rem;
+  border-radius: 18px;
+  background: rgba(255, 249, 240, 0.7);
+  border: 1px solid rgba(213, 195, 169, 0.78);
+  box-shadow: 0 12px 24px rgba(44, 31, 18, 0.12);
   backdrop-filter: blur(16px);
   pointer-events: auto;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.game-log-panel:hover,
+.game-log-panel:focus-within {
+  background: rgba(255, 249, 240, 0.92);
+  box-shadow: 0 16px 30px rgba(44, 31, 18, 0.16);
 }
 
 .game-log-panel.collapsed {
-  gap: 0.35rem;
+  justify-self: end;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0.2rem;
+  padding: 0.52rem 0.62rem;
+  opacity: 0.88;
+}
+
+.game-log-panel.collapsed .summary-line {
+  display: none;
 }
 
 .game-log-header {
@@ -32,12 +51,13 @@
 
 .game-log-toggle {
   flex-shrink: 0;
+  padding: 0.42rem 0.7rem;
 }
 
 .game-log-list {
   display: grid;
   gap: 0.55rem;
-  max-height: min(22rem, 42vh);
+  max-height: min(18rem, 36vh);
   overflow: auto;
   padding-right: 0.1rem;
 }

@@ -27,6 +27,8 @@ describe("GameLogPanel", () => {
       />
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Show Log" }));
+
     const summaries = screen.getAllByText(/action$/i);
     expect(summaries[0]).toHaveTextContent("Newest action");
     expect(summaries[1]).toHaveTextContent("Older action");
@@ -36,16 +38,20 @@ describe("GameLogPanel", () => {
   it("shows an empty state when no entries are present", () => {
     render(<GameLogPanel factionTurn={1} entries={[]} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Show Log" }));
+
     expect(screen.getByText("No multiplayer actions have been logged yet.")).toBeInTheDocument();
   });
 
   it("can collapse and reopen the log body", () => {
     render(<GameLogPanel factionTurn={3} entries={[logEntry()]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Log" }));
     expect(screen.queryByText("Eyrie moved from clearing 3 to clearing 7.")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show Log" }));
     expect(screen.getByText("Eyrie moved from clearing 3 to clearing 7.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Log" }));
+    expect(screen.queryByText("Eyrie moved from clearing 3 to clearing 7.")).not.toBeInTheDocument();
   });
 });

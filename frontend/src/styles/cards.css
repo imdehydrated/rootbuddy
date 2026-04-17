@@ -5,35 +5,61 @@
   bottom: 1rem;
   z-index: 6;
   transform: translateX(-50%);
-  width: min(56rem, calc(100% - 2rem));
+  width: min(42rem, calc(100% - 2rem));
   pointer-events: none;
 }
 
 .board-card-tray-shell.with-action-tray {
-  bottom: 14rem;
+  bottom: 11.5rem;
 }
 
 .card-hand-tray {
   display: grid;
-  gap: 0.7rem;
-  padding: 0.75rem 0.9rem 0.85rem;
-  border-radius: 22px;
-  background: rgba(255, 249, 240, 0.78);
-  border: 1px solid rgba(213, 195, 169, 0.92);
-  box-shadow: 0 16px 32px rgba(44, 31, 18, 0.14);
+  gap: 0.5rem;
+  padding: 0.58rem 0.68rem 0.66rem;
+  border-radius: 18px;
+  background: rgba(255, 249, 240, 0.66);
+  border: 1px solid rgba(213, 195, 169, 0.78);
+  box-shadow: 0 12px 24px rgba(44, 31, 18, 0.12);
   backdrop-filter: blur(16px);
   pointer-events: auto;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.card-hand-tray:hover,
+.card-hand-tray:focus-within {
+  background: rgba(255, 249, 240, 0.9);
+  box-shadow: 0 16px 30px rgba(44, 31, 18, 0.16);
+}
+
+.card-hand-tray.collapsed {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 .card-hand-tray-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
 .card-hand-tray-header strong {
-  font-size: 1rem;
+  font-size: 0.92rem;
+}
+
+.card-hand-toggle {
+  flex-shrink: 0;
+  padding: 0.42rem 0.7rem;
+}
+
+.card-hand-summary-strip {
+  max-width: 22rem;
+  padding: 0.18rem 0.02rem 0;
 }
 
 .card-hand-strip,
@@ -44,7 +70,7 @@
 
 .card-hand-strip {
   grid-auto-flow: column;
-  grid-auto-columns: minmax(12rem, 15rem);
+  grid-auto-columns: minmax(10.5rem, 13rem);
   overflow-x: auto;
   padding-bottom: 0.2rem;
 }
