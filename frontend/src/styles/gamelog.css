@@ -36,6 +36,7 @@
   gap: 0.2rem;
   padding: 0.52rem 0.62rem;
   opacity: 0.88;
+  animation: rootbuddy-fade-rise var(--motion);
 }
 
 .game-log-panel.collapsed .summary-line {
@@ -70,6 +71,16 @@
   border-radius: 18px;
   border: 1px solid rgba(124, 97, 65, 0.14);
   background: rgba(255, 252, 246, 0.88);
+  animation: rootbuddy-fade-rise var(--motion);
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    transform var(--motion-fast);
+}
+
+.game-log-entry:hover {
+  transform: translateX(-2px);
+  background: rgba(255, 252, 246, 0.96);
 }
 
 .game-log-entry.marquise {

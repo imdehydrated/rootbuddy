@@ -26,7 +26,8 @@
   transition:
     background 160ms ease,
     box-shadow 160ms ease,
-    opacity 160ms ease;
+    opacity 160ms ease,
+    transform var(--motion-fast);
 }
 
 .card-hand-tray:hover,
@@ -39,6 +40,7 @@
   width: fit-content;
   max-width: 100%;
   margin-inline: auto;
+  animation: rootbuddy-fade-rise var(--motion);
 }
 
 .card-hand-tray-header {
@@ -100,6 +102,10 @@
   background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(245, 234, 214, 0.94));
   box-shadow: 0 10px 22px rgba(50, 34, 18, 0.1);
   text-align: left;
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
 }
 
 .card-component.compact {
@@ -113,6 +119,13 @@
 
 button.card-component {
   cursor: pointer;
+}
+
+button.card-component:hover,
+button.card-component:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(39, 72, 60, 0.34);
+  box-shadow: 0 14px 26px rgba(50, 34, 18, 0.14);
 }
 
 .card-component-body {

@@ -244,7 +244,11 @@
   border-radius: 20px;
   border: 1px solid rgba(39, 72, 60, 0.14);
   background: rgba(255, 249, 240, 0.76);
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
 }
 
 .player-action-card:hover,
@@ -302,7 +306,11 @@
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--active-faction-color) 8%, white), transparent 34%),
     rgba(255, 249, 240, 0.78);
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
 }
 
 .embedded-action-card:hover,

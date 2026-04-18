@@ -9,6 +9,9 @@
   --line: #d3c2ab;
   --warn: #9a4638;
   --bg: #e7dcc8;
+  --motion-fast: 120ms ease;
+  --motion: 180ms ease;
+  --motion-slow: 260ms ease;
 }
 
 *,
@@ -54,10 +57,26 @@ button {
   background: linear-gradient(180deg, rgba(255, 251, 245, 0.96), rgba(239, 228, 211, 0.96));
   box-shadow: 0 2px 0 rgba(73, 52, 33, 0.08);
   cursor: pointer;
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    color var(--motion-fast),
+    opacity var(--motion-fast);
+}
+
+button:not(:disabled):not(.clearing-marker):not(.forest-marker):not(.card-component):not(.mode-choice-card):not(.lobby-seat-card):not(.pregame-faction-card):not(.assist-intent-card):not(.assist-choice-card):hover {
+  border-color: rgba(82, 112, 74, 0.35);
+  box-shadow: 0 4px 10px rgba(73, 52, 33, 0.12);
+}
+
+button:not(:disabled):not(.clearing-marker):not(.forest-marker):not(.card-component):not(.mode-choice-card):not(.lobby-seat-card):not(.pregame-faction-card):not(.assist-intent-card):not(.assist-choice-card):active {
+  box-shadow: 0 1px 0 rgba(73, 52, 33, 0.12);
 }
 
 button:disabled {
   cursor: not-allowed;
+  opacity: 0.58;
 }
 
 input,
@@ -66,8 +85,74 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 251, 245, 0.94);
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    background var(--motion-fast);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid rgba(82, 112, 74, 0.42);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: rgba(82, 112, 74, 0.46);
+  background: rgba(255, 253, 249, 0.98);
+  box-shadow: 0 0 0 4px rgba(82, 112, 74, 0.12);
 }
 
 textarea {
   resize: vertical;
+}
+
+@keyframes rootbuddy-fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rootbuddy-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rootbuddy-soft-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
