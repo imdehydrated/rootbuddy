@@ -63,7 +63,7 @@
     linear-gradient(130deg, rgba(26, 20, 14, 0.46), rgba(26, 20, 14, 0.12)),
     radial-gradient(circle at top right, rgba(180, 98, 44, 0.18), transparent 26%),
     radial-gradient(circle at bottom left, rgba(82, 112, 74, 0.14), transparent 30%),
-    url("/autumn-board.svg");
+    url("/autumn-board-ai.jpg");
   background-position: center;
   background-size: cover;
   border: 1px solid rgba(88, 67, 47, 0.16);

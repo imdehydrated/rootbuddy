@@ -45,6 +45,7 @@ type DragState = {
 const MIN_BOARD_SCALE = 1;
 const MAX_BOARD_SCALE = 2.25;
 const BOARD_ZOOM_STEP = 0.12;
+const BOARD_ASPECT_RATIO = 16 / 10;
 
 function clampBoardScale(nextScale: number) {
   return Math.min(MAX_BOARD_SCALE, Math.max(MIN_BOARD_SCALE, nextScale));
@@ -119,12 +120,17 @@ export function BoardPanel({
           return null;
         }
 
+        const dx = to.left - from.left;
+        const dy = to.top - from.top;
+
         return {
           key: `${clearing.id}-${adjacentID}`,
           x1: from.left,
           y1: from.top,
           x2: to.left,
           y2: to.top,
+          length: Math.hypot(dx, dy / BOARD_ASPECT_RATIO),
+          angle: Math.atan2(dy / BOARD_ASPECT_RATIO, dx) * (180 / Math.PI),
           connectedToFocused:
             focusedClearingID !== null &&
             (clearing.id === focusedClearingID || adjacentID === focusedClearingID)
@@ -249,15 +255,19 @@ export function BoardPanel({
         onWheel={handleBoardWheel}
       >
         <div
-          className="board-view"
+          className={`board-view ${boardLayout.imagePath ? "has-map-art" : "fallback-map-art"}`}
           data-testid="board-view"
           style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}
         >
-          <img
-            className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
-            src={boardLayout.imagePath}
-            alt={`${boardLayout.label} board`}
-          />
+          {boardLayout.imagePath ? (
+            <img
+              className={`board-map-art ${previewedAction ? "preview-active" : ""}`}
+              src={boardLayout.imagePath}
+              alt={`${boardLayout.label} board`}
+              decoding="async"
+              draggable={false}
+            />
+          ) : null}
           <div className="board-overlay">
             {previewRoutes.length > 0 ? (
               <svg className="board-preview-routes" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -273,35 +283,20 @@ export function BoardPanel({
                 ))}
               </svg>
             ) : null}
-            {!boardLayout.imagePath ? (
-              <svg className="board-paths" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {adjacencySegments.map((segment) => (
-                  <line
-                    key={segment.key}
-                    x1={segment.x1}
-                    y1={segment.y1}
-                    x2={segment.x2}
-                    y2={segment.y2}
-                    className={segment.connectedToFocused ? "connected-to-focus" : undefined}
-                  />
-                ))}
-              </svg>
-            ) : (
-              <svg className="board-paths board-paths-focus" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {adjacencySegments
-                  .filter((segment) => segment.connectedToFocused)
-                  .map((segment) => (
-                    <line
-                      key={segment.key}
-                      x1={segment.x1}
-                      y1={segment.y1}
-                      x2={segment.x2}
-                      y2={segment.y2}
-                      className="connected-to-focus"
-                    />
-                  ))}
-              </svg>
-            )}
+            <div className="board-paths" aria-hidden="true">
+              {adjacencySegments.map((segment) => (
+                <span
+                  key={segment.key}
+                  className={`board-path-segment ${segment.connectedToFocused ? "connected-to-focus" : ""}`}
+                  style={{
+                    left: `${segment.x1}%`,
+                    top: `${segment.y1}%`,
+                    width: `${segment.length}%`,
+                    transform: `rotate(${segment.angle}deg)`
+                  }}
+                />
+              ))}
+            </div>
             {clearings.map((clearing, index) => (
               <ClearingMarker
                 key={clearing.id}

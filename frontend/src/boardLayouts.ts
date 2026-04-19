@@ -16,7 +16,7 @@ export interface BoardLayout {
 const autumnBoardLayout: BoardLayout = {
   id: "autumn",
   label: "Autumn",
-  imagePath: "/autumn-board.svg",
+  imagePath: "/autumn-board-ai.jpg",
   clearingPositions: {
     1: { left: 8.4, top: 18.2 },
     5: { left: 50.2, top: 15.8 },
