@@ -174,9 +174,9 @@ func summarizeAction(action game.Action) string {
 			action.MarquiseSetup.RecruiterClearingID,
 		)
 	case game.ActionEyrieSetup:
-		return fmt.Sprintf("Eyrie setup: start in clearing %d", action.EyrieSetup.ClearingID)
+		return fmt.Sprintf("Eyrie setup: leader %d, start in clearing %d", action.EyrieSetup.Leader, action.EyrieSetup.ClearingID)
 	case game.ActionVagabondSetup:
-		return fmt.Sprintf("Vagabond setup: start in forest %d", action.VagabondSetup.ForestID)
+		return fmt.Sprintf("Vagabond setup: character %d, start in forest %d", action.VagabondSetup.Character, action.VagabondSetup.ForestID)
 	case game.ActionUsePersistentEffect:
 		switch action.UsePersistentEffect.EffectID {
 		case "better_burrow_bank":

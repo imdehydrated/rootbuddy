@@ -180,8 +180,6 @@ function lobby(players: LobbyPlayer[], options: Partial<Lobby> = {}): Lobby {
     players,
     factions: [0, 2],
     mapID: "autumn",
-    vagabondCharacter: 0,
-    eyrieLeader: 0,
     createdAt: "2026-04-07T00:00:00Z",
     ...options
   };

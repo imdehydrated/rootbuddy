@@ -372,7 +372,7 @@ export function useMultiplayer({
     setSetupScreen("wizard");
   }
 
-  async function handleCreateLobby(request: { displayName: string; factions: number[]; eyrieLeader: number; vagabondCharacter: number }) {
+  async function handleCreateLobby(request: { displayName: string; factions: number[] }) {
     try {
       setMultiplayerSubmitting(true);
       setStatus("Creating multiplayer lobby...");

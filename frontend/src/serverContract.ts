@@ -115,8 +115,6 @@ export type CreateLobbyRequestDTO = {
   displayName: string;
   factions?: number[];
   mapID?: string;
-  vagabondCharacter?: number;
-  eyrieLeader?: number;
 };
 
 export type JoinLobbyRequestDTO = {

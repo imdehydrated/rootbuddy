@@ -835,12 +835,10 @@ func TestHandleBattleContext(t *testing.T) {
 
 func TestHandleSetup(t *testing.T) {
 	body, _ := json.Marshal(SetupRequest{
-		GameMode:          game.GameModeOnline,
-		PlayerFaction:     game.Marquise,
-		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-		MapID:             game.AutumnMapID,
-		VagabondCharacter: game.CharThief,
-		EyrieLeader:       game.LeaderBuilder,
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/game/setup", bytes.NewReader(body))
@@ -875,12 +873,10 @@ func TestHandleSetup(t *testing.T) {
 
 func TestOnlineSetupApplyRedactsHiddenHandsAfterFinalSetup(t *testing.T) {
 	setupBody, _ := json.Marshal(SetupRequest{
-		GameMode:          game.GameModeOnline,
-		PlayerFaction:     game.Marquise,
-		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-		MapID:             game.AutumnMapID,
-		VagabondCharacter: game.CharThief,
-		EyrieLeader:       game.LeaderBuilder,
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
 	})
 
 	setupReq := httptest.NewRequest(http.MethodPost, "/api/game/setup", bytes.NewReader(setupBody))
@@ -933,14 +929,16 @@ func TestOnlineSetupApplyRedactsHiddenHandsAfterFinalSetup(t *testing.T) {
 		Type: game.ActionEyrieSetup,
 		EyrieSetup: &game.EyrieSetupAction{
 			Faction:    game.Eyrie,
+			Leader:     game.LeaderBuilder,
 			ClearingID: 3,
 		},
 	})
 	state = applyAndDecode(game.Action{
 		Type: game.ActionVagabondSetup,
 		VagabondSetup: &game.VagabondSetupAction{
-			Faction:  game.Vagabond,
-			ForestID: 7,
+			Faction:   game.Vagabond,
+			Character: game.CharThief,
+			ForestID:  7,
 		},
 	})
 
@@ -955,6 +953,15 @@ func TestOnlineSetupApplyRedactsHiddenHandsAfterFinalSetup(t *testing.T) {
 	}
 	if state.OtherHandCounts[game.Eyrie] != 3 || state.OtherHandCounts[game.Alliance] != 3 || state.OtherHandCounts[game.Vagabond] != 3 {
 		t.Fatalf("expected redacted other hand counts after setup, got %+v", state.OtherHandCounts)
+	}
+	hiddenSupporters := 0
+	for _, hidden := range state.HiddenCards {
+		if hidden.OwnerFaction == game.Alliance && hidden.Zone == game.HiddenCardZoneSupporters {
+			hiddenSupporters++
+		}
+	}
+	if hiddenSupporters != 3 {
+		t.Fatalf("expected redacted Alliance supporter count after setup, got %+v", state.HiddenCards)
 	}
 	if len(state.Deck) != 39 {
 		t.Fatalf("expected redacted deck to preserve remaining count only, got %+v", state.Deck)

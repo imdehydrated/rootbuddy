@@ -23,7 +23,7 @@ import { TurnStatePanel } from "./components/TurnStatePanel";
 import { TurnSummaryPanel } from "./components/TurnSummaryPanel";
 import { VPTracker } from "./components/VPTracker";
 import { rulerOfClearing, usedBuildSlots } from "./gameHelpers";
-import { ACTION_TYPE, factionLabels, phaseLabels, setupStageLabels, stepLabels, suitLabels } from "./labels";
+import { ACTION_TYPE, eyrieLeaderLabels, factionLabels, phaseLabels, setupStageLabels, stepLabels, suitLabels, vagabondCharacterLabels } from "./labels";
 import { clearSavedSession } from "./localSession";
 import { gameOverHeadline, initialState, useGameState } from "./hooks/useGameState";
 import { emptyBattleModifiers, useBattleFlow } from "./hooks/useBattleFlow";
@@ -457,6 +457,30 @@ export default function App() {
               <p className="eyebrow">Setup</p>
               <strong>{setupPrompt.instruction}</strong>
               <span>{setupPrompt.detail}</span>
+              {parsedState.setupStage === 2 ? (
+                <label className="setup-choice-field">
+                  <span className="summary-label">Eyrie Leader</span>
+                  <select value={board.selectedEyrieSetupLeader} onChange={(event) => board.setSelectedEyrieSetupLeader(Number(event.target.value))}>
+                    {eyrieLeaderLabels.map((label, index) => (
+                      <option key={label} value={index}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {parsedState.setupStage === 3 ? (
+                <label className="setup-choice-field">
+                  <span className="summary-label">Vagabond Character</span>
+                  <select value={board.selectedVagabondSetupCharacter} onChange={(event) => board.setSelectedVagabondSetupCharacter(Number(event.target.value))}>
+                    {vagabondCharacterLabels.map((label, index) => (
+                      <option key={label} value={index}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <span>{board.setupLegalChoiceCount} legal choice{board.setupLegalChoiceCount === 1 ? "" : "s"}</span>
               {parsedState.setupStage === 1 && board.hasMarquiseDraftSelection ? (
                 <button

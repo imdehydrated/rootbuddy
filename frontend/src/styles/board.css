@@ -699,6 +699,29 @@
   line-height: 1.25;
 }
 
+.setup-choice-field {
+  width: min(100%, 18rem);
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.18rem;
+  color: #fff7e4;
+}
+
+.setup-choice-field .summary-label {
+  color: rgba(255, 244, 214, 0.82);
+}
+
+.setup-choice-field select {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.32rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 236, 194, 0.38);
+  background: rgba(255, 246, 223, 0.9);
+  color: var(--ink);
+  text-shadow: none;
+}
+
 .board-setup-prompt button {
   margin-top: 0.25rem;
   padding: 0.38rem 0.75rem;

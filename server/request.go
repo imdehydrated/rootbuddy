@@ -41,13 +41,11 @@ type BattleResponseRequest struct {
 }
 
 type SetupRequest struct {
-	GameMode          game.GameMode          `json:"gameMode"`
-	PlayerFaction     game.Faction           `json:"playerFaction"`
-	Factions          []game.Faction         `json:"factions"`
-	MapID             game.MapID             `json:"mapID"`
-	VagabondCharacter game.VagabondCharacter `json:"vagabondCharacter"`
-	EyrieLeader       game.EyrieLeader       `json:"eyrieLeader"`
-	RandomSeed        int64                  `json:"randomSeed,omitempty"`
+	GameMode      game.GameMode  `json:"gameMode"`
+	PlayerFaction game.Faction   `json:"playerFaction"`
+	Factions      []game.Faction `json:"factions"`
+	MapID         game.MapID     `json:"mapID"`
+	RandomSeed    int64          `json:"randomSeed,omitempty"`
 }
 
 type LoadGameRequest struct {

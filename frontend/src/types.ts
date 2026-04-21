@@ -91,8 +91,6 @@ export interface Lobby {
   players: LobbyPlayer[];
   factions: number[];
   mapID: string;
-  vagabondCharacter: number;
-  eyrieLeader: number;
   createdAt: string;
 }
 
@@ -206,8 +204,6 @@ export interface SetupRequest {
   playerFaction: number;
   factions: number[];
   mapID: string;
-  vagabondCharacter: number;
-  eyrieLeader: number;
   randomSeed?: number;
 }
 
@@ -402,10 +398,12 @@ export interface Action {
   } | null;
   eyrieSetup?: {
     faction: number;
+    leader: number;
     clearingID: number;
   } | null;
   vagabondSetup?: {
     faction: number;
+    character: number;
     forestID: number;
   } | null;
   usePersistentEffect?: {

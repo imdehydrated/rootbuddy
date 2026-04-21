@@ -334,12 +334,14 @@ type MarquiseSetupAction struct {
 
 type EyrieSetupAction struct {
 	Faction    Faction
+	Leader     EyrieLeader
 	ClearingID int
 }
 
 type VagabondSetupAction struct {
-	Faction  Faction
-	ForestID int
+	Faction   Faction
+	Character VagabondCharacter
+	ForestID  int
 }
 
 type UsePersistentEffectAction struct {

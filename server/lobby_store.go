@@ -75,11 +75,9 @@ func (s *lobbyStore) createLobby(req CreateLobbyRequest) (Lobby, string, error) 
 			IsHost:      true,
 			Connected:   false,
 		}},
-		Factions:          factions,
-		MapID:             req.MapID,
-		VagabondCharacter: req.VagabondCharacter,
-		EyrieLeader:       req.EyrieLeader,
-		CreatedAt:         time.Now().UTC(),
+		Factions:  factions,
+		MapID:     req.MapID,
+		CreatedAt: time.Now().UTC(),
 	}
 
 	if lobby.MapID == "" {
@@ -279,13 +277,11 @@ func (s *lobbyStore) startLobby(token string) (Lobby, game.GameState, int64, err
 	}
 
 	authoritative, err := engine.SetupGame(engine.SetupRequest{
-		GameMode:          game.GameModeOnline,
-		PlayerFaction:     hostFaction,
-		Factions:          lobby.claimedFactions(),
-		MapID:             lobby.MapID,
-		VagabondCharacter: lobby.VagabondCharacter,
-		EyrieLeader:       lobby.EyrieLeader,
-		RandomSeed:        randomSeed,
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: hostFaction,
+		Factions:      lobby.claimedFactions(),
+		MapID:         lobby.MapID,
+		RandomSeed:    randomSeed,
 	})
 	if err != nil {
 		return Lobby{}, game.GameState{}, 0, err

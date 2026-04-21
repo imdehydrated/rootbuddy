@@ -30,8 +30,6 @@ function lobby(overrides: Partial<Lobby> = {}): Lobby {
     ],
     factions: [0, 2, 1, 3],
     mapID: "autumn",
-    vagabondCharacter: 0,
-    eyrieLeader: 0,
     createdAt: "",
     ...overrides
   };

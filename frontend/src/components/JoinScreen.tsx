@@ -1,17 +1,12 @@
 import { useState } from "react";
-import { eyrieLeaderLabels, factionLabels, vagabondCharacterLabels } from "../labels";
+import { factionLabels } from "../labels";
 
 type JoinScreenProps = {
   mode: "create" | "join";
   submitting: boolean;
   status: string;
   onBack: () => void;
-  onCreateLobby: (request: {
-    displayName: string;
-    factions: number[];
-    eyrieLeader: number;
-    vagabondCharacter: number;
-  }) => Promise<void>;
+  onCreateLobby: (request: { displayName: string; factions: number[] }) => Promise<void>;
   onJoinLobby: (request: { displayName: string; joinCode: string }) => Promise<void>;
 };
 
@@ -28,8 +23,6 @@ export function JoinScreen({
   const [displayName, setDisplayName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [factions, setFactions] = useState<number[]>([0, 2, 1, 3]);
-  const [vagabondCharacter, setVagabondCharacter] = useState(0);
-  const [eyrieLeader, setEyrieLeader] = useState(0);
 
   function toggleFaction(faction: number) {
     setFactions((current) => {
@@ -50,9 +43,7 @@ export function JoinScreen({
     if (mode === "create") {
       await onCreateLobby({
         displayName,
-        factions,
-        eyrieLeader,
-        vagabondCharacter
+        factions
       });
       return;
     }
@@ -98,32 +89,6 @@ export function JoinScreen({
                 ))}
               </div>
             </div>
-
-            {factions.includes(2) ? (
-              <div className="summary-stack">
-                <span className="summary-label">Eyrie Leader</span>
-                <select value={eyrieLeader} onChange={(event) => setEyrieLeader(Number(event.target.value))}>
-                  {eyrieLeaderLabels.map((label, index) => (
-                    <option key={label} value={index}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
-            {factions.includes(3) ? (
-              <div className="summary-stack">
-                <span className="summary-label">Vagabond Character</span>
-                <select value={vagabondCharacter} onChange={(event) => setVagabondCharacter(Number(event.target.value))}>
-                  {vagabondCharacterLabels.map((label, index) => (
-                    <option key={label} value={index}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
           </>
         )}
 

@@ -94,14 +94,14 @@ export function setupBoardPrompt(stage: number, draft: MarquiseSetupDraft): { ti
     case 2:
       return {
         title: "Eyrie Setup",
-        instruction: "Choose the starting roost",
-        detail: "Click one of the highlighted corner clearings."
+        instruction: "Choose leader and starting roost",
+        detail: "Pick the Eyrie leader, then click one of the highlighted corner clearings."
       };
     case 3:
       return {
         title: "Vagabond Setup",
-        instruction: "Choose the starting forest",
-        detail: "Click one of the highlighted forest markers."
+        instruction: "Choose character and starting forest",
+        detail: "Pick the Vagabond character, then click one of the highlighted forest markers."
       };
     default:
       return {
@@ -148,6 +148,8 @@ export function useBoardInteraction({
   const [marquiseSetupDraft, setMarquiseSetupDraft] = useState<MarquiseSetupDraft>(emptyMarquiseSetupDraft);
   const [eyrieSetupDraftClearingID, setEyrieSetupDraftClearingID] = useState<number | null>(null);
   const [vagabondSetupDraftForestID, setVagabondSetupDraftForestID] = useState<number | null>(null);
+  const [selectedEyrieSetupLeader, setSelectedEyrieSetupLeader] = useState(0);
+  const [selectedVagabondSetupCharacter, setSelectedVagabondSetupCharacter] = useState(0);
 
   useEffect(() => {
     if (parsedState.map.clearings.some((clearing) => clearing.id === selectedClearingID)) {
@@ -453,9 +455,11 @@ export function useBoardInteraction({
     }
 
     if (parsedState.setupStage === 2) {
-      const action = eyrieSetupActions.find((candidate) => candidate.eyrieSetup?.clearingID === clearingID);
+      const action = eyrieSetupActions.find(
+        (candidate) => candidate.eyrieSetup?.clearingID === clearingID && candidate.eyrieSetup?.leader === selectedEyrieSetupLeader
+      );
       if (!action) {
-        setStatus("That starting clearing is not legal for the Eyrie.");
+        setStatus("That leader and starting clearing combination is not legal for the Eyrie.");
         return;
       }
       setEyrieSetupDraftClearingID(clearingID);
@@ -511,9 +515,11 @@ export function useBoardInteraction({
       return;
     }
 
-    const action = vagabondSetupActions.find((candidate) => candidate.vagabondSetup?.forestID === forestID);
+    const action = vagabondSetupActions.find(
+      (candidate) => candidate.vagabondSetup?.forestID === forestID && candidate.vagabondSetup?.character === selectedVagabondSetupCharacter
+    );
     if (!action) {
-      setStatus("That forest is not a legal Vagabond starting forest.");
+      setStatus("That character and forest combination is not legal for the Vagabond.");
       return;
     }
     setVagabondSetupDraftForestID(forestID);
@@ -538,6 +544,10 @@ export function useBoardInteraction({
       marquiseSetupDraft.recruiterClearingID !== null,
     marquiseSetupDraft,
     setMarquiseSetupDraft,
+    selectedEyrieSetupLeader,
+    setSelectedEyrieSetupLeader,
+    selectedVagabondSetupCharacter,
+    setSelectedVagabondSetupCharacter,
     handleSetupClearingClick,
     handleSetupForestClick,
     handleAssistBattleCandidatesChange,

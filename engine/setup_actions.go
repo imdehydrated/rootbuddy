@@ -130,29 +130,45 @@ func legalEyrieStartingClearings(state game.GameState) []int {
 }
 
 func validEyrieSetupActions(state game.GameState) []game.Action {
-	actions := make([]game.Action, 0, 4)
-	for _, clearingID := range legalEyrieStartingClearings(state) {
-		actions = append(actions, game.Action{
-			Type: game.ActionEyrieSetup,
-			EyrieSetup: &game.EyrieSetupAction{
-				Faction:    game.Eyrie,
-				ClearingID: clearingID,
-			},
-		})
+	clearings := legalEyrieStartingClearings(state)
+	actions := make([]game.Action, 0, len(state.Eyrie.AvailableLeaders)*len(clearings))
+	for _, leader := range state.Eyrie.AvailableLeaders {
+		for _, clearingID := range clearings {
+			actions = append(actions, game.Action{
+				Type: game.ActionEyrieSetup,
+				EyrieSetup: &game.EyrieSetupAction{
+					Faction:    game.Eyrie,
+					Leader:     leader,
+					ClearingID: clearingID,
+				},
+			})
+		}
 	}
 	return actions
 }
 
+func supportedVagabondCharacters() []game.VagabondCharacter {
+	return []game.VagabondCharacter{
+		game.CharThief,
+		game.CharTinker,
+		game.CharRanger,
+	}
+}
+
 func validVagabondSetupActions(state game.GameState) []game.Action {
-	actions := make([]game.Action, 0, len(state.Map.Forests))
-	for _, forest := range state.Map.Forests {
-		actions = append(actions, game.Action{
-			Type: game.ActionVagabondSetup,
-			VagabondSetup: &game.VagabondSetupAction{
-				Faction:  game.Vagabond,
-				ForestID: forest.ID,
-			},
-		})
+	characters := supportedVagabondCharacters()
+	actions := make([]game.Action, 0, len(characters)*len(state.Map.Forests))
+	for _, character := range characters {
+		for _, forest := range state.Map.Forests {
+			actions = append(actions, game.Action{
+				Type: game.ActionVagabondSetup,
+				VagabondSetup: &game.VagabondSetupAction{
+					Faction:   game.Vagabond,
+					Character: character,
+					ForestID:  forest.ID,
+				},
+			})
+		}
 	}
 	return actions
 }
@@ -187,6 +203,12 @@ func applyEyrieSetup(state *game.GameState, action game.Action) {
 		return
 	}
 
+	if !eyrieLeaderAvailable(state.Eyrie.AvailableLeaders, action.EyrieSetup.Leader) {
+		return
+	}
+
+	state.Eyrie.Leader = action.EyrieSetup.Leader
+	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, action.EyrieSetup.Leader)
 	placeBuilding(state, game.Eyrie, action.EyrieSetup.ClearingID, game.Roost)
 	placeWarriors(state, game.Eyrie, action.EyrieSetup.ClearingID, 6)
 	state.Eyrie.WarriorSupply -= 6
@@ -202,7 +224,18 @@ func applyVagabondSetup(state *game.GameState, action game.Action) {
 		return
 	}
 
+	state.Vagabond.Character = action.VagabondSetup.Character
+	state.Vagabond.Items = VagabondStartingItems(action.VagabondSetup.Character)
 	state.Vagabond.ClearingID = 0
 	state.Vagabond.ForestID = action.VagabondSetup.ForestID
 	state.Vagabond.InForest = true
+}
+
+func eyrieLeaderAvailable(leaders []game.EyrieLeader, leader game.EyrieLeader) bool {
+	for _, candidate := range leaders {
+		if candidate == leader {
+			return true
+		}
+	}
+	return false
 }

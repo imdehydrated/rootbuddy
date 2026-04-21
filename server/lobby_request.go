@@ -3,11 +3,9 @@ package server
 import "github.com/imdehydrated/rootbuddy/game"
 
 type CreateLobbyRequest struct {
-	DisplayName       string                 `json:"displayName"`
-	Factions          []game.Faction         `json:"factions,omitempty"`
-	MapID             game.MapID             `json:"mapID,omitempty"`
-	VagabondCharacter game.VagabondCharacter `json:"vagabondCharacter,omitempty"`
-	EyrieLeader       game.EyrieLeader       `json:"eyrieLeader,omitempty"`
+	DisplayName string         `json:"displayName"`
+	Factions    []game.Faction `json:"factions,omitempty"`
+	MapID       game.MapID     `json:"mapID,omitempty"`
 }
 
 type JoinLobbyRequest struct {

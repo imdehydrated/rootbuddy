@@ -280,10 +280,35 @@ func redactStateForPlayer(state game.GameState, perspective game.Faction) game.G
 	}
 
 	if perspective != game.Alliance {
+		redacted.HiddenCards = hiddenAllianceSupporterPlaceholders(state)
 		redacted.Alliance.Supporters = nil
 	}
 
 	return redacted
+}
+
+func hiddenAllianceSupporterPlaceholders(state game.GameState) []game.HiddenCard {
+	count := len(state.Alliance.Supporters)
+	if count == 0 {
+		for _, hidden := range state.HiddenCards {
+			if hidden.OwnerFaction == game.Alliance && hidden.Zone == game.HiddenCardZoneSupporters {
+				count++
+			}
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+
+	hidden := make([]game.HiddenCard, 0, count)
+	for i := 0; i < count; i++ {
+		hidden = append(hidden, game.HiddenCard{
+			ID:           i + 1,
+			OwnerFaction: game.Alliance,
+			Zone:         game.HiddenCardZoneSupporters,
+		})
+	}
+	return hidden
 }
 
 func redactEffectResultForPlayer(before game.GameState, after game.GameState, action game.Action, result *game.EffectResult) *game.EffectResult {

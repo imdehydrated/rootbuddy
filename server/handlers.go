@@ -571,13 +571,12 @@ func HandleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state, err := engine.SetupGame(engine.SetupRequest{
-		GameMode:          req.GameMode,
-		PlayerFaction:     req.PlayerFaction,
-		Factions:          req.Factions,
-		MapID:             req.MapID,
-		VagabondCharacter: req.VagabondCharacter,
-		EyrieLeader:       req.EyrieLeader,
-		RandomSeed:        req.RandomSeed,
+		GameMode:      req.GameMode,
+		PlayerFaction: req.PlayerFaction,
+		TrackAllHands: req.GameMode == game.GameModeOnline,
+		Factions:      req.Factions,
+		MapID:         req.MapID,
+		RandomSeed:    req.RandomSeed,
 	})
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})

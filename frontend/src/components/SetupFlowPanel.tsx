@@ -1,4 +1,4 @@
-import { factionLabels } from "../labels";
+import { eyrieLeaderLabels, factionLabels, vagabondCharacterLabels } from "../labels";
 
 type MarquiseSetupDraft = {
   keepClearingID: number | null;
@@ -12,7 +12,11 @@ type SetupFlowPanelProps = {
   activeFaction: number;
   legalChoiceCount: number;
   marquiseDraft: MarquiseSetupDraft;
+  selectedEyrieLeader: number;
+  selectedVagabondCharacter: number;
   onResetMarquiseDraft: () => void;
+  onSelectedEyrieLeaderChange: (leader: number) => void;
+  onSelectedVagabondCharacterChange: (character: number) => void;
 };
 
 function stageTitle(stage: number): string {
@@ -20,9 +24,9 @@ function stageTitle(stage: number): string {
     case 1:
       return "Choose the Marquise setup";
     case 2:
-      return "Choose the Eyrie starting clearing";
+      return "Choose the Eyrie leader and starting clearing";
     case 3:
-      return "Choose the Vagabond starting forest";
+      return "Choose the Vagabond character and starting forest";
     default:
       return "Setup";
   }
@@ -45,9 +49,9 @@ function stageInstruction(stage: number, draft: MarquiseSetupDraft): string {
       }
       return "Applying the Marquise setup.";
     case 2:
-      return "Click a highlighted corner clearing.";
+      return "Pick a leader, then click a highlighted corner clearing.";
     case 3:
-      return "Click a forest marker on the board.";
+      return "Pick a character, then click a forest marker on the board.";
     default:
       return "Follow the highlighted setup choices.";
   }
@@ -66,7 +70,11 @@ export function SetupFlowPanel({
   activeFaction,
   legalChoiceCount,
   marquiseDraft,
-  onResetMarquiseDraft
+  selectedEyrieLeader,
+  selectedVagabondCharacter,
+  onResetMarquiseDraft,
+  onSelectedEyrieLeaderChange,
+  onSelectedVagabondCharacterChange
 }: SetupFlowPanelProps) {
   return (
     <section className="panel sidebar-panel">
@@ -114,6 +122,34 @@ export function SetupFlowPanel({
           <button type="button" className="secondary" onClick={onResetMarquiseDraft}>
             Reset Marquise Choice
           </button>
+        </div>
+      ) : null}
+
+      {stage === 2 ? (
+        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+          <span className="summary-label">Eyrie Leader</span>
+          <select value={selectedEyrieLeader} onChange={(event) => onSelectedEyrieLeaderChange(Number(event.target.value))}>
+            {eyrieLeaderLabels.map((label, index) => (
+              <option key={label} value={index}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <span className="summary-line">The chosen leader determines the Loyal Viziers placed in the starting decree.</span>
+        </div>
+      ) : null}
+
+      {stage === 3 ? (
+        <div className="summary-stack" style={{ marginTop: "0.9rem" }}>
+          <span className="summary-label">Vagabond Character</span>
+          <select value={selectedVagabondCharacter} onChange={(event) => onSelectedVagabondCharacterChange(Number(event.target.value))}>
+            {vagabondCharacterLabels.map((label, index) => (
+              <option key={label} value={index}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <span className="summary-line">The chosen character determines the starting item loadout.</span>
         </div>
       ) : null}
     </section>

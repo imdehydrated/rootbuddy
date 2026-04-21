@@ -1,5 +1,5 @@
 import { describeKnownCardID } from "./cardCatalog";
-import { ACTION_TYPE, factionLabels, buildingLabels, suitLabels } from "./labels";
+import { ACTION_TYPE, factionLabels, buildingLabels, suitLabels, eyrieLeaderLabels, vagabondCharacterLabels } from "./labels";
 import type { Action, Card, GameState } from "./types";
 
 export type ActionCardReference = {
@@ -276,9 +276,9 @@ export function describeAction(action: Action, state?: GameState): string {
     case ACTION_TYPE.MARQUISE_SETUP:
       return `Marquise setup: keep ${action.marquiseSetup?.keepClearingID ?? "?"}, sawmill ${action.marquiseSetup?.sawmillClearingID ?? "?"}, workshop ${action.marquiseSetup?.workshopClearingID ?? "?"}, recruiter ${action.marquiseSetup?.recruiterClearingID ?? "?"}`;
     case ACTION_TYPE.EYRIE_SETUP:
-      return `Eyrie setup: start in clearing ${action.eyrieSetup?.clearingID ?? "?"}`;
+      return `Eyrie setup: ${eyrieLeaderLabels[action.eyrieSetup?.leader ?? -1] ?? "leader ?"}, start in clearing ${action.eyrieSetup?.clearingID ?? "?"}`;
     case ACTION_TYPE.VAGABOND_SETUP:
-      return `Vagabond setup: start in forest ${action.vagabondSetup?.forestID ?? "?"}`;
+      return `Vagabond setup: ${vagabondCharacterLabels[action.vagabondSetup?.character ?? -1] ?? "character ?"}, start in forest ${action.vagabondSetup?.forestID ?? "?"}`;
     case ACTION_TYPE.USE_PERSISTENT_EFFECT: {
       const effectID = action.usePersistentEffect?.effectID ?? "";
       switch (effectID) {

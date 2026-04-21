@@ -9,13 +9,12 @@ import (
 )
 
 type SetupRequest struct {
-	GameMode          game.GameMode
-	PlayerFaction     game.Faction
-	Factions          []game.Faction
-	MapID             game.MapID
-	VagabondCharacter game.VagabondCharacter
-	EyrieLeader       game.EyrieLeader
-	RandomSeed        int64
+	GameMode      game.GameMode
+	PlayerFaction game.Faction
+	TrackAllHands bool
+	Factions      []game.Faction
+	MapID         game.MapID
+	RandomSeed    int64
 }
 
 var baseQuestRegistry = buildQuestRegistry()
@@ -59,9 +58,9 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 		GamePhase:         game.LifecycleSetup,
 		SetupStage:        game.SetupStageUnspecified,
 		PlayerFaction:     req.PlayerFaction,
+		TrackAllHands:     req.TrackAllHands,
 		RoundNumber:       1,
 		CurrentStep:       game.StepUnspecified,
-		TurnOrder:         filteredTurnOrder(req.Factions),
 		VictoryPoints:     make(map[game.Faction]int, len(req.Factions)),
 		ItemSupply:        InitialItemSupply(),
 		PersistentEffects: map[game.Faction][]game.CardID{},
@@ -69,6 +68,7 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 		HiddenCards:       []game.HiddenCard{},
 		NextHiddenCardID:  1,
 	}
+	state.TurnOrder = randomizedTurnOrder(req.Factions, &state)
 
 	if len(state.TurnOrder) == 0 {
 		return game.GameState{}, errors.New("setup produced no turn order")
@@ -76,19 +76,20 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 
 	populateRuins(&state)
 	initializeMarquiseSetupState(&state, present)
-	initializeEyrieSetupState(&state, present, req.EyrieLeader)
+	initializeEyrieSetupState(&state, present)
 	initializeAllianceSetupState(&state, present)
-	initializeVagabondSetupState(&state, present, req.VagabondCharacter)
+	initializeVagabondSetupState(&state, present)
 
 	for _, faction := range state.TurnOrder {
 		state.VictoryPoints[faction] = 0
 	}
+	setupDeckAndHands(&state, present)
 	advanceSetupStage(&state)
 
 	return state, nil
 }
 
-func filteredTurnOrder(factions []game.Faction) []game.Faction {
+func randomizedTurnOrder(factions []game.Faction, state *game.GameState) []game.Faction {
 	present := map[game.Faction]bool{}
 	for _, faction := range factions {
 		present[faction] = true
@@ -100,6 +101,10 @@ func filteredTurnOrder(factions []game.Faction) []game.Faction {
 			order = append(order, faction)
 		}
 	}
+	rng := nextShuffleRNG(state)
+	rng.Shuffle(len(order), func(i, j int) {
+		order[i], order[j] = order[j], order[i]
+	})
 	return order
 }
 
@@ -180,21 +185,20 @@ func initializeMarquiseSetupState(state *game.GameState, present map[game.Factio
 	state.Marquise.WarriorSupply = 25
 }
 
-func initializeEyrieSetupState(state *game.GameState, present map[game.Faction]bool, leader game.EyrieLeader) {
+func initializeEyrieSetupState(state *game.GameState, present map[game.Faction]bool) {
 	if !present[game.Eyrie] {
 		return
 	}
 
 	state.Eyrie.WarriorSupply = 20
 	state.Eyrie.RoostsPlaced = 0
-	state.Eyrie.Leader = leader
+	state.Eyrie.Leader = -1
 	state.Eyrie.AvailableLeaders = []game.EyrieLeader{
 		game.LeaderBuilder,
 		game.LeaderCharismatic,
 		game.LeaderCommander,
 		game.LeaderDespot,
 	}
-	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, leader)
 }
 
 func initializeAllianceSetupState(state *game.GameState, present map[game.Faction]bool) {
@@ -207,13 +211,12 @@ func initializeAllianceSetupState(state *game.GameState, present map[game.Factio
 	state.Alliance.SympathyPlaced = 0
 }
 
-func initializeVagabondSetupState(state *game.GameState, present map[game.Faction]bool, character game.VagabondCharacter) {
+func initializeVagabondSetupState(state *game.GameState, present map[game.Faction]bool) {
 	if !present[game.Vagabond] {
 		return
 	}
 
-	state.Vagabond.Character = character
-	state.Vagabond.Items = VagabondStartingItems(character)
+	state.Vagabond.Character = -1
 	state.Vagabond.Relationships = map[game.Faction]game.RelationshipLevel{}
 	for _, faction := range state.TurnOrder {
 		if faction == game.Vagabond {
@@ -234,14 +237,6 @@ func factionPresentInTurnOrder(state game.GameState, faction game.Faction) bool 
 		}
 	}
 	return false
-}
-
-func buildPresenceMap(state game.GameState) map[game.Faction]bool {
-	present := map[game.Faction]bool{}
-	for _, faction := range state.TurnOrder {
-		present[faction] = true
-	}
-	return present
 }
 
 func advanceSetupStage(state *game.GameState) {
@@ -265,7 +260,6 @@ func advanceSetupStage(state *game.GameState) {
 }
 
 func finalizeSetup(state *game.GameState) {
-	setupDeckAndHands(state, buildPresenceMap(*state))
 	state.SetupStage = game.SetupStageComplete
 	state.GamePhase = game.LifecyclePlaying
 	if len(state.TurnOrder) > 0 {
@@ -318,23 +312,6 @@ func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {
 	}
 
 	for _, faction := range state.TurnOrder {
-		if faction == game.Alliance {
-			if state.GameMode == game.GameModeOnline {
-				if tracksHandForFaction(*state, game.Alliance) {
-					state.Alliance.Supporters = drawCardsToSlice(state, 3)
-				} else {
-					consumeDeckCards(state, 3)
-				}
-			} else if faction != state.PlayerFaction {
-				for i := 0; i < 3; i++ {
-					addHiddenCard(state, game.Alliance, game.HiddenCardZoneSupporters, 0)
-				}
-			}
-			continue
-		}
-	}
-
-	for _, faction := range state.TurnOrder {
 		if faction == state.PlayerFaction {
 			if state.GameMode == game.GameModeOnline {
 				DrawCards(state, faction, 3)
@@ -347,6 +324,28 @@ func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {
 			for i := 0; i < 3; i++ {
 				addHiddenCard(state, faction, game.HiddenCardZoneHand, 0)
 			}
+		}
+	}
+
+	if present[game.Alliance] {
+		setupAllianceSupporters(state)
+	}
+}
+
+func setupAllianceSupporters(state *game.GameState) {
+	switch state.GameMode {
+	case game.GameModeOnline:
+		if tracksHandForFaction(*state, game.Alliance) {
+			state.Alliance.Supporters = drawCardsToSlice(state, 3)
+			return
+		}
+		consumeDeckCards(state, 3)
+		for i := 0; i < 3; i++ {
+			addHiddenCard(state, game.Alliance, game.HiddenCardZoneSupporters, 0)
+		}
+	case game.GameModeAssist:
+		for i := 0; i < 3; i++ {
+			addHiddenCard(state, game.Alliance, game.HiddenCardZoneSupporters, 0)
 		}
 	}
 }

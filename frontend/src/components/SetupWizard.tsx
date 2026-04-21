@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { setupGame } from "../api";
-import { eyrieLeaderLabels, factionLabels, vagabondCharacterLabels } from "../labels";
+import { factionLabels } from "../labels";
 import type { SavedSession } from "../localSession";
 import type { GameState } from "../types";
 
@@ -31,8 +31,6 @@ export function SetupWizard({
   const [selectedMode, setSelectedMode] = useState<0 | 1 | null>(null);
   const [playerFaction, setPlayerFaction] = useState(0);
   const [factions, setFactions] = useState<number[]>([0, 2, 1, 3]);
-  const [vagabondCharacter, setVagabondCharacter] = useState(0);
-  const [eyrieLeader, setEyrieLeader] = useState(0);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const selectedFactionLabels = factions.map((faction) => factionLabels[faction]);
@@ -78,9 +76,7 @@ export function SetupWizard({
         gameMode: selectedMode,
         playerFaction,
         factions,
-        mapID: "autumn",
-        vagabondCharacter,
-        eyrieLeader
+        mapID: "autumn"
       });
       onStart(result.state, result.gameID, result.revision);
     } catch (error) {
@@ -185,7 +181,7 @@ export function SetupWizard({
                       <article className="pregame-meta-card">
                         <span className="summary-label">Perspective</span>
                         <strong>{factionLabels[playerFaction]}</strong>
-                        <span className="summary-line">Configure the player seat and any faction-specific setup before launch.</span>
+                        <span className="summary-line">Configure the player seat before resolving faction choices during setup.</span>
                       </article>
                     </>
                   )}
@@ -272,44 +268,10 @@ export function SetupWizard({
                       </select>
                       <span className="summary-line">Set the point-of-view faction so RootBuddy can present the right prompts first.</span>
                     </section>
-
-                    {factions.includes(2) ? (
-                      <section className="summary-stack pregame-assist-config pregame-config-card">
-                        <span className="summary-label">Eyrie Leader</span>
-                        <select
-                          value={eyrieLeader}
-                          onChange={(event) => setEyrieLeader(Number(event.target.value))}
-                        >
-                          {eyrieLeaderLabels.map((label, index) => (
-                            <option key={label} value={index}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="summary-line">Choose the initial Eyrie leader so decree guidance starts from the right posture.</span>
-                      </section>
-                    ) : null}
-
-                    {factions.includes(3) ? (
-                      <section className="summary-stack pregame-assist-config pregame-config-card">
-                        <span className="summary-label">Vagabond Character</span>
-                        <select
-                          value={vagabondCharacter}
-                          onChange={(event) => setVagabondCharacter(Number(event.target.value))}
-                        >
-                          {vagabondCharacterLabels.map((label, index) => (
-                            <option key={label} value={index}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="summary-line">Pick the starting Vagabond so item prompts and quests line up with the chosen character.</span>
-                      </section>
-                    ) : null}
                   </div>
 
                   <div className="pregame-action-strip">
-                    <span className="summary-line">Choose the factions at the table, set any faction-specific setup choices, and then launch directly into assist mode.</span>
+                    <span className="summary-line">Choose the factions at the table, then resolve leader, character, and board placement choices in the setup flow.</span>
                     <div className="sidebar-actions footer">
                       <button type="button" className="secondary" onClick={onUseSample} disabled={submitting}>
                         Use Sample State

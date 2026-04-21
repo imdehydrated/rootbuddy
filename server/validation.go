@@ -198,12 +198,18 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.EyrieSetup.ClearingID <= 0 {
 			return "eyrie setup action must have a valid clearing ID"
 		}
+		if req.Action.EyrieSetup.Leader < game.LeaderBuilder || req.Action.EyrieSetup.Leader > game.LeaderDespot {
+			return "eyrie setup action must have a valid leader"
+		}
 	case game.ActionVagabondSetup:
 		if req.Action.VagabondSetup == nil {
 			return "vagabond setup payload is required"
 		}
 		if req.Action.VagabondSetup.ForestID <= 0 {
 			return "vagabond setup action must have a valid forest ID"
+		}
+		if req.Action.VagabondSetup.Character < game.CharThief || req.Action.VagabondSetup.Character > game.CharRanger {
+			return "vagabond setup action must have a valid character"
 		}
 	case game.ActionUsePersistentEffect:
 		if req.Action.UsePersistentEffect == nil {

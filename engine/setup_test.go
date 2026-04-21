@@ -8,12 +8,10 @@ import (
 
 func TestSetupGameStartsInLifecycleSetup(t *testing.T) {
 	state, err := SetupGame(SetupRequest{
-		GameMode:          game.GameModeOnline,
-		PlayerFaction:     game.Marquise,
-		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-		MapID:             game.AutumnMapID,
-		VagabondCharacter: game.CharThief,
-		EyrieLeader:       game.LeaderCommander,
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
 	})
 	if err != nil {
 		t.Fatalf("expected setup to succeed, got %v", err)
@@ -25,11 +23,56 @@ func TestSetupGameStartsInLifecycleSetup(t *testing.T) {
 	if state.SetupStage != game.SetupStageMarquise || state.FactionTurn != game.Marquise {
 		t.Fatalf("expected Marquise setup stage first, got stage=%v faction=%v", state.SetupStage, state.FactionTurn)
 	}
-	if len(state.Deck) != 0 {
-		t.Fatalf("expected deck to remain undealt until setup is complete, got %+v", state.Deck)
+	if len(state.Marquise.CardsInHand) != 3 {
+		t.Fatalf("expected player Marquise hand to be dealt during setup, got %+v", state.Marquise.CardsInHand)
+	}
+	if state.OtherHandCounts[game.Eyrie] != 3 || state.OtherHandCounts[game.Alliance] != 3 || state.OtherHandCounts[game.Vagabond] != 3 {
+		t.Fatalf("expected other hand counts during setup, got %+v", state.OtherHandCounts)
+	}
+	if hiddenCardCount(state, game.Alliance, game.HiddenCardZoneSupporters) != 3 {
+		t.Fatalf("expected hidden Alliance supporter count during setup, got %+v", state.HiddenCards)
+	}
+	if len(state.Deck) != 39 {
+		t.Fatalf("expected deck to be shuffled and dealt during setup, got %d cards", len(state.Deck))
 	}
 	if state.Marquise.KeepClearingID != 0 || state.Eyrie.RoostsPlaced != 0 || state.Vagabond.ForestID != 0 {
 		t.Fatalf("expected no setup choices to be resolved yet, got marquise=%+v eyrie=%+v vagabond=%+v", state.Marquise, state.Eyrie, state.Vagabond)
+	}
+	if state.Eyrie.Leader != -1 || len(state.Vagabond.Items) != 0 || state.Vagabond.Character != -1 {
+		t.Fatalf("expected Eyrie leader and Vagabond character to wait for setup actions, got eyrie=%+v vagabond=%+v", state.Eyrie, state.Vagabond)
+	}
+}
+
+func TestSetupGameTracksAllianceSupportersForAlliancePerspective(t *testing.T) {
+	online, err := SetupGame(SetupRequest{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Alliance,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
+		RandomSeed:    12,
+	})
+	if err != nil {
+		t.Fatalf("expected online setup to succeed, got %v", err)
+	}
+	if len(online.Alliance.CardsInHand) != 3 {
+		t.Fatalf("expected Alliance player hand to be dealt, got %+v", online.Alliance.CardsInHand)
+	}
+	if len(online.Alliance.Supporters) != 3 {
+		t.Fatalf("expected Alliance player supporters to be visible, got %+v", online.Alliance.Supporters)
+	}
+
+	assist, err := SetupGame(SetupRequest{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Alliance,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
+		RandomSeed:    12,
+	})
+	if err != nil {
+		t.Fatalf("expected assist setup to succeed, got %v", err)
+	}
+	if hiddenCardCount(assist, game.Alliance, game.HiddenCardZoneSupporters) != 3 {
+		t.Fatalf("expected Alliance supporter placeholders in assist mode, got %+v", assist.HiddenCards)
 	}
 }
 
@@ -39,7 +82,6 @@ func TestValidSetupActionsGenerateLegalMarquiseChoices(t *testing.T) {
 		PlayerFaction: game.Marquise,
 		Factions:      []game.Faction{game.Marquise, game.Eyrie},
 		MapID:         game.AutumnMapID,
-		EyrieLeader:   game.LeaderBuilder,
 	})
 	if err != nil {
 		t.Fatalf("expected setup to succeed, got %v", err)
@@ -73,12 +115,10 @@ func TestValidSetupActionsGenerateLegalMarquiseChoices(t *testing.T) {
 
 func TestSetupActionsAdvanceToPlayingStateAndDealHands(t *testing.T) {
 	state, err := SetupGame(SetupRequest{
-		GameMode:          game.GameModeOnline,
-		PlayerFaction:     game.Marquise,
-		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-		MapID:             game.AutumnMapID,
-		VagabondCharacter: game.CharRanger,
-		EyrieLeader:       game.LeaderBuilder,
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
 	})
 	if err != nil {
 		t.Fatalf("expected setup to succeed, got %v", err)
@@ -102,29 +142,37 @@ func TestSetupActionsAdvanceToPlayingStateAndDealHands(t *testing.T) {
 		Type: game.ActionEyrieSetup,
 		EyrieSetup: &game.EyrieSetupAction{
 			Faction:    game.Eyrie,
+			Leader:     game.LeaderBuilder,
 			ClearingID: 3,
 		},
 	})
 	if state.SetupStage != game.SetupStageVagabond || state.FactionTurn != game.Vagabond {
 		t.Fatalf("expected setup to advance to Vagabond, got stage=%v faction=%v", state.SetupStage, state.FactionTurn)
 	}
+	if state.Eyrie.Leader != game.LeaderBuilder || eyrieLeaderAvailable(state.Eyrie.AvailableLeaders, game.LeaderBuilder) {
+		t.Fatalf("expected Eyrie setup action to choose Builder and remove it from available leaders, got %+v", state.Eyrie)
+	}
 
 	state = ApplyAction(state, game.Action{
 		Type: game.ActionVagabondSetup,
 		VagabondSetup: &game.VagabondSetupAction{
-			Faction:  game.Vagabond,
-			ForestID: 7,
+			Faction:   game.Vagabond,
+			Character: game.CharRanger,
+			ForestID:  7,
 		},
 	})
 
 	if state.GamePhase != game.LifecyclePlaying {
 		t.Fatalf("expected setup to transition into playing state, got %v", state.GamePhase)
 	}
+	if state.Vagabond.Character != game.CharRanger || len(state.Vagabond.Items) == 0 {
+		t.Fatalf("expected Vagabond setup action to choose Ranger and assign starting items, got %+v", state.Vagabond)
+	}
 	if state.SetupStage != game.SetupStageComplete {
 		t.Fatalf("expected setup stage complete, got %v", state.SetupStage)
 	}
-	if state.FactionTurn != game.Marquise || state.CurrentPhase != game.Birdsong || state.CurrentStep != game.StepBirdsong {
-		t.Fatalf("expected Marquise birdsong start after setup, got faction=%v phase=%v step=%v", state.FactionTurn, state.CurrentPhase, state.CurrentStep)
+	if state.FactionTurn != state.TurnOrder[0] || state.CurrentPhase != game.Birdsong || state.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected randomized starting faction birdsong after setup, got order=%v faction=%v phase=%v step=%v", state.TurnOrder, state.FactionTurn, state.CurrentPhase, state.CurrentStep)
 	}
 	if len(state.Marquise.CardsInHand) != 3 {
 		t.Fatalf("expected player Marquise to start with 3 cards after setup, got %+v", state.Marquise.CardsInHand)
@@ -139,12 +187,10 @@ func TestSetupActionsAdvanceToPlayingStateAndDealHands(t *testing.T) {
 
 func TestAssistSetupCreatesHiddenPlaceholdersByZone(t *testing.T) {
 	state, err := SetupGame(SetupRequest{
-		GameMode:          game.GameModeAssist,
-		PlayerFaction:     game.Marquise,
-		Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-		MapID:             game.AutumnMapID,
-		VagabondCharacter: game.CharRanger,
-		EyrieLeader:       game.LeaderBuilder,
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
 	})
 	if err != nil {
 		t.Fatalf("expected setup to succeed, got %v", err)
@@ -164,14 +210,16 @@ func TestAssistSetupCreatesHiddenPlaceholdersByZone(t *testing.T) {
 		Type: game.ActionEyrieSetup,
 		EyrieSetup: &game.EyrieSetupAction{
 			Faction:    game.Eyrie,
+			Leader:     game.LeaderBuilder,
 			ClearingID: 3,
 		},
 	})
 	state = ApplyAction(state, game.Action{
 		Type: game.ActionVagabondSetup,
 		VagabondSetup: &game.VagabondSetupAction{
-			Faction:  game.Vagabond,
-			ForestID: 7,
+			Faction:   game.Vagabond,
+			Character: game.CharRanger,
+			ForestID:  7,
 		},
 	})
 
@@ -192,7 +240,6 @@ func TestValidEyrieSetupActionsPreferOppositeCorner(t *testing.T) {
 		PlayerFaction: game.Eyrie,
 		Factions:      []game.Faction{game.Marquise, game.Eyrie},
 		MapID:         game.AutumnMapID,
-		EyrieLeader:   game.LeaderDespot,
 	})
 	if err != nil {
 		t.Fatalf("expected setup to succeed, got %v", err)
@@ -210,21 +257,24 @@ func TestValidEyrieSetupActionsPreferOppositeCorner(t *testing.T) {
 	})
 
 	actions := ValidActions(state)
-	if len(actions) != 1 || actions[0].EyrieSetup == nil || actions[0].EyrieSetup.ClearingID != 3 {
+	if len(actions) != 4 || actions[0].EyrieSetup == nil {
 		t.Fatalf("expected only opposite-corner Eyrie setup action, got %+v", actions)
+	}
+	for _, action := range actions {
+		if action.EyrieSetup == nil || action.EyrieSetup.ClearingID != 3 {
+			t.Fatalf("expected all Eyrie leaders to start in the opposite corner, got %+v", actions)
+		}
 	}
 }
 
 func TestSetupGameWithSameSeedProducesDeterministicRuinsAndDeck(t *testing.T) {
 	setup := func() game.GameState {
 		state, err := SetupGame(SetupRequest{
-			GameMode:          game.GameModeOnline,
-			PlayerFaction:     game.Marquise,
-			Factions:          []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-			MapID:             game.AutumnMapID,
-			VagabondCharacter: game.CharRanger,
-			EyrieLeader:       game.LeaderBuilder,
-			RandomSeed:        12345,
+			GameMode:      game.GameModeOnline,
+			PlayerFaction: game.Marquise,
+			Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+			MapID:         game.AutumnMapID,
+			RandomSeed:    12345,
 		})
 		if err != nil {
 			t.Fatalf("expected setup to succeed, got %v", err)
@@ -244,14 +294,16 @@ func TestSetupGameWithSameSeedProducesDeterministicRuinsAndDeck(t *testing.T) {
 			Type: game.ActionEyrieSetup,
 			EyrieSetup: &game.EyrieSetupAction{
 				Faction:    game.Eyrie,
+				Leader:     game.LeaderBuilder,
 				ClearingID: 3,
 			},
 		})
 		state = ApplyAction(state, game.Action{
 			Type: game.ActionVagabondSetup,
 			VagabondSetup: &game.VagabondSetupAction{
-				Faction:  game.Vagabond,
-				ForestID: 7,
+				Faction:   game.Vagabond,
+				Character: game.CharRanger,
+				ForestID:  7,
 			},
 		})
 

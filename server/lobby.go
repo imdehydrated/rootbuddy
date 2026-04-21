@@ -25,16 +25,14 @@ type PlayerSlot struct {
 }
 
 type Lobby struct {
-	JoinCode          string                 `json:"joinCode"`
-	GameID            string                 `json:"gameID,omitempty"`
-	State             LobbyState             `json:"state"`
-	HostToken         string                 `json:"-"`
-	Players           []PlayerSlot           `json:"players"`
-	Factions          []game.Faction         `json:"factions"`
-	MapID             game.MapID             `json:"mapID"`
-	VagabondCharacter game.VagabondCharacter `json:"vagabondCharacter"`
-	EyrieLeader       game.EyrieLeader       `json:"eyrieLeader"`
-	CreatedAt         time.Time              `json:"createdAt"`
+	JoinCode  string         `json:"joinCode"`
+	GameID    string         `json:"gameID,omitempty"`
+	State     LobbyState     `json:"state"`
+	HostToken string         `json:"-"`
+	Players   []PlayerSlot   `json:"players"`
+	Factions  []game.Faction `json:"factions"`
+	MapID     game.MapID     `json:"mapID"`
+	CreatedAt time.Time      `json:"createdAt"`
 }
 
 var defaultLobbyFactions = []game.Faction{
