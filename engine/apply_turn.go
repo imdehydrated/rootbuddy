@@ -154,7 +154,8 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.TurnProgress.DecreeCardsResolved = 0
 	case game.ActionScoreRoosts:
 		state.TurnProgress.EveningMainActionTaken = true
-		beginNextFactionTurn(state)
+		state.CurrentPhase = game.Evening
+		state.CurrentStep = game.StepEvening
 	case game.ActionPassPhase:
 		switch state.CurrentPhase {
 		case game.Birdsong:

@@ -39,6 +39,26 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 			wantFaction: game.Eyrie,
 		},
 		{
+			name: "eyrie draw advances to alliance",
+			state: game.GameState{
+				FactionTurn:  game.Eyrie,
+				CurrentPhase: game.Evening,
+				CurrentStep:  game.StepEvening,
+				TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+				TurnProgress: game.TurnProgress{
+					EveningMainActionTaken: true,
+				},
+			},
+			action: game.Action{
+				Type: game.ActionEveningDraw,
+				EveningDraw: &game.EveningDrawAction{
+					Faction: game.Eyrie,
+					Count:   1,
+				},
+			},
+			wantFaction: game.Alliance,
+		},
+		{
 			name: "alliance draw advances to vagabond",
 			state: game.GameState{
 				FactionTurn:  game.Alliance,
@@ -107,7 +127,7 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 	}
 }
 
-func TestApplyActionScoreRoostsAdvancesToAllianceAndKeepsScore(t *testing.T) {
+func TestApplyActionScoreRoostsStaysInEyrieEveningForDraw(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Eyrie,
 		CurrentPhase: game.Evening,
@@ -133,16 +153,16 @@ func TestApplyActionScoreRoostsAdvancesToAllianceAndKeepsScore(t *testing.T) {
 	next := ApplyAction(state, action)
 
 	if next.VictoryPoints[game.Eyrie] != 4 {
-		t.Fatalf("expected eyrie score to persist after turn advance, got %d", next.VictoryPoints[game.Eyrie])
+		t.Fatalf("expected eyrie score to persist after scoring roosts, got %d", next.VictoryPoints[game.Eyrie])
 	}
-	if next.FactionTurn != game.Alliance {
-		t.Fatalf("expected alliance turn after eyrie evening, got %v", next.FactionTurn)
+	if next.FactionTurn != game.Eyrie {
+		t.Fatalf("expected eyrie turn to continue for evening draw, got %v", next.FactionTurn)
 	}
-	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
-		t.Fatalf("expected alliance birdsong after eyrie evening, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	if next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+		t.Fatalf("expected eyrie evening draw step after scoring, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
 	}
-	if !reflect.DeepEqual(next.TurnProgress, game.TurnProgress{}) {
-		t.Fatalf("expected turn progress reset after eyrie evening, got %+v", next.TurnProgress)
+	if !next.TurnProgress.EveningMainActionTaken {
+		t.Fatalf("expected evening scoring to be marked complete before draw")
 	}
 }
 

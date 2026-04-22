@@ -173,3 +173,39 @@ func TestValidEyrieDaylightActionsAllowsResolvingCardsInAnyOrderWithinColumn(t *
 		}
 	}
 }
+
+func TestValidEyrieEveningActionsScoreThenDraw(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 3,
+		},
+	}
+
+	got := ValidEyrieEveningActions(state)
+	wantScore := game.Action{
+		Type: game.ActionScoreRoosts,
+		ScoreRoosts: &game.ScoreRoostsAction{
+			Faction: game.Eyrie,
+			Points:  2,
+		},
+	}
+	if !containsAction(got, wantScore) {
+		t.Fatalf("expected score-roosts action %+v, got %+v", wantScore, got)
+	}
+
+	state.TurnProgress.EveningMainActionTaken = true
+	got = ValidEyrieEveningActions(state)
+	wantDraw := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Eyrie,
+			Count:   2,
+		},
+	}
+	if !containsAction(got, wantDraw) {
+		t.Fatalf("expected eyrie evening draw action %+v, got %+v", wantDraw, got)
+	}
+}

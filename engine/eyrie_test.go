@@ -155,7 +155,7 @@ func TestResolveBattleCommanderAddsOneHit(t *testing.T) {
 	}
 }
 
-func TestEyrieEveningScoresRoosts(t *testing.T) {
+func TestEyrieEveningScoresRoostsThenDraws(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Eyrie,
 		CurrentPhase: game.Evening,
@@ -173,5 +173,13 @@ func TestEyrieEveningScoresRoosts(t *testing.T) {
 	next := ApplyAction(state, actions[0])
 	if next.VictoryPoints[game.Eyrie] != 2 {
 		t.Fatalf("expected eyrie VP to increase to 2, got %d", next.VictoryPoints[game.Eyrie])
+	}
+	if next.FactionTurn != game.Eyrie || next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+		t.Fatalf("expected eyrie to remain in evening for draw, got faction=%v phase=%v step=%v", next.FactionTurn, next.CurrentPhase, next.CurrentStep)
+	}
+
+	actions = ValidActions(next)
+	if len(actions) != 1 || actions[0].EveningDraw == nil || actions[0].EveningDraw.Count != 2 {
+		t.Fatalf("expected eyrie evening draw action for 2 cards, got %+v", actions)
 	}
 }
