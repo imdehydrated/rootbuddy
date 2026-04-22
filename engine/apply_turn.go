@@ -15,11 +15,11 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 	case game.ActionAddToDecree:
 		state.TurnProgress.BirdsongMainActionTaken = true
 		state.CurrentPhase = game.Daylight
-		state.CurrentStep = game.StepDaylightActions
+		state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 	case game.ActionBirdsongWood:
 		state.TurnProgress.BirdsongMainActionTaken = true
 		state.CurrentPhase = game.Daylight
-		state.CurrentStep = game.StepDaylightActions
+		state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 	case game.ActionDaybreak:
 		state.TurnProgress.BirdsongMainActionTaken = true
 		state.CurrentPhase = game.Birdsong
@@ -119,8 +119,15 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			state.TurnProgress.ActionsUsed++
 		}
 	case game.ActionCraft:
-		state.TurnProgress.DaylightMainActionTaken = true
-		state.CurrentStep = game.StepDaylightActions
+		if action.Craft != nil &&
+			game.DaylightEntryStep(action.Craft.Faction) == game.StepDaylightCraft &&
+			effectiveStep(*state) == game.StepDaylightCraft {
+			state.CurrentPhase = game.Daylight
+			state.CurrentStep = game.StepDaylightCraft
+		} else {
+			state.TurnProgress.DaylightMainActionTaken = true
+			state.CurrentStep = game.StepDaylightActions
+		}
 		state.TurnProgress.HasCrafted = true
 	case game.ActionExplore, game.ActionAid, game.ActionQuest, game.ActionStrike, game.ActionRepair:
 		state.TurnProgress.DaylightMainActionTaken = true
@@ -152,9 +159,9 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		switch state.CurrentPhase {
 		case game.Birdsong:
 			state.CurrentPhase = game.Daylight
-			state.CurrentStep = game.StepDaylightActions
+			state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 		case game.Daylight:
-			if state.CurrentStep == game.StepDaylightCraft {
+			if effectiveStep(*state) == game.StepDaylightCraft {
 				state.CurrentStep = game.StepDaylightActions
 			} else {
 				state.CurrentPhase = game.Evening

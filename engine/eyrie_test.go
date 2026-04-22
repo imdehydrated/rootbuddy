@@ -67,8 +67,8 @@ func TestApplyActionAddToDecreeAdvancesToDaylightAndRemovesCard(t *testing.T) {
 	}
 
 	next := ApplyAction(state, action)
-	if next.CurrentPhase != game.Daylight || next.CurrentStep != game.StepDaylightActions {
-		t.Fatalf("expected add-to-decree to advance to daylight actions, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	if next.CurrentPhase != game.Daylight || next.CurrentStep != game.StepDaylightCraft {
+		t.Fatalf("expected add-to-decree to advance to daylight craft, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
 	}
 	if len(next.Eyrie.CardsInHand) != 0 {
 		t.Fatalf("expected decree card to be removed from hand, got %+v", next.Eyrie.CardsInHand)

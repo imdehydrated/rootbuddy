@@ -392,8 +392,8 @@ func TestHandleApplyActionAcceptsPassPhase(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode pass phase apply response: %v", err)
 	}
-	if resp.State.CurrentPhase != game.Daylight || resp.State.CurrentStep != game.StepDaylightActions {
-		t.Fatalf("expected pass phase to advance to daylight actions, got phase=%v step=%v", resp.State.CurrentPhase, resp.State.CurrentStep)
+	if resp.State.CurrentPhase != game.Daylight || resp.State.CurrentStep != game.StepDaylightCraft {
+		t.Fatalf("expected pass phase to advance to daylight craft, got phase=%v step=%v", resp.State.CurrentPhase, resp.State.CurrentStep)
 	}
 }
 

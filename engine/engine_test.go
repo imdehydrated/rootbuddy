@@ -163,8 +163,8 @@ func TestEngineFlowBirdsongRecruitMoveBattleResolve(t *testing.T) {
 	}
 
 	afterBirdsong := ApplyAction(state, birdsongAction)
-	if afterBirdsong.CurrentPhase != game.Daylight || afterBirdsong.CurrentStep != game.StepDaylightActions {
-		t.Fatalf("expected birdsong to advance to daylight actions, got phase=%v step=%v", afterBirdsong.CurrentPhase, afterBirdsong.CurrentStep)
+	if afterBirdsong.CurrentPhase != game.Daylight || afterBirdsong.CurrentStep != game.StepDaylightCraft {
+		t.Fatalf("expected birdsong to advance to daylight craft, got phase=%v step=%v", afterBirdsong.CurrentPhase, afterBirdsong.CurrentStep)
 	}
 
 	recruitAction := game.Action{
@@ -175,12 +175,22 @@ func TestEngineFlowBirdsongRecruitMoveBattleResolve(t *testing.T) {
 		},
 	}
 
-	actions = ValidActions(afterBirdsong)
+	afterCraftPass := ApplyAction(afterBirdsong, game.Action{
+		Type: game.ActionPassPhase,
+		PassPhase: &game.PassPhaseAction{
+			Faction: game.Marquise,
+		},
+	})
+	if afterCraftPass.CurrentPhase != game.Daylight || afterCraftPass.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected craft pass to advance to daylight actions, got phase=%v step=%v", afterCraftPass.CurrentPhase, afterCraftPass.CurrentStep)
+	}
+
+	actions = ValidActions(afterCraftPass)
 	if !containsAction(actions, recruitAction) {
 		t.Fatalf("expected recruit action %+v, got %+v", recruitAction, actions)
 	}
 
-	afterRecruit := ApplyAction(afterBirdsong, recruitAction)
+	afterRecruit := ApplyAction(afterCraftPass, recruitAction)
 	moveAction := game.Action{
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
@@ -219,5 +229,183 @@ func TestEngineFlowBirdsongRecruitMoveBattleResolve(t *testing.T) {
 	}
 	if afterBattle.TurnProgress.ActionsUsed != 3 {
 		t.Fatalf("expected recruit, move, and battle to consume 3 actions, got %d", afterBattle.TurnProgress.ActionsUsed)
+	}
+}
+
+func TestValidActionsUsesDedicatedCraftStepBeforeFactionActions(t *testing.T) {
+	craftCard := game.Card{
+		ID:   9001,
+		Name: "Test Craft",
+		Suit: game.Fox,
+		Kind: game.OneTimeEffectCard,
+		CraftingCost: game.CraftingCost{
+			Fox: 1,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		state       game.GameState
+		wantFaction game.Faction
+	}{
+		{
+			name: "marquise",
+			state: game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID:   1,
+							Suit: game.Fox,
+							Buildings: []game.Building{
+								{Faction: game.Marquise, Type: game.Workshop},
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Marquise,
+				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightCraft,
+				Marquise: game.MarquiseState{
+					CardsInHand: []game.Card{craftCard},
+				},
+			},
+			wantFaction: game.Marquise,
+		},
+		{
+			name: "eyrie",
+			state: game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID:   1,
+							Suit: game.Fox,
+							Buildings: []game.Building{
+								{Faction: game.Eyrie, Type: game.Roost},
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Eyrie,
+				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightCraft,
+				Eyrie: game.EyrieState{
+					CardsInHand: []game.Card{craftCard},
+				},
+			},
+			wantFaction: game.Eyrie,
+		},
+		{
+			name: "alliance",
+			state: game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID:   1,
+							Suit: game.Fox,
+							Buildings: []game.Building{
+								{Faction: game.Alliance, Type: game.Base},
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Alliance,
+				CurrentPhase: game.Daylight,
+				CurrentStep:  game.StepDaylightCraft,
+				Alliance: game.AllianceState{
+					CardsInHand: []game.Card{craftCard},
+				},
+			},
+			wantFaction: game.Alliance,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actions := ValidActions(tt.state)
+			wantCraft := game.Action{
+				Type: game.ActionCraft,
+				Craft: &game.CraftAction{
+					Faction:               tt.wantFaction,
+					CardID:                craftCard.ID,
+					UsedWorkshopClearings: []int{1},
+				},
+			}
+			if !containsAction(actions, wantCraft) {
+				t.Fatalf("expected craft action %+v, got %+v", wantCraft, actions)
+			}
+
+			next := ApplyAction(tt.state, wantCraft)
+			if next.CurrentPhase != game.Daylight || next.CurrentStep != game.StepDaylightCraft {
+				t.Fatalf("expected craft to stay in craft step for another craft/pass choice, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+			}
+
+			afterPass := ApplyAction(next, game.Action{
+				Type: game.ActionPassPhase,
+				PassPhase: &game.PassPhaseAction{
+					Faction: tt.wantFaction,
+				},
+			})
+			if afterPass.CurrentPhase != game.Daylight || afterPass.CurrentStep != game.StepDaylightActions {
+				t.Fatalf("expected craft pass to advance to action step, got phase=%v step=%v", afterPass.CurrentPhase, afterPass.CurrentStep)
+			}
+		})
+	}
+}
+
+func TestImplicitDaylightCraftStepCanCraftAndPass(t *testing.T) {
+	craftCard := game.Card{
+		ID:   9002,
+		Name: "Implicit Craft",
+		Suit: game.Fox,
+		Kind: game.OneTimeEffectCard,
+		CraftingCost: game.CraftingCost{
+			Fox: 1,
+		},
+	}
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{craftCard},
+		},
+	}
+
+	actions := ValidActions(state)
+	craftAction := game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:               game.Marquise,
+			CardID:                craftCard.ID,
+			UsedWorkshopClearings: []int{1},
+		},
+	}
+	if !containsAction(actions, craftAction) {
+		t.Fatalf("expected implicit daylight craft action %+v, got %+v", craftAction, actions)
+	}
+
+	afterCraft := ApplyAction(state, craftAction)
+	if afterCraft.CurrentPhase != game.Daylight || afterCraft.CurrentStep != game.StepDaylightCraft {
+		t.Fatalf("expected implicit craft to remain in craft step, got phase=%v step=%v", afterCraft.CurrentPhase, afterCraft.CurrentStep)
+	}
+
+	afterPass := ApplyAction(state, game.Action{
+		Type: game.ActionPassPhase,
+		PassPhase: &game.PassPhaseAction{
+			Faction: game.Marquise,
+		},
+	})
+	if afterPass.CurrentPhase != game.Daylight || afterPass.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected implicit craft pass to advance to actions, got phase=%v step=%v", afterPass.CurrentPhase, afterPass.CurrentStep)
 	}
 }

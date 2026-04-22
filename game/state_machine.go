@@ -9,6 +9,15 @@ type TurnWindow struct {
 	Step       TurnStep
 }
 
+func DaylightEntryStep(faction Faction) TurnStep {
+	switch faction {
+	case Marquise, Eyrie, Alliance:
+		return StepDaylightCraft
+	default:
+		return StepDaylightActions
+	}
+}
+
 func (state GameState) TurnWindow() TurnWindow {
 	lifecycle := state.GamePhase
 	if lifecycle == LifecycleSetup && state.SetupStage == SetupStageUnspecified {
@@ -34,7 +43,7 @@ func (state GameState) TurnWindow() TurnWindow {
 	case Birdsong:
 		window.Step = StepBirdsong
 	case Daylight:
-		window.Step = StepDaylightActions
+		window.Step = DaylightEntryStep(state.FactionTurn)
 	case Evening:
 		window.Step = StepEvening
 	}
