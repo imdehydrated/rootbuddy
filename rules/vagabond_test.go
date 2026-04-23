@@ -58,6 +58,17 @@ func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
 	if !containsAction(got, wantSlip) {
 		t.Fatalf("expected slip action %+v, got %+v", wantSlip, got)
 	}
+	wantStaySlip := game.Action{
+		Type: game.ActionSlip,
+		Slip: &game.SlipAction{
+			Faction: game.Vagabond,
+			From:    1,
+			To:      1,
+		},
+	}
+	if !containsAction(got, wantStaySlip) {
+		t.Fatalf("expected stay slip action %+v, got %+v", wantStaySlip, got)
+	}
 	wantForestSlip := game.Action{
 		Type: game.ActionSlip,
 		Slip: &game.SlipAction{
@@ -68,6 +79,63 @@ func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
 	}
 	if !containsAction(got, wantForestSlip) {
 		t.Fatalf("expected forest slip action %+v, got %+v", wantForestSlip, got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionPassPhase {
+			t.Fatalf("did not expect pass before slip has been resolved, got %+v", got)
+		}
+	}
+}
+
+func TestValidVagabondBirdsongActionsAllowsPassAfterSlip(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		TurnProgress: game.TurnProgress{
+			HasSlipped: true,
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
+	wantPass := game.Action{
+		Type: game.ActionPassPhase,
+		PassPhase: &game.PassPhaseAction{
+			Faction: game.Vagabond,
+		},
+	}
+	if !containsAction(got, wantPass) {
+		t.Fatalf("expected pass after slip has been resolved, got %+v", got)
+	}
+}
+
+func TestValidVagabondBirdsongActionsIncludesStayInForestSlip(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			InForest: true,
+			ForestID: 2,
+		},
+		Map: game.Map{
+			Forests: []game.Forest{
+				{ID: 2, AdjacentClearings: []int{1}},
+			},
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
+	wantStay := game.Action{
+		Type: game.ActionSlip,
+		Slip: &game.SlipAction{
+			Faction:      game.Vagabond,
+			FromForestID: 2,
+			ToForestID:   2,
+		},
+	}
+	if !containsAction(got, wantStay) {
+		t.Fatalf("expected stay-in-forest slip action %+v, got %+v", wantStay, got)
 	}
 }
 

@@ -31,6 +31,15 @@ func ValidVagabondBirdsongActions(state game.GameState) []game.Action {
 
 	if !state.TurnProgress.HasSlipped {
 		if clearing, ok := vagabondCurrentClearing(state); ok {
+			actions = append(actions, game.Action{
+				Type: game.ActionSlip,
+				Slip: &game.SlipAction{
+					Faction: game.Vagabond,
+					From:    clearing.ID,
+					To:      clearing.ID,
+				},
+			})
+
 			for _, adjacentID := range clearing.Adj {
 				actions = append(actions, game.Action{
 					Type: game.ActionSlip,
@@ -55,6 +64,15 @@ func ValidVagabondBirdsongActions(state game.GameState) []game.Action {
 		}
 
 		if forest, ok := vagabondCurrentForest(state); ok {
+			actions = append(actions, game.Action{
+				Type: game.ActionSlip,
+				Slip: &game.SlipAction{
+					Faction:      game.Vagabond,
+					FromForestID: forest.ID,
+					ToForestID:   forest.ID,
+				},
+			})
+
 			for _, adjacentID := range forest.AdjacentClearings {
 				actions = append(actions, game.Action{
 					Type: game.ActionSlip,
@@ -68,12 +86,14 @@ func ValidVagabondBirdsongActions(state game.GameState) []game.Action {
 		}
 	}
 
-	actions = append(actions, game.Action{
-		Type: game.ActionPassPhase,
-		PassPhase: &game.PassPhaseAction{
-			Faction: game.Vagabond,
-		},
-	})
+	if state.TurnProgress.HasSlipped {
+		actions = append(actions, game.Action{
+			Type: game.ActionPassPhase,
+			PassPhase: &game.PassPhaseAction{
+				Faction: game.Vagabond,
+			},
+		})
+	}
 
 	return actions
 }

@@ -159,6 +159,11 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 	case game.ActionPassPhase:
 		switch state.CurrentPhase {
 		case game.Birdsong:
+			if state.FactionTurn == game.Vagabond && !state.TurnProgress.HasSlipped {
+				state.CurrentPhase = game.Birdsong
+				state.CurrentStep = game.StepBirdsong
+				return
+			}
 			state.CurrentPhase = game.Daylight
 			state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 		case game.Daylight:

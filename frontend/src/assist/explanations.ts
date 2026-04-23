@@ -47,6 +47,9 @@ export function actionExplanation(action: Action, state: GameState): string {
     case ACTION_TYPE.DAYBREAK:
       return `Refresh ${action.daybreak?.refreshedItemIndexes.length ?? 0} Vagabond item(s). This converts exhausted gear back into usable actions for the turn.`;
     case ACTION_TYPE.SLIP:
+      if ((action.slip?.from && action.slip.to === action.slip.from) || (action.slip?.fromForestID && action.slip.toForestID === action.slip.fromForestID)) {
+        return "Stay at the current Vagabond location. This resolves Slip without changing position.";
+      }
       return `Slip to ${action.slip?.toForestID ? `forest ${action.slip.toForestID}` : `clearing ${action.slip?.to ?? "?"}`}. This is the Vagabond's safe reposition before committing to aid, quest, battle, or explore lines.`;
     case ACTION_TYPE.BIRDSONG_WOOD:
       return `Place wood in clearings ${(action.birdsongWood?.clearingIDs ?? []).join(", ") || "?"}. This is board setup for the Marquise build engine rather than immediate score.`;

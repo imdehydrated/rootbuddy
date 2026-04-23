@@ -139,6 +139,12 @@ func summarizeAction(action game.Action) string {
 	case game.ActionDaybreak:
 		return fmt.Sprintf("Refresh %d item(s)", len(action.Daybreak.RefreshedItemIndexes))
 	case game.ActionSlip:
+		if action.Slip.From > 0 && action.Slip.To == action.Slip.From {
+			return fmt.Sprintf("Stay in clearing %d", action.Slip.From)
+		}
+		if action.Slip.FromForestID > 0 && action.Slip.ToForestID == action.Slip.FromForestID {
+			return fmt.Sprintf("Stay in forest %d", action.Slip.FromForestID)
+		}
 		if action.Slip.ToForestID > 0 {
 			return fmt.Sprintf("Slip to forest %d", action.Slip.ToForestID)
 		}

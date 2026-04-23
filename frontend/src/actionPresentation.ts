@@ -250,6 +250,12 @@ export function describeAction(action: Action, state?: GameState): string {
     case ACTION_TYPE.DAYBREAK:
       return `Refresh ${action.daybreak?.refreshedItemIndexes?.length ?? 0} item(s)`;
     case ACTION_TYPE.SLIP:
+      if (action.slip?.from && action.slip.to === action.slip.from) {
+        return `Stay in clearing ${action.slip.from}`;
+      }
+      if (action.slip?.fromForestID && action.slip.toForestID === action.slip.fromForestID) {
+        return `Stay in forest ${action.slip.fromForestID}`;
+      }
       return `Slip from ${describeBoardLocation(action.slip?.from, action.slip?.fromForestID)} to ${describeBoardLocation(action.slip?.to, action.slip?.toForestID)}`;
     case ACTION_TYPE.BIRDSONG_WOOD:
       return `Place wood in clearings ${(action.birdsongWood?.clearingIDs ?? []).join(", ")}`;

@@ -190,3 +190,57 @@ func TestApplyActionEveningDrawUsesDefaultTurnOrderWhenUnset(t *testing.T) {
 		t.Fatalf("expected default turn order to be stored, got %+v", next.TurnOrder)
 	}
 }
+
+func TestApplyActionPassPhaseDoesNotSkipVagabondSlip(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+	}
+
+	action := game.Action{
+		Type: game.ActionPassPhase,
+		PassPhase: &game.PassPhaseAction{
+			Faction: game.Vagabond,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected vagabond to remain in birdsong before slip, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if next.TurnProgress.HasSlipped {
+		t.Fatalf("expected pass phase not to mark slip resolved")
+	}
+}
+
+func TestApplyActionStaySlipResolvesVagabondSlip(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			ClearingID: 3,
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionSlip,
+		Slip: &game.SlipAction{
+			Faction: game.Vagabond,
+			From:    3,
+			To:      3,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if !next.TurnProgress.HasSlipped {
+		t.Fatalf("expected stay slip to mark slip resolved")
+	}
+	if next.Vagabond.ClearingID != 3 || next.Vagabond.InForest {
+		t.Fatalf("expected vagabond to remain in clearing 3, got clearing=%d inForest=%v", next.Vagabond.ClearingID, next.Vagabond.InForest)
+	}
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected vagabond to remain in birdsong after resolving slip, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+}
