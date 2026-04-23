@@ -40,14 +40,11 @@ func applyMovement(state *game.GameState, action game.Action) {
 
 	if action.Movement.Faction == game.Vagabond {
 		if action.Movement.ToForestID != 0 {
-			state.Vagabond.ClearingID = 0
-			state.Vagabond.ForestID = action.Movement.ToForestID
-			state.Vagabond.InForest = true
-		} else {
-			state.Vagabond.ClearingID = action.Movement.To
-			state.Vagabond.ForestID = 0
-			state.Vagabond.InForest = false
+			return
 		}
+		state.Vagabond.ClearingID = action.Movement.To
+		state.Vagabond.ForestID = 0
+		state.Vagabond.InForest = false
 		exhaustReadyItemsByType(state, game.ItemBoots, max(1, action.Movement.Count))
 
 		toIndex := findClearingIndex(state.Map, action.Movement.To)

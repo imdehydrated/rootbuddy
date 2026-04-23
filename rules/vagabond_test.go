@@ -185,7 +185,7 @@ func TestValidVagabondMoveActionsCountsHostileBootTax(t *testing.T) {
 	}
 }
 
-func TestValidVagabondMoveActionsCanMoveBetweenClearingAndForest(t *testing.T) {
+func TestValidVagabondMoveActionsCanExitForestButCannotEnterForest(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -211,7 +211,7 @@ func TestValidVagabondMoveActionsCanMoveBetweenClearingAndForest(t *testing.T) {
 	}
 
 	got := ValidVagabondMoveActions(state)
-	wantForestMove := game.Action{
+	unwantForestMove := game.Action{
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
 			Faction:    game.Vagabond,
@@ -222,8 +222,8 @@ func TestValidVagabondMoveActionsCanMoveBetweenClearingAndForest(t *testing.T) {
 		},
 	}
 
-	if !containsAction(got, wantForestMove) {
-		t.Fatalf("expected clearing-to-forest move %+v, got %+v", wantForestMove, got)
+	if containsAction(got, unwantForestMove) {
+		t.Fatalf("did not expect clearing-to-forest daylight move %+v, got %+v", unwantForestMove, got)
 	}
 
 	state.Vagabond.ClearingID = 0
@@ -296,7 +296,8 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 		Map: game.Map{
 			Clearings: []game.Clearing{
 				{
-					ID: 1,
+					ID:   1,
+					Suit: game.Fox,
 					Warriors: map[game.Faction]int{
 						game.Marquise: 1,
 						game.Alliance: 1,
@@ -311,6 +312,7 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 			},
 			Items: []game.Item{
 				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
 			},
 			Relationships: map[game.Faction]game.RelationshipLevel{
 				game.Marquise: game.RelHostile,
@@ -326,6 +328,7 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 			TargetFaction: game.Alliance,
 			ClearingID:    1,
 			CardID:        foxCard.ID,
+			ItemIndex:     0,
 		},
 	}
 	unwantMarquise := game.Action{
@@ -335,14 +338,93 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 			TargetFaction: game.Marquise,
 			ClearingID:    1,
 			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	}
+	wantAllianceBoots := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Alliance,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     1,
 		},
 	}
 
 	if !containsAction(got, wantAlliance) {
 		t.Fatalf("expected alliance aid action %+v, got %+v", wantAlliance, got)
 	}
+	if !containsAction(got, wantAllianceBoots) {
+		t.Fatalf("expected selected-item aid action %+v, got %+v", wantAllianceBoots, got)
+	}
 	if containsAction(got, unwantMarquise) {
 		t.Fatalf("did not expect hostile marquise aid action %+v, got %+v", unwantMarquise, got)
+	}
+}
+
+func TestValidAidActionsRequiresCardMatchingClearingSuit(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	rabbitCard := firstCardOfSuit(t, game.Rabbit)
+	birdCard := firstCardOfSuit(t, game.Bird)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID:  1,
+			CardsInHand: []game.Card{foxCard, rabbitCard, birdCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidAidActions(state)
+	wantFox := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	}
+	wantBird := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        birdCard.ID,
+			ItemIndex:     0,
+		},
+	}
+	unwantRabbit := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        rabbitCard.ID,
+			ItemIndex:     0,
+		},
+	}
+
+	if !containsAction(got, wantFox) || !containsAction(got, wantBird) {
+		t.Fatalf("expected fox and bird aid actions, got %+v", got)
+	}
+	if containsAction(got, unwantRabbit) {
+		t.Fatalf("did not expect off-suit rabbit aid action %+v, got %+v", unwantRabbit, got)
 	}
 }
 
@@ -386,7 +468,8 @@ func TestValidVagabondBattleActionsSkipsCoalitionPartner(t *testing.T) {
 		Map: game.Map{
 			Clearings: []game.Clearing{
 				{
-					ID: 1,
+					ID:   1,
+					Suit: game.Fox,
 					Warriors: map[game.Faction]int{
 						game.Marquise: 1,
 					},
@@ -492,6 +575,7 @@ func TestValidAidActionsAllowsCoalitionPartnerDespiteHostileRelationship(t *test
 			TargetFaction: game.Marquise,
 			ClearingID:    1,
 			CardID:        foxCard.ID,
+			ItemIndex:     0,
 		},
 	}
 

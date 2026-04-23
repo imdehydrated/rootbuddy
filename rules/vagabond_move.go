@@ -28,20 +28,6 @@ func ValidVagabondMoveActions(state game.GameState) []game.Action {
 			})
 		}
 
-		if len(vagabondItemIndexes(state, game.ItemBoots, game.ItemReady)) > 0 {
-			for _, forestID := range forestIDsAdjacentToClearing(state.Map, clearing.ID) {
-				actions = append(actions, game.Action{
-					Type: game.ActionMovement,
-					Movement: &game.MovementAction{
-						Faction:    game.Vagabond,
-						Count:      1,
-						MaxCount:   1,
-						From:       clearing.ID,
-						ToForestID: forestID,
-					},
-				})
-			}
-		}
 	}
 
 	if forest, ok := vagabondCurrentForest(state); ok {

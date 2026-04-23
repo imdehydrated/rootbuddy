@@ -107,7 +107,7 @@ export function factionSpatialChoiceDetail(action: Action): string {
     case ACTION_TYPE.EXPLORE:
       return `Item: ${itemTypeLabels[action.explore?.itemType ?? -1] ?? "Unknown"}`;
     case ACTION_TYPE.AID:
-      return `Card: ${knownCardLabel(action.aid?.cardID)}`;
+      return `Card: ${knownCardLabel(action.aid?.cardID)}; item slot: ${action.aid?.itemIndex ?? "?"}`;
     case ACTION_TYPE.STRIKE:
       return `Target: ${factionLabels[action.strike?.targetFaction ?? -1] ?? "Unknown faction"}`;
     case ACTION_TYPE.ORGANIZE:

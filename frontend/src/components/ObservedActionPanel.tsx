@@ -34,6 +34,7 @@ type ObservedFormState = {
   actorFaction: number;
   template: ObservedTemplateKey;
   cardID: string;
+  itemIndex: string;
   count: string;
   clearingID: string;
   targetFaction: number;
@@ -111,6 +112,7 @@ function initialFormState(state: GameState): ObservedFormState {
     actorFaction,
     template: templatesForFaction(actorFaction)[0],
     cardID: "24",
+    itemIndex: "0",
     count: "1",
     clearingID: String(state.map.clearings[0]?.id ?? 1),
     targetFaction,
@@ -242,7 +244,8 @@ function buildObservedAction(form: ObservedFormState): Action {
           faction,
           targetFaction: form.targetFaction,
           clearingID: parseNumber(form.clearingID),
-          cardID: parseNumber(form.cardID)
+          cardID: parseNumber(form.cardID),
+          itemIndex: parseNumber(form.itemIndex, 0)
         }
       };
     case "other_player_draw":
@@ -375,6 +378,13 @@ function observedFormIssues(form: ObservedFormState): ObservedIssue[] {
     issues.push(...battleIssues);
   }
 
+  if (form.template === "aid") {
+    const itemIssue = integerFieldIssue("Item slot", form.itemIndex, 0);
+    if (itemIssue) {
+      issues.push(itemIssue);
+    }
+  }
+
   return issues;
 }
 
@@ -483,6 +493,9 @@ export function ObservedActionPanel({
     form.template === "craft" && enteredWorkshopClearings.length > 0
       ? { label: "Workshops", items: enteredWorkshopClearings.map((clearingID) => `Clearing ${clearingID}`) }
       : null,
+    form.template === "aid"
+      ? { label: "Item", items: [`Slot ${parseNumber(form.itemIndex, 0)}`] }
+      : null,
     form.template === "add_to_decree" && enteredDecreeColumns.length > 0
       ? { label: "Columns", items: enteredDecreeColumns.map((column) => `Column ${column}`) }
       : null
@@ -571,6 +584,13 @@ export function ObservedActionPanel({
           <label>
             <span>Draw Count</span>
             <input value={form.count} onChange={(event) => updateForm("count", event.target.value)} />
+          </label>
+        ) : null}
+
+        {form.template === "aid" ? (
+          <label>
+            <span>Item Slot</span>
+            <input value={form.itemIndex} onChange={(event) => updateForm("itemIndex", event.target.value)} />
           </label>
         ) : null}
 

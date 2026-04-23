@@ -159,6 +159,11 @@ func TestApplyActionAidObservedHiddenVagabondCardInAssistMode(t *testing.T) {
 		OtherHandCounts: map[game.Faction]int{
 			game.Vagabond: 2,
 		},
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{ID: 1, Suit: game.Rabbit},
+			},
+		},
 		Marquise: game.MarquiseState{},
 		Vagabond: game.VagabondState{
 			Items: []game.Item{
@@ -177,6 +182,7 @@ func TestApplyActionAidObservedHiddenVagabondCardInAssistMode(t *testing.T) {
 			TargetFaction: game.Marquise,
 			ClearingID:    1,
 			CardID:        24,
+			ItemIndex:     0,
 		},
 	})
 

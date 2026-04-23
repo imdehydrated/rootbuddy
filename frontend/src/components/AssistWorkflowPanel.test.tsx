@@ -263,7 +263,8 @@ describe("AssistWorkflowPanel", () => {
         faction: 3,
         targetFaction: 0,
         clearingID: 6,
-        cardID: 7
+        cardID: 7,
+        itemIndex: 0
       }
     };
     const bankAid: Action = {
@@ -272,7 +273,8 @@ describe("AssistWorkflowPanel", () => {
         faction: 3,
         targetFaction: 0,
         clearingID: 6,
-        cardID: 15
+        cardID: 15,
+        itemIndex: 0
       }
     };
     const onApply = vi.fn(async () => undefined);

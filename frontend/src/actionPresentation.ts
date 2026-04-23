@@ -240,7 +240,7 @@ export function describeAction(action: Action, state?: GameState): string {
     case ACTION_TYPE.QUEST:
       return `Complete quest ${describeQuestLabel(action.quest?.questID, state)}`;
     case ACTION_TYPE.AID:
-      return `Aid ${factionLabels[action.aid?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.aid?.clearingID ?? "?"}`;
+      return `Aid ${factionLabels[action.aid?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.aid?.clearingID ?? "?"} with item slot ${action.aid?.itemIndex ?? "?"}`;
     case ACTION_TYPE.STRIKE:
       return `Strike ${factionLabels[action.strike?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.strike?.clearingID ?? "?"}`;
     case ACTION_TYPE.REPAIR:

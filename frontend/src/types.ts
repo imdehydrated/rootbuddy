@@ -318,6 +318,7 @@ export interface Action {
     targetFaction: number;
     clearingID: number;
     cardID: number;
+    itemIndex: number;
   } | null;
   strike?: {
     faction: number;

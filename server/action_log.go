@@ -129,7 +129,7 @@ func summarizeAction(action game.Action) string {
 	case game.ActionQuest:
 		return fmt.Sprintf("Complete quest %d", action.Quest.QuestID)
 	case game.ActionAid:
-		return fmt.Sprintf("Aid %s in clearing %d", factionLabel(action.Aid.TargetFaction), action.Aid.ClearingID)
+		return fmt.Sprintf("Aid %s in clearing %d with item %d", factionLabel(action.Aid.TargetFaction), action.Aid.ClearingID, action.Aid.ItemIndex)
 	case game.ActionStrike:
 		return fmt.Sprintf("Strike %s in clearing %d", factionLabel(action.Strike.TargetFaction), action.Strike.ClearingID)
 	case game.ActionRepair:

@@ -37,7 +37,7 @@ export function actionExplanation(action: Action, state: GameState): string {
     case ACTION_TYPE.QUEST:
       return `Complete the available quest from the current board position. Quests are a low-conflict way for the Vagabond to convert ready items into score or cards.`;
     case ACTION_TYPE.AID:
-      return `Aid ${factionLabel(action.aid?.targetFaction)} in clearing ${action.aid?.clearingID ?? "?"} with ${describeKnownCardID(action.aid?.cardID ?? 0)}. This grows Vagabond relationships without forcing a fight.`;
+      return `Aid ${factionLabel(action.aid?.targetFaction)} in clearing ${action.aid?.clearingID ?? "?"} with ${describeKnownCardID(action.aid?.cardID ?? 0)} and item slot ${action.aid?.itemIndex ?? "?"}. This grows Vagabond relationships without forcing a fight.`;
     case ACTION_TYPE.STRIKE:
       return `Spend a crossbow shot to remove a key enemy piece in clearing ${action.strike?.clearingID ?? "?"}. Use it when one token, building, or warrior is blocking your route or score line.`;
     case ACTION_TYPE.REPAIR:

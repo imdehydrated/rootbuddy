@@ -97,7 +97,7 @@ func TestApplyActionVagabondMovementExhaustsBootsAndMoves(t *testing.T) {
 		t.Fatalf("expected boots to exhaust after moving, got %v", next.Vagabond.Items[0].Status)
 	}
 
-	forestMove := game.Action{
+	invalidForestMove := game.Action{
 		Type: game.ActionMovement,
 		Movement: &game.MovementAction{
 			Faction:    game.Vagabond,
@@ -109,9 +109,12 @@ func TestApplyActionVagabondMovementExhaustsBootsAndMoves(t *testing.T) {
 	}
 
 	next.Vagabond.Items[0].Status = game.ItemReady
-	next = ApplyAction(next, forestMove)
-	if !next.Vagabond.InForest || next.Vagabond.ForestID != 1 || next.Vagabond.ClearingID != 0 {
-		t.Fatalf("expected vagabond to enter forest 1, got %+v", next.Vagabond)
+	next = ApplyAction(next, invalidForestMove)
+	if next.Vagabond.InForest || next.Vagabond.ForestID != 0 || next.Vagabond.ClearingID != 2 {
+		t.Fatalf("expected daylight move to forest to be ignored, got %+v", next.Vagabond)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemReady {
+		t.Fatalf("expected invalid forest move not to exhaust boots, got %v", next.Vagabond.Items[0].Status)
 	}
 }
 
@@ -165,10 +168,16 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	foxCard := firstVagabondTestCard(t, game.Fox)
 
 	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{ID: 1, Suit: game.Fox},
+			},
+		},
 		Vagabond: game.VagabondState{
 			CardsInHand: []game.Card{foxCard},
 			Items: []game.Item{
 				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
 			},
 		},
 	}
@@ -180,6 +189,7 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 			TargetFaction: game.Marquise,
 			ClearingID:    1,
 			CardID:        foxCard.ID,
+			ItemIndex:     1,
 		},
 	}
 
@@ -190,8 +200,8 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != foxCard.ID {
 		t.Fatalf("expected card to move to marquise hand, got %+v", next.Marquise.CardsInHand)
 	}
-	if next.Vagabond.Items[0].Status != game.ItemExhausted {
-		t.Fatalf("expected aid to exhaust one item, got %v", next.Vagabond.Items[0].Status)
+	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[1].Status != game.ItemExhausted {
+		t.Fatalf("expected aid to exhaust selected item only, got %+v", next.Vagabond.Items)
 	}
 	if vagabondRelationshipLevel(next, game.Marquise) != game.RelFriendly {
 		t.Fatalf("expected relationship to improve to friendly, got %v", vagabondRelationshipLevel(next, game.Marquise))

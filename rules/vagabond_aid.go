@@ -3,7 +3,8 @@ package rules
 import "github.com/imdehydrated/rootbuddy/game"
 
 func ValidAidActions(state game.GameState) []game.Action {
-	if len(vagabondReadyItemIndexes(state)) == 0 || len(state.Vagabond.CardsInHand) == 0 {
+	readyItemIndexes := vagabondReadyItemIndexes(state)
+	if len(readyItemIndexes) == 0 || len(state.Vagabond.CardsInHand) == 0 {
 		return nil
 	}
 
@@ -19,15 +20,22 @@ func ValidAidActions(state game.GameState) []game.Action {
 		}
 
 		for _, card := range state.Vagabond.CardsInHand {
-			actions = append(actions, game.Action{
-				Type: game.ActionAid,
-				Aid: &game.AidAction{
-					Faction:       game.Vagabond,
-					TargetFaction: targetFaction,
-					ClearingID:    clearing.ID,
-					CardID:        card.ID,
-				},
-			})
+			if !matchesSuitOrBird(card, clearing.Suit) {
+				continue
+			}
+
+			for _, itemIndex := range readyItemIndexes {
+				actions = append(actions, game.Action{
+					Type: game.ActionAid,
+					Aid: &game.AidAction{
+						Faction:       game.Vagabond,
+						TargetFaction: targetFaction,
+						ClearingID:    clearing.ID,
+						CardID:        card.ID,
+						ItemIndex:     itemIndex,
+					},
+				})
+			}
 		}
 	}
 

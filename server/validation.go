@@ -99,6 +99,9 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.Aid == nil {
 			return "aid payload is required"
 		}
+		if req.Action.Aid.ItemIndex < 0 {
+			return "aid action must have a valid item index"
+		}
 	case game.ActionStrike:
 		if req.Action.Strike == nil {
 			return "strike payload is required"

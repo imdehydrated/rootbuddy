@@ -386,6 +386,22 @@ func applyAid(state *game.GameState, action game.Action) {
 		return
 	}
 
+	clearing := findClearing(state, action.Aid.ClearingID)
+	if clearing == nil {
+		return
+	}
+
+	aidCard, found := CardByID(action.Aid.CardID)
+	if !found || (aidCard.Suit != clearing.Suit && aidCard.Suit != game.Bird) {
+		return
+	}
+
+	if action.Aid.ItemIndex < 0 ||
+		action.Aid.ItemIndex >= len(state.Vagabond.Items) ||
+		state.Vagabond.Items[action.Aid.ItemIndex].Status != game.ItemReady {
+		return
+	}
+
 	card, ok := game.Card{}, false
 	if tracksHandForFaction(*state, game.Vagabond) {
 		var cards []game.Card
@@ -399,9 +415,7 @@ func applyAid(state *game.GameState, action game.Action) {
 	if !ok {
 		return
 	}
-	if exhaustAnyReadyItems(state, 1) == 0 {
-		return
-	}
+	state.Vagabond.Items[action.Aid.ItemIndex].Status = game.ItemExhausted
 
 	appendCardToFactionHand(state, action.Aid.TargetFaction, card)
 	improveVagabondRelationship(state, action.Aid.TargetFaction)

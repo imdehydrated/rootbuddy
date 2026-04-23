@@ -236,6 +236,7 @@ type AidAction struct {
 	TargetFaction Faction
 	ClearingID    int
 	CardID        CardID
+	ItemIndex     int
 }
 
 type StrikeAction struct {
