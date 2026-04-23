@@ -290,6 +290,56 @@ func TestValidExploreActionsUsesRuinItems(t *testing.T) {
 	}
 }
 
+func TestValidVagabondEveningActionsDrawsBaseCardPlusCoins(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemCoin, Status: game.ItemReady},
+				{Type: game.ItemCoin, Status: game.ItemExhausted},
+				{Type: game.ItemCoin, Status: game.ItemDamaged},
+			},
+		},
+	}
+
+	got := ValidVagabondEveningActions(state)
+	want := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Vagabond,
+			Count:   3,
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected evening draw action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondEveningActionsDrawsBaseCardInForest(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			InForest: true,
+		},
+	}
+
+	got := ValidVagabondEveningActions(state)
+	want := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Vagabond,
+			Count:   1,
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected forest evening draw action %+v, got %+v", want, got)
+	}
+}
+
 func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	state := game.GameState{

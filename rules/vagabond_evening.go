@@ -3,16 +3,12 @@ package rules
 import "github.com/imdehydrated/rootbuddy/game"
 
 func vagabondDrawCount(state game.GameState) int {
-	if state.Vagabond.InForest {
-		return 0
-	}
-
 	coinCount := len(vagabondItemIndexes(state, game.ItemCoin, game.ItemReady, game.ItemExhausted))
 	if coinCount > 3 {
 		return 3
 	}
 
-	return coinCount
+	return 1 + coinCount
 }
 
 func ValidVagabondEveningActions(state game.GameState) []game.Action {

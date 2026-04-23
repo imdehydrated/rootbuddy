@@ -271,7 +271,7 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 		Type: game.ActionEveningDraw,
 		EveningDraw: &game.EveningDrawAction{
 			Faction: game.Vagabond,
-			Count:   0,
+			Count:   1,
 		},
 	}
 
