@@ -66,6 +66,93 @@ func TestValidSpreadSympathyActionsRequiresAdjacencyAfterFirstToken(t *testing.T
 	}
 }
 
+func TestValidSpreadSympathyActionsAppliesMartialLaw(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	birdCard := firstCardOfSuit(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard, birdCard},
+		},
+	}
+
+	got := ValidSpreadSympathyActions(state)
+	want := game.Action{
+		Type: game.ActionSpreadSympathy,
+		SpreadSympathy: &game.SpreadSympathyAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	}
+	unwantSingle := game.Action{
+		Type: game.ActionSpreadSympathy,
+		SpreadSympathy: &game.SpreadSympathyAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			SupporterCardIDs: []game.CardID{foxCard.ID},
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected martial-law sympathy action %+v, got %+v", want, got)
+	}
+	if containsAction(got, unwantSingle) {
+		t.Fatalf("did not expect single-supporter martial-law action %+v, got %+v", unwantSingle, got)
+	}
+}
+
+func TestValidSpreadSympathyActionsIgnoresAllianceWarriorsForMartialLaw(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Alliance: 3,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard},
+		},
+	}
+
+	got := ValidSpreadSympathyActions(state)
+	want := game.Action{
+		Type: game.ActionSpreadSympathy,
+		SpreadSympathy: &game.SpreadSympathyAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			SupporterCardIDs: []game.CardID{foxCard.ID},
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected alliance warriors not to trigger martial law %+v, got %+v", want, got)
+	}
+}
+
 func TestValidRevoltActionsRequiresSympathyAndTwoSupporters(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	birdCard := firstCardOfSuit(t, game.Bird)

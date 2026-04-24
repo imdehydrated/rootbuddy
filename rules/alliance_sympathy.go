@@ -14,6 +14,24 @@ func canSpreadSympathy(clearing game.Clearing, state game.GameState) bool {
 	return adjacentToAllianceSympathy(clearing, state.Map)
 }
 
+func martialLawApplies(clearing game.Clearing) bool {
+	for faction, warriors := range clearing.Warriors {
+		if faction == game.Alliance || warriors < 3 {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func spreadSympathySupporterCost(state game.GameState, clearing game.Clearing) int {
+	cost := allianceSupporterCost(state.Alliance.SympathyPlaced)
+	if martialLawApplies(clearing) {
+		cost++
+	}
+	return cost
+}
+
 func ValidSpreadSympathyActions(state game.GameState) []game.Action {
 	if state.FactionTurn != game.Alliance || state.CurrentPhase != game.Birdsong {
 		return nil
@@ -27,7 +45,6 @@ func ValidSpreadSympathyActions(state game.GameState) []game.Action {
 		return nil
 	}
 
-	cost := allianceSupporterCost(state.Alliance.SympathyPlaced)
 	actions := []game.Action{}
 
 	for _, clearing := range state.Map.Clearings {
@@ -35,6 +52,7 @@ func ValidSpreadSympathyActions(state game.GameState) []game.Action {
 			continue
 		}
 
+		cost := spreadSympathySupporterCost(state, clearing)
 		matchingCards := allianceSupporterCardIDs(state, clearing.Suit)
 		for _, supporterIDs := range supporterCardSubsets(matchingCards, cost) {
 			actions = append(actions, game.Action{
