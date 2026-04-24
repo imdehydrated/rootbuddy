@@ -2,8 +2,8 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
-func allianceDrawCount(officers int) int {
-	return 1 + officers
+func allianceDrawCount(state game.GameState) int {
+	return 1 + len(allianceBaseClearings(state))
 }
 
 func ValidAllianceRecruitActions(state game.GameState) []game.Action {
@@ -80,7 +80,7 @@ func ValidAllianceEveningActions(state game.GameState) []game.Action {
 			Type: game.ActionEveningDraw,
 			EveningDraw: &game.EveningDrawAction{
 				Faction: game.Alliance,
-				Count:   allianceDrawCount(state.Alliance.Officers),
+				Count:   allianceDrawCount(state),
 			},
 		},
 	}

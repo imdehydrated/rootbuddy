@@ -77,6 +77,40 @@ func TestApplyActionRecruit(t *testing.T) {
 	}
 }
 
+func TestApplyActionRecruitAppliesRepeatedClearingIDs(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+				},
+			},
+		},
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Marquise: game.MarquiseState{
+			WarriorSupply: 3,
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1, 1},
+		},
+	}
+
+	next := ApplyAction(state, action)
+
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 2 {
+		t.Fatalf("expected 2 marquise warriors after duplicate-clearing recruit, got %d", next.Map.Clearings[0].Warriors[game.Marquise])
+	}
+	if next.Marquise.WarriorSupply != 1 {
+		t.Fatalf("expected warrior supply to decrease to 1, got %d", next.Marquise.WarriorSupply)
+	}
+}
+
 func TestApplyActionOverwork(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

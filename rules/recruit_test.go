@@ -290,3 +290,99 @@ func TestValidRecruitActions(t *testing.T) {
 		})
 	}
 }
+
+func TestValidRecruitActionsCountsMultipleRecruitersInSameClearing(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
+				},
+				{
+					ID: 2,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Marquise: game.MarquiseState{
+			WarriorSupply: 3,
+		},
+	}
+
+	got := ValidRecruitActions(state)
+	want := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1, 1, 2},
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected recruit action to include one clearing ID per recruiter %+v, got %+v", want, got)
+	}
+}
+
+func TestValidRecruitActionsDeduplicatesLimitedSupplyChoicesForSharedClearing(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
+				},
+				{
+					ID: 2,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Marquise: game.MarquiseState{
+			WarriorSupply: 2,
+		},
+	}
+
+	got := ValidRecruitActions(state)
+	wantActions := []game.Action{
+		{
+			Type: game.ActionRecruit,
+			Recruit: &game.RecruitAction{
+				Faction:     game.Marquise,
+				ClearingIDs: []int{1, 1},
+			},
+		},
+		{
+			Type: game.ActionRecruit,
+			Recruit: &game.RecruitAction{
+				Faction:     game.Marquise,
+				ClearingIDs: []int{1, 2},
+			},
+		},
+	}
+
+	if len(got) != len(wantActions) {
+		t.Fatalf("expected %d unique recruit actions, got %d: %+v", len(wantActions), len(got), got)
+	}
+	for _, want := range wantActions {
+		if !containsAction(got, want) {
+			t.Fatalf("expected recruit action %+v to be generated, got %+v", want, got)
+		}
+	}
+}

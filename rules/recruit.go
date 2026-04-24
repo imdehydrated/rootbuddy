@@ -1,6 +1,11 @@
 package rules
 
-import "github.com/imdehydrated/rootbuddy/game"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/imdehydrated/rootbuddy/game"
+)
 
 func recruitClearingSubsets(clearingIDs []int, choose int) [][]int {
 	if choose <= 0 || choose > len(clearingIDs) {
@@ -8,11 +13,17 @@ func recruitClearingSubsets(clearingIDs []int, choose int) [][]int {
 	}
 
 	subsets := [][]int{}
+	seen := map[string]bool{}
 	current := make([]int, 0, choose)
 
 	var build func(start int)
 	build = func(start int) {
 		if len(current) == choose {
+			key := recruitClearingSubsetKey(current)
+			if seen[key] {
+				return
+			}
+			seen[key] = true
 			subset := make([]int, len(current))
 			copy(subset, current)
 			subsets = append(subsets, subset)
@@ -30,6 +41,17 @@ func recruitClearingSubsets(clearingIDs []int, choose int) [][]int {
 
 	build(0)
 	return subsets
+}
+
+func recruitClearingSubsetKey(clearingIDs []int) string {
+	var key strings.Builder
+	for i, clearingID := range clearingIDs {
+		if i > 0 {
+			key.WriteByte(',')
+		}
+		key.WriteString(strconv.Itoa(clearingID))
+	}
+	return key.String()
 }
 
 func ValidRecruitActions(state game.GameState) []game.Action {

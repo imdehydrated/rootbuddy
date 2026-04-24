@@ -283,6 +283,80 @@ func TestValidAllianceEveningActionsIncludesDrawAndOfficerActionChoices(t *testi
 	}
 }
 
+func TestValidAllianceEveningDrawUsesBasesNotOfficers(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Alliance: game.AllianceState{
+			Officers: 3,
+		},
+	}
+
+	got := ValidAllianceEveningActions(state)
+	wantDraw := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Alliance,
+			Count:   1,
+		},
+	}
+	unwantedOfficerDraw := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Alliance,
+			Count:   4,
+		},
+	}
+
+	if !containsAction(got, wantDraw) {
+		t.Fatalf("expected base draw action %+v, got %+v", wantDraw, got)
+	}
+	if containsAction(got, unwantedOfficerDraw) {
+		t.Fatalf("expected officers not to increase draw count, got %+v", got)
+	}
+}
+
+func TestValidAllianceEveningDrawCountsPlacedBases(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:        1,
+					Suit:      game.Fox,
+					Buildings: []game.Building{{Faction: game.Alliance, Type: game.Base}},
+				},
+				{
+					ID:        2,
+					Suit:      game.Rabbit,
+					Buildings: []game.Building{{Faction: game.Alliance, Type: game.Base}},
+				},
+				{
+					ID:        3,
+					Suit:      game.Mouse,
+					Buildings: []game.Building{{Faction: game.Alliance, Type: game.Base}},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+	}
+
+	got := ValidAllianceEveningActions(state)
+	wantDraw := game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Alliance,
+			Count:   4,
+		},
+	}
+
+	if !containsAction(got, wantDraw) {
+		t.Fatalf("expected draw action to count placed bases %+v, got %+v", wantDraw, got)
+	}
+}
+
 func TestValidBattlesTargetsAllianceSympathy(t *testing.T) {
 	board := game.Map{
 		Clearings: []game.Clearing{

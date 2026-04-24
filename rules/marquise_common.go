@@ -24,7 +24,6 @@ func marquiseRecruiterClearings(board game.Map) []int {
 		for _, building := range clearing.Buildings {
 			if building.Faction == game.Marquise && building.Type == game.Recruiter {
 				recruiterClearings = append(recruiterClearings, clearing.ID)
-				break
 			}
 		}
 	}
