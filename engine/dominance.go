@@ -143,13 +143,22 @@ func hasActiveDominance(state game.GameState, faction game.Faction) bool {
 	return ok
 }
 
-func birdDominanceCorners(state game.GameState) []int {
+func birdDominanceCornerPairs(state game.GameState) [][2]int {
 	switch state.Map.ID {
 	case game.AutumnMapID:
-		return []int{1, 3}
+		return [][2]int{{1, oppositeCornerClearing(state.Map.ID, 1)}, {2, oppositeCornerClearing(state.Map.ID, 2)}}
 	default:
 		return nil
 	}
+}
+
+func rulesClearing(state game.GameState, clearingID int, faction game.Faction) bool {
+	index := findClearingIndex(state.Map, clearingID)
+	if index == -1 {
+		return false
+	}
+	ruler, ruled := rules.Ruler(state.Map.Clearings[index])
+	return ruled && ruler == faction
 }
 
 func winsByDominance(state game.GameState, faction game.Faction) bool {
@@ -166,21 +175,12 @@ func winsByDominance(state game.GameState, faction game.Faction) bool {
 	}
 
 	if card.Suit == game.Bird {
-		corners := birdDominanceCorners(state)
-		if len(corners) != 2 {
-			return false
-		}
-		for _, clearingID := range corners {
-			index := findClearingIndex(state.Map, clearingID)
-			if index == -1 {
-				return false
-			}
-			ruler, ruled := rules.Ruler(state.Map.Clearings[index])
-			if !ruled || ruler != faction {
-				return false
+		for _, pair := range birdDominanceCornerPairs(state) {
+			if rulesClearing(state, pair[0], faction) && rulesClearing(state, pair[1], faction) {
+				return true
 			}
 		}
-		return true
+		return false
 	}
 
 	count := 0

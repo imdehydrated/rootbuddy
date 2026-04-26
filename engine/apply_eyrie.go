@@ -50,6 +50,22 @@ func removeLeader(leaders []game.EyrieLeader, remove game.EyrieLeader) []game.Ey
 	return filtered
 }
 
+func hasAvailableNewLeader(state game.GameState) bool {
+	for _, leader := range state.Eyrie.AvailableLeaders {
+		if leader != state.Eyrie.Leader {
+			return true
+		}
+	}
+	return false
+}
+
+func recycleEyrieLeadersIfNeeded(state *game.GameState) {
+	if hasAvailableNewLeader(*state) {
+		return
+	}
+	state.Eyrie.AvailableLeaders = game.AllEyrieLeaders()
+}
+
 func eyrieCardSuit(id game.CardID) game.Suit {
 	if id == game.LoyalVizier1 || id == game.LoyalVizier2 {
 		return game.Bird
@@ -103,6 +119,7 @@ func applyTurmoil(state *game.GameState, action game.Action) {
 	DiscardCards(state, state.Eyrie.Decree.Move)
 	DiscardCards(state, state.Eyrie.Decree.Battle)
 	DiscardCards(state, state.Eyrie.Decree.Build)
+	recycleEyrieLeadersIfNeeded(state)
 	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, state.Eyrie.Leader)
 	state.Eyrie.AvailableLeaders = removeLeader(state.Eyrie.AvailableLeaders, action.Turmoil.NewLeader)
 	state.Eyrie.Leader = action.Turmoil.NewLeader

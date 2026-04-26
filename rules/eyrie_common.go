@@ -117,9 +117,18 @@ func leaderVizierColumns(leader game.EyrieLeader) [2]game.DecreeColumn {
 }
 
 func availableNewLeaders(state game.GameState) []game.EyrieLeader {
+	leaders := availableLeadersExcept(state.Eyrie.AvailableLeaders, state.Eyrie.Leader)
+	if len(leaders) > 0 {
+		return leaders
+	}
+
+	return availableLeadersExcept(game.AllEyrieLeaders(), state.Eyrie.Leader)
+}
+
+func availableLeadersExcept(candidates []game.EyrieLeader, current game.EyrieLeader) []game.EyrieLeader {
 	leaders := []game.EyrieLeader{}
-	for _, leader := range state.Eyrie.AvailableLeaders {
-		if leader != state.Eyrie.Leader {
+	for _, leader := range candidates {
+		if leader != current {
 			leaders = append(leaders, leader)
 		}
 	}

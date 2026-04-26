@@ -9,6 +9,15 @@ const (
 	LeaderDespot
 )
 
+func AllEyrieLeaders() []EyrieLeader {
+	return []EyrieLeader{
+		LeaderBuilder,
+		LeaderCharismatic,
+		LeaderCommander,
+		LeaderDespot,
+	}
+}
+
 type Decree struct {
 	Recruit []CardID
 	Move    []CardID

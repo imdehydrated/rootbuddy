@@ -124,6 +124,51 @@ func TestValidEyrieDaylightActionsReturnsTurmoilWhenCurrentCardIsUnresolvable(t 
 	}
 }
 
+func TestValidEyrieDaylightActionsRecyclesLeadersWhenNoneAreAvailable(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Eyrie: game.EyrieState{
+			Leader: game.LeaderDespot,
+			Decree: game.Decree{
+				Recruit: []game.CardID{foxCard.ID},
+			},
+		},
+	}
+
+	got := ValidEyrieDaylightActions(state)
+	wantLeaders := []game.EyrieLeader{
+		game.LeaderBuilder,
+		game.LeaderCharismatic,
+		game.LeaderCommander,
+	}
+	unwanted := game.Action{
+		Type: game.ActionTurmoil,
+		Turmoil: &game.TurmoilAction{
+			Faction:   game.Eyrie,
+			NewLeader: game.LeaderDespot,
+		},
+	}
+
+	for _, leader := range wantLeaders {
+		want := game.Action{
+			Type: game.ActionTurmoil,
+			Turmoil: &game.TurmoilAction{
+				Faction:   game.Eyrie,
+				NewLeader: leader,
+			},
+		}
+		if !containsAction(got, want) {
+			t.Fatalf("expected recycled turmoil action %+v, got %+v", want, got)
+		}
+	}
+	if containsAction(got, unwanted) {
+		t.Fatalf("did not expect current leader to be available after recycling, got %+v", got)
+	}
+}
+
 func TestValidEyrieDaylightActionsAllowsResolvingCardsInAnyOrderWithinColumn(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	rabbitCard := firstCardOfSuit(t, game.Rabbit)

@@ -171,6 +171,78 @@ func TestBeginNextFactionTurnChecksDominanceVictory(t *testing.T) {
 	}
 }
 
+func TestBirdDominanceAcceptsSecondAutumnOppositeCornerPair(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Alliance,
+		TurnOrder:   []game.Faction{game.Alliance, game.Marquise},
+		ActiveDominance: map[game.Faction]game.CardID{
+			game.Marquise: 14,
+		},
+		Map: game.Map{
+			ID: game.AutumnMapID,
+			Clearings: []game.Clearing{
+				{
+					ID:   2,
+					Suit: game.Mouse,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:   4,
+					Suit: game.Rabbit,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+	}
+
+	beginNextFactionTurn(&state)
+
+	if state.GamePhase != game.LifecycleGameOver || state.Winner != game.Marquise {
+		t.Fatalf("expected bird dominance to win with corners 2 and 4, got phase=%v winner=%v", state.GamePhase, state.Winner)
+	}
+}
+
+func TestBirdDominanceRequiresOppositeAutumnCorners(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Alliance,
+		TurnOrder:   []game.Faction{game.Alliance, game.Marquise},
+		ActiveDominance: map[game.Faction]game.CardID{
+			game.Marquise: 14,
+		},
+		Map: game.Map{
+			ID: game.AutumnMapID,
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Mouse,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+	}
+
+	beginNextFactionTurn(&state)
+
+	if state.GamePhase == game.LifecycleGameOver {
+		t.Fatalf("did not expect bird dominance to win with non-opposite corners, got phase=%v winner=%v", state.GamePhase, state.Winner)
+	}
+}
+
 func TestValidActionsIncludesVagabondCoalitionTarget(t *testing.T) {
 	state := game.GameState{
 		GamePhase:    game.LifecyclePlaying,

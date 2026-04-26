@@ -119,6 +119,70 @@ func TestApplyTurmoilReassignsLeaderAndViziers(t *testing.T) {
 	}
 }
 
+func TestApplyTurmoilRecyclesLeadersWhenNoneAreAvailable(t *testing.T) {
+	state := game.GameState{
+		FactionTurn: game.Eyrie,
+		Eyrie: game.EyrieState{
+			Leader: game.LeaderDespot,
+			Decree: game.Decree{
+				Move:  []game.CardID{game.LoyalVizier1},
+				Build: []game.CardID{game.LoyalVizier2},
+			},
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionTurmoil,
+		Turmoil: &game.TurmoilAction{
+			Faction:   game.Eyrie,
+			NewLeader: game.LeaderBuilder,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if next.Eyrie.Leader != game.LeaderBuilder {
+		t.Fatalf("expected recycled leader choice to become builder, got %v", next.Eyrie.Leader)
+	}
+	if !eyrieLeaderAvailable(next.Eyrie.AvailableLeaders, game.LeaderCharismatic) ||
+		!eyrieLeaderAvailable(next.Eyrie.AvailableLeaders, game.LeaderCommander) {
+		t.Fatalf("expected unchosen recycled leaders to remain available, got %+v", next.Eyrie.AvailableLeaders)
+	}
+	if eyrieLeaderAvailable(next.Eyrie.AvailableLeaders, game.LeaderDespot) ||
+		eyrieLeaderAvailable(next.Eyrie.AvailableLeaders, game.LeaderBuilder) {
+		t.Fatalf("expected old and new leaders to be unavailable, got %+v", next.Eyrie.AvailableLeaders)
+	}
+}
+
+func TestApplyTurmoilAfterRecycleContinuesUsingRemainingAvailableLeaders(t *testing.T) {
+	state := game.GameState{
+		FactionTurn: game.Eyrie,
+		Eyrie: game.EyrieState{
+			Leader:           game.LeaderBuilder,
+			AvailableLeaders: []game.EyrieLeader{game.LeaderCharismatic, game.LeaderCommander},
+			Decree: game.Decree{
+				Recruit: []game.CardID{game.LoyalVizier1},
+				Move:    []game.CardID{game.LoyalVizier2},
+			},
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionTurmoil,
+		Turmoil: &game.TurmoilAction{
+			Faction:   game.Eyrie,
+			NewLeader: game.LeaderCharismatic,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if next.Eyrie.Leader != game.LeaderCharismatic {
+		t.Fatalf("expected next leader to be charismatic, got %v", next.Eyrie.Leader)
+	}
+	if len(next.Eyrie.AvailableLeaders) != 1 || next.Eyrie.AvailableLeaders[0] != game.LeaderCommander {
+		t.Fatalf("expected only commander to remain available, got %+v", next.Eyrie.AvailableLeaders)
+	}
+}
+
 func TestResolveBattleCommanderAddsOneHit(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
