@@ -139,9 +139,11 @@ export const sampleState: GameState = {
     cardsAddedToDecree: 0,
     officerActionsUsed: 0,
     hasOrganized: false,
+    hasRefreshed: false,
     hasSlipped: false,
     usedPersistentEffectIDs: [],
     birdsongMainActionTaken: false,
+    spreadSympathyStarted: false,
     daylightMainActionTaken: false,
     eveningMainActionTaken: false
   }

@@ -111,6 +111,71 @@ func TestApplySpreadSympathyRemovesSupportersAndScores(t *testing.T) {
 	if len(next.Map.Clearings[1].Tokens) != 1 || next.Map.Clearings[1].Tokens[0].Type != game.TokenSympathy {
 		t.Fatalf("expected sympathy token in clearing 2, got %+v", next.Map.Clearings[1].Tokens)
 	}
+	if !next.TurnProgress.SpreadSympathyStarted {
+		t.Fatalf("expected spread sympathy to mark the Alliance Birdsong spread step as started")
+	}
+}
+
+func TestAllianceBirdsongHidesRevoltAfterSpreadSympathyStarts(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	birdCard := firstAllianceTestCard(t, game.Bird)
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Adj:  []int{2},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Adj:  []int{1},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			SympathyPlaced: 1,
+			Supporters:     []game.Card{foxCard, birdCard, rabbitCard},
+		},
+		TurnProgress: game.TurnProgress{
+			SpreadSympathyStarted: true,
+		},
+	}
+
+	actions := ValidActions(state)
+	wantSpread := game.Action{
+		Type: game.ActionSpreadSympathy,
+		SpreadSympathy: &game.SpreadSympathyAction{
+			Faction:          game.Alliance,
+			ClearingID:       2,
+			SupporterCardIDs: []game.CardID{rabbitCard.ID},
+		},
+	}
+	unwantedRevolt := game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	}
+
+	if !containsAction(actions, wantSpread) {
+		t.Fatalf("expected spread sympathy to remain available after the spread step starts, got %+v", actions)
+	}
+	if containsAction(actions, unwantedRevolt) {
+		t.Fatalf("did not expect revolt after spread sympathy starts, got %+v", actions)
+	}
 }
 
 func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {

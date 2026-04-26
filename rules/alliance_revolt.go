@@ -11,6 +11,10 @@ func ValidRevoltActions(state game.GameState) []game.Action {
 		return nil
 	}
 
+	if state.TurnProgress.SpreadSympathyStarted {
+		return nil
+	}
+
 	actions := []game.Action{}
 	for _, clearing := range state.Map.Clearings {
 		if !hasAllianceSympathy(clearing) || allianceHasBaseInSuit(state, clearing.Suit) {

@@ -191,9 +191,11 @@ export interface GameState {
     cardsAddedToDecree: number;
     officerActionsUsed: number;
     hasOrganized: boolean;
+    hasRefreshed: boolean;
     hasSlipped: boolean;
     usedPersistentEffectIDs: string[];
     birdsongMainActionTaken: boolean;
+    spreadSympathyStarted: boolean;
     daylightMainActionTaken: boolean;
     eveningMainActionTaken: boolean;
   };

@@ -59,6 +59,38 @@ func TestResolveBattleVagabondCapsHitsByExhaustedSwords(t *testing.T) {
 	}
 }
 
+func TestApplyDaybreakMarksVagabondRefreshResolved(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemExhausted},
+			},
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionDaybreak,
+		Daybreak: &game.DaybreakAction{
+			Faction:              game.Vagabond,
+			RefreshedItemIndexes: []int{0},
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if !next.TurnProgress.HasRefreshed {
+		t.Fatalf("expected daybreak to mark refresh resolved")
+	}
+	if next.Vagabond.Items[0].Status != game.ItemReady {
+		t.Fatalf("expected exhausted item to refresh, got %v", next.Vagabond.Items[0].Status)
+	}
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected vagabond to remain in birdsong after refresh, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+}
+
 func TestApplyActionVagabondMovementExhaustsBootsAndMoves(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

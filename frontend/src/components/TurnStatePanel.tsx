@@ -290,6 +290,30 @@ export function TurnStatePanel({
             />
             Has Slipped
           </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={state.turnProgress.hasRefreshed}
+              onChange={(event) =>
+                onUpdateState((draft) => {
+                  draft.turnProgress.hasRefreshed = event.target.checked;
+                })
+              }
+            />
+            Has Refreshed
+          </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={state.turnProgress.spreadSympathyStarted}
+              onChange={(event) =>
+                onUpdateState((draft) => {
+                  draft.turnProgress.spreadSympathyStarted = event.target.checked;
+                })
+              }
+            />
+            Spread Sympathy Started
+          </label>
         </div>
       </div>
 

@@ -6,7 +6,7 @@ import (
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
-func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
+func TestValidVagabondBirdsongActionsRequiresRefreshBeforeSlip(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -43,6 +43,52 @@ func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
 			RefreshedItemIndexes: []int{0},
 		},
 	}
+	if !containsAction(got, wantDaybreak) {
+		t.Fatalf("expected daybreak action %+v, got %+v", wantDaybreak, got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionSlip {
+			t.Fatalf("did not expect slip before refresh has been resolved, got %+v", got)
+		}
+		if action.Type == game.ActionPassPhase {
+			t.Fatalf("did not expect pass before slip has been resolved, got %+v", got)
+		}
+	}
+}
+
+func TestValidVagabondBirdsongActionsIncludesSlipAfterRefresh(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:  1,
+					Adj: []int{2},
+				},
+				{
+					ID:  2,
+					Adj: []int{1},
+				},
+			},
+			Forests: []game.Forest{
+				{ID: 1, AdjacentClearings: []int{1}},
+			},
+		},
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemExhausted},
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+		TurnProgress: game.TurnProgress{
+			HasRefreshed: true,
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
 	wantSlip := game.Action{
 		Type: game.ActionSlip,
 		Slip: &game.SlipAction{
@@ -50,10 +96,6 @@ func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
 			From:    1,
 			To:      2,
 		},
-	}
-
-	if !containsAction(got, wantDaybreak) {
-		t.Fatalf("expected daybreak action %+v, got %+v", wantDaybreak, got)
 	}
 	if !containsAction(got, wantSlip) {
 		t.Fatalf("expected slip action %+v, got %+v", wantSlip, got)
@@ -81,9 +123,52 @@ func TestValidVagabondBirdsongActionsIncludesDaybreakAndSlip(t *testing.T) {
 		t.Fatalf("expected forest slip action %+v, got %+v", wantForestSlip, got)
 	}
 	for _, action := range got {
+		if action.Type == game.ActionDaybreak {
+			t.Fatalf("did not expect refresh after refresh has been resolved, got %+v", got)
+		}
 		if action.Type == game.ActionPassPhase {
 			t.Fatalf("did not expect pass before slip has been resolved, got %+v", got)
 		}
+	}
+}
+
+func TestValidVagabondBirdsongActionsAllowsSlipWhenNothingCanRefresh(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:  1,
+					Adj: []int{2},
+				},
+				{
+					ID:  2,
+					Adj: []int{1},
+				},
+			},
+		},
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
+	wantSlip := game.Action{
+		Type: game.ActionSlip,
+		Slip: &game.SlipAction{
+			Faction: game.Vagabond,
+			From:    1,
+			To:      2,
+		},
+	}
+
+	if !containsAction(got, wantSlip) {
+		t.Fatalf("expected slip when nothing can refresh %+v, got %+v", wantSlip, got)
 	}
 }
 

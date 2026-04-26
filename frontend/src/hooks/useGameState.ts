@@ -67,7 +67,9 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.turnProgress.usedWorkshopClearings ??= [];
   normalized.turnProgress.resolvedDecreeCardIDs ??= [];
   normalized.turnProgress.usedPersistentEffectIDs ??= [];
+  normalized.turnProgress.hasRefreshed ??= false;
   normalized.turnProgress.birdsongMainActionTaken ??= false;
+  normalized.turnProgress.spreadSympathyStarted ??= false;
   normalized.turnProgress.daylightMainActionTaken ??= false;
   normalized.turnProgress.eveningMainActionTaken ??= false;
   for (const clearing of normalized.map.clearings) {

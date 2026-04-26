@@ -13,9 +13,11 @@ type TurnProgress struct {
 	CardsAddedToDecree      int
 	OfficerActionsUsed      int
 	HasOrganized            bool
+	HasRefreshed            bool
 	HasSlipped              bool
 	UsedPersistentEffectIDs []string
 	BirdsongMainActionTaken bool
+	SpreadSympathyStarted   bool
 	DaylightMainActionTaken bool
 	EveningMainActionTaken  bool
 }

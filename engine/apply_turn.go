@@ -22,6 +22,7 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 	case game.ActionDaybreak:
 		state.TurnProgress.BirdsongMainActionTaken = true
+		state.TurnProgress.HasRefreshed = true
 		state.CurrentPhase = game.Birdsong
 		state.CurrentStep = game.StepBirdsong
 	case game.ActionSlip:
@@ -133,7 +134,12 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.TurnProgress.DaylightMainActionTaken = true
 		state.CurrentPhase = game.Daylight
 		state.CurrentStep = game.StepDaylightActions
-	case game.ActionSpreadSympathy, game.ActionRevolt:
+	case game.ActionSpreadSympathy:
+		state.TurnProgress.BirdsongMainActionTaken = true
+		state.TurnProgress.SpreadSympathyStarted = true
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+	case game.ActionRevolt:
 		state.TurnProgress.BirdsongMainActionTaken = true
 		state.CurrentPhase = game.Birdsong
 		state.CurrentStep = game.StepBirdsong

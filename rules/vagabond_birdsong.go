@@ -12,20 +12,26 @@ func ValidVagabondBirdsongActions(state game.GameState) []game.Action {
 	}
 
 	actions := []game.Action{}
-	exhausted := vagabondExhaustedItemIndexes(state)
-	refreshLimit := 3 + len(vagabondItemIndexes(state, game.ItemTea, game.ItemReady))
-	if refreshLimit > len(exhausted) {
-		refreshLimit = len(exhausted)
-	}
-	if refreshLimit > 0 {
-		for _, refreshedIndexes := range chooseItemIndexSubsets(exhausted, refreshLimit) {
-			actions = append(actions, game.Action{
-				Type: game.ActionDaybreak,
-				Daybreak: &game.DaybreakAction{
-					Faction:              game.Vagabond,
-					RefreshedItemIndexes: refreshedIndexes,
-				},
-			})
+	if !state.TurnProgress.HasRefreshed {
+		exhausted := vagabondExhaustedItemIndexes(state)
+		refreshLimit := 3 + len(vagabondItemIndexes(state, game.ItemTea, game.ItemReady))
+		if refreshLimit > len(exhausted) {
+			refreshLimit = len(exhausted)
+		}
+		if refreshLimit > 0 {
+			for _, refreshedIndexes := range chooseItemIndexSubsets(exhausted, refreshLimit) {
+				actions = append(actions, game.Action{
+					Type: game.ActionDaybreak,
+					Daybreak: &game.DaybreakAction{
+						Faction:              game.Vagabond,
+						RefreshedItemIndexes: refreshedIndexes,
+					},
+				})
+			}
+		}
+
+		if len(actions) > 0 {
+			return actions
 		}
 	}
 

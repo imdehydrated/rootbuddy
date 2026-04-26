@@ -193,6 +193,39 @@ func TestValidRevoltActionsRequiresSympathyAndTwoSupporters(t *testing.T) {
 	}
 }
 
+func TestValidRevoltActionsStopsAfterSpreadSympathyStarts(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	birdCard := firstCardOfSuit(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   4,
+					Suit: game.Fox,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard, birdCard},
+		},
+		TurnProgress: game.TurnProgress{
+			SpreadSympathyStarted: true,
+		},
+	}
+
+	got := ValidRevoltActions(state)
+	if len(got) != 0 {
+		t.Fatalf("expected no revolt actions after spread sympathy starts, got %+v", got)
+	}
+}
+
 func TestValidMobilizeActionsStopsAtSupporterLimitWithoutBase(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 
