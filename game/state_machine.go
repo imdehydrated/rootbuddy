@@ -11,7 +11,7 @@ type TurnWindow struct {
 
 func DaylightEntryStep(faction Faction) TurnStep {
 	switch faction {
-	case Marquise, Eyrie, Alliance:
+	case Marquise, Eyrie:
 		return StepDaylightCraft
 	default:
 		return StepDaylightActions

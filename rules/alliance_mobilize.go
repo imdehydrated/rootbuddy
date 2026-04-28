@@ -7,7 +7,9 @@ func ValidMobilizeActions(state game.GameState) []game.Action {
 		return nil
 	}
 
-	if state.CurrentStep != game.StepUnspecified && state.CurrentStep != game.StepDaylightActions {
+	if state.CurrentStep != game.StepUnspecified &&
+		state.CurrentStep != game.StepDaylightCraft &&
+		state.CurrentStep != game.StepDaylightActions {
 		return nil
 	}
 

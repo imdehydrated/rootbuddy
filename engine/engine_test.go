@@ -294,29 +294,6 @@ func TestValidActionsUsesDedicatedCraftStepBeforeFactionActions(t *testing.T) {
 			},
 			wantFaction: game.Eyrie,
 		},
-		{
-			name: "alliance",
-			state: game.GameState{
-				Map: game.Map{
-					Clearings: []game.Clearing{
-						{
-							ID:   1,
-							Suit: game.Fox,
-							Buildings: []game.Building{
-								{Faction: game.Alliance, Type: game.Base},
-							},
-						},
-					},
-				},
-				FactionTurn:  game.Alliance,
-				CurrentPhase: game.Daylight,
-				CurrentStep:  game.StepDaylightCraft,
-				Alliance: game.AllianceState{
-					CardsInHand: []game.Card{craftCard},
-				},
-			},
-			wantFaction: game.Alliance,
-		},
 	}
 
 	for _, tt := range tests {
@@ -349,6 +326,73 @@ func TestValidActionsUsesDedicatedCraftStepBeforeFactionActions(t *testing.T) {
 				t.Fatalf("expected craft pass to advance to action step, got phase=%v step=%v", afterPass.CurrentPhase, afterPass.CurrentStep)
 			}
 		})
+	}
+}
+
+func TestValidActionsAllianceDaylightOffersCraftMobilizeAndTrainTogether(t *testing.T) {
+	craftCard := game.Card{
+		ID:   9101,
+		Name: "Alliance Craft",
+		Suit: game.Fox,
+		Kind: game.OneTimeEffectCard,
+		CraftingCost: game.CraftingCost{
+			Fox: 1,
+		},
+	}
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Alliance: game.AllianceState{
+			CardsInHand: []game.Card{craftCard},
+		},
+	}
+
+	actions := ValidActions(state)
+	wantCraft := game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:               game.Alliance,
+			CardID:                craftCard.ID,
+			UsedWorkshopClearings: []int{1},
+		},
+	}
+	wantMobilize := game.Action{
+		Type: game.ActionMobilize,
+		Mobilize: &game.MobilizeAction{
+			Faction: game.Alliance,
+			CardID:  craftCard.ID,
+		},
+	}
+	wantTrain := game.Action{
+		Type: game.ActionTrain,
+		Train: &game.TrainAction{
+			Faction: game.Alliance,
+			CardID:  craftCard.ID,
+		},
+	}
+
+	for _, want := range []game.Action{wantCraft, wantMobilize, wantTrain} {
+		if !containsAction(actions, want) {
+			t.Fatalf("expected Alliance Daylight action %+v, got %+v", want, actions)
+		}
+	}
+
+	next := ApplyAction(state, wantCraft)
+	if next.CurrentPhase != game.Daylight || next.CurrentStep != game.StepDaylightActions {
+		t.Fatalf("expected Alliance craft to remain in Daylight actions, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
 	}
 }
 

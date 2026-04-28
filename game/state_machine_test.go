@@ -10,7 +10,7 @@ func TestTurnWindowDefaultsDaylightToFactionEntryStep(t *testing.T) {
 	}{
 		{name: "marquise", faction: Marquise, wantStep: StepDaylightCraft},
 		{name: "eyrie", faction: Eyrie, wantStep: StepDaylightCraft},
-		{name: "alliance", faction: Alliance, wantStep: StepDaylightCraft},
+		{name: "alliance", faction: Alliance, wantStep: StepDaylightActions},
 		{name: "vagabond", faction: Vagabond, wantStep: StepDaylightActions},
 	}
 

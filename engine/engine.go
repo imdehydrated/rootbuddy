@@ -96,6 +96,8 @@ func validAllianceActions(state game.GameState) []game.Action {
 		actions := rules.ValidAllianceCraftActions(state)
 		actions = append(actions, effectActions(state)...)
 		actions = append(actions, validDominanceActions(state)...)
+		actions = append(actions, rules.ValidMobilizeActions(state)...)
+		actions = append(actions, rules.ValidTrainActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
 			PassPhase: &game.PassPhaseAction{
@@ -106,6 +108,7 @@ func validAllianceActions(state game.GameState) []game.Action {
 	case game.StepDaylightActions:
 		actions := effectActions(state)
 		actions = append(actions, validDominanceActions(state)...)
+		actions = append(actions, rules.ValidAllianceCraftActions(state)...)
 		actions = append(actions, rules.ValidMobilizeActions(state)...)
 		actions = append(actions, rules.ValidTrainActions(state)...)
 		actions = append(actions, game.Action{
