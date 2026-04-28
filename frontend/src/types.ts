@@ -416,6 +416,14 @@ export interface Action {
     clearingID: number;
     observedCardID: number;
   } | null;
+  eyrieEmergency?: {
+    faction: number;
+    count: number;
+  } | null;
+  eyrieNewRoost?: {
+    faction: number;
+    clearingID: number;
+  } | null;
 }
 
 export interface BattleModifiers {

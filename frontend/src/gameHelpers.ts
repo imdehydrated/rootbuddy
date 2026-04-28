@@ -231,6 +231,9 @@ export function affectedClearings(action: Action): HighlightedClearing[] {
         add(clearingID, "affected");
       }
       break;
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      add(action.eyrieNewRoost?.clearingID, "affected");
+      break;
     case ACTION_TYPE.MARQUISE_SETUP:
       add(action.marquiseSetup?.keepClearingID, "affected");
       add(action.marquiseSetup?.sawmillClearingID, "affected");

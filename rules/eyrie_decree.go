@@ -2,6 +2,34 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
+func ValidEyrieEmergencyOrdersActions(state game.GameState) []game.Action {
+	if state.FactionTurn != game.Eyrie || state.CurrentPhase != game.Birdsong {
+		return nil
+	}
+
+	if state.CurrentStep != game.StepUnspecified && state.CurrentStep != game.StepBirdsong {
+		return nil
+	}
+
+	if state.TurnProgress.CardsAddedToDecree > 0 {
+		return nil
+	}
+
+	if state.TurnProgress.EyrieEmergencyResolved || len(state.Eyrie.CardsInHand) > 0 {
+		return nil
+	}
+
+	return []game.Action{
+		{
+			Type: game.ActionEyrieEmergencyOrders,
+			EyrieEmergency: &game.EyrieEmergencyOrdersAction{
+				Faction: game.Eyrie,
+				Count:   1,
+			},
+		},
+	}
+}
+
 func addToDecreeActionsForCards(cards []game.Card) []game.Action {
 	actions := []game.Action{}
 
@@ -73,11 +101,97 @@ func ValidAddToDecreeActions(state game.GameState) []game.Action {
 		return []game.Action{}
 	}
 
+	if state.TurnProgress.CardsAddedToDecree > 0 {
+		return []game.Action{}
+	}
+
+	if len(ValidEyrieEmergencyOrdersActions(state)) > 0 {
+		return []game.Action{}
+	}
+
 	if len(state.Eyrie.CardsInHand) == 0 {
 		return []game.Action{}
 	}
 
 	return addToDecreeActionsForCards(state.Eyrie.CardsInHand)
+}
+
+func ValidEyrieNewRoostActions(state game.GameState) []game.Action {
+	if state.FactionTurn != game.Eyrie || state.CurrentPhase != game.Birdsong {
+		return nil
+	}
+
+	if state.CurrentStep != game.StepUnspecified && state.CurrentStep != game.StepBirdsong {
+		return nil
+	}
+
+	if state.TurnProgress.CardsAddedToDecree == 0 || state.TurnProgress.EyrieNewRoostResolved || eyrieHasRoost(state) {
+		return nil
+	}
+
+	if state.Eyrie.WarriorSupply < 3 || state.Eyrie.RoostsPlaced >= 7 {
+		return nil
+	}
+
+	minWarriors := 0
+	candidates := []game.Clearing{}
+	for _, clearing := range state.Map.Clearings {
+		if !hasOpenBuildSlot(clearing) {
+			continue
+		}
+
+		warriors := totalWarriors(clearing)
+		if len(candidates) == 0 || warriors < minWarriors {
+			minWarriors = warriors
+			candidates = []game.Clearing{clearing}
+			continue
+		}
+		if warriors == minWarriors {
+			candidates = append(candidates, clearing)
+		}
+	}
+
+	actions := make([]game.Action, 0, len(candidates))
+	for _, clearing := range candidates {
+		actions = append(actions, game.Action{
+			Type: game.ActionEyrieNewRoost,
+			EyrieNewRoost: &game.EyrieNewRoostAction{
+				Faction:    game.Eyrie,
+				ClearingID: clearing.ID,
+			},
+		})
+	}
+
+	return actions
+}
+
+func ValidEyrieBirdsongActions(state game.GameState) []game.Action {
+	if emergencyActions := ValidEyrieEmergencyOrdersActions(state); len(emergencyActions) > 0 {
+		return emergencyActions
+	}
+
+	if decreeActions := ValidAddToDecreeActions(state); len(decreeActions) > 0 {
+		return decreeActions
+	}
+
+	if newRoostActions := ValidEyrieNewRoostActions(state); len(newRoostActions) > 0 {
+		return newRoostActions
+	}
+
+	if state.FactionTurn == game.Eyrie && state.CurrentPhase == game.Birdsong &&
+		(state.CurrentStep == game.StepUnspecified || state.CurrentStep == game.StepBirdsong) &&
+		state.TurnProgress.CardsAddedToDecree > 0 {
+		return []game.Action{
+			{
+				Type: game.ActionPassPhase,
+				PassPhase: &game.PassPhaseAction{
+					Faction: game.Eyrie,
+				},
+			},
+		}
+	}
+
+	return nil
 }
 
 func ValidEyrieDaylightActions(state game.GameState) []game.Action {

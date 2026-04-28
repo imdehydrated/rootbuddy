@@ -55,7 +55,7 @@ func validEyrieActions(state game.GameState) []game.Action {
 	switch effectiveStep(state) {
 	case game.StepBirdsong:
 		actions := effectActions(state)
-		return append(actions, rules.ValidAddToDecreeActions(state)...)
+		return append(actions, rules.ValidEyrieBirdsongActions(state)...)
 	case game.StepDaylightCraft:
 		actions := rules.ValidEyrieCraftActions(state)
 		actions = append(actions, effectActions(state)...)

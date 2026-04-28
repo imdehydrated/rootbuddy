@@ -94,6 +94,8 @@ export function buildRecruitClearingIDs(action: Action | null | undefined): numb
       return action.recruit?.clearingIDs ?? [];
     case ACTION_TYPE.OVERWORK:
       return action.overwork?.clearingID ? [action.overwork.clearingID] : [];
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return action.eyrieNewRoost?.clearingID ? [action.eyrieNewRoost.clearingID] : [];
     default:
       return [];
   }

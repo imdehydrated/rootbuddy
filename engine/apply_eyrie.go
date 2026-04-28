@@ -26,6 +26,7 @@ func applyAddToDecree(state *game.GameState, action game.Action) {
 	state.TurnProgress.ResolvedDecreeCardIDs = nil
 	state.TurnProgress.DecreeColumnsResolved = 0
 	state.TurnProgress.DecreeCardsResolved = 0
+	state.TurnProgress.CardsAddedToDecree = len(action.AddToDecree.CardIDs)
 
 	for i, cardID := range action.AddToDecree.CardIDs {
 		if i >= len(action.AddToDecree.Columns) {
@@ -38,6 +39,55 @@ func applyAddToDecree(state *game.GameState, action game.Action) {
 
 		appendCardToDecree(&state.Eyrie.Decree, action.AddToDecree.Columns[i], cardID)
 	}
+}
+
+func applyEyrieEmergencyOrders(state *game.GameState, action game.Action) {
+	if action.EyrieEmergency == nil {
+		return
+	}
+
+	DrawCards(state, action.EyrieEmergency.Faction, action.EyrieEmergency.Count)
+}
+
+func eyrieHasRoostOnMap(state game.GameState) bool {
+	for _, clearing := range state.Map.Clearings {
+		for _, building := range clearing.Buildings {
+			if building.Faction == game.Eyrie && building.Type == game.Roost {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func clearingHasOpenBuildSlot(clearing game.Clearing) bool {
+	usedSlots := len(clearing.Buildings)
+	if clearing.Ruins {
+		usedSlots++
+	}
+	return usedSlots < clearing.BuildSlots
+}
+
+func applyEyrieNewRoost(state *game.GameState, action game.Action) {
+	if action.EyrieNewRoost == nil || eyrieHasRoostOnMap(*state) || state.Eyrie.WarriorSupply < 3 || state.Eyrie.RoostsPlaced >= 7 {
+		return
+	}
+
+	index := findClearingIndex(state.Map, action.EyrieNewRoost.ClearingID)
+	if index == -1 || !clearingHasOpenBuildSlot(state.Map.Clearings[index]) {
+		return
+	}
+
+	state.Map.Clearings[index].Buildings = append(state.Map.Clearings[index].Buildings, game.Building{
+		Faction: game.Eyrie,
+		Type:    game.Roost,
+	})
+	if state.Map.Clearings[index].Warriors == nil {
+		state.Map.Clearings[index].Warriors = map[game.Faction]int{}
+	}
+	state.Map.Clearings[index].Warriors[game.Eyrie] += 3
+	state.Eyrie.WarriorSupply -= 3
+	state.Eyrie.RoostsPlaced++
 }
 
 func removeLeader(leaders []game.EyrieLeader, remove game.EyrieLeader) []game.EyrieLeader {

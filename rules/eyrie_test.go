@@ -60,6 +60,102 @@ func TestValidAddToDecreeActions(t *testing.T) {
 	}
 }
 
+func TestValidEyrieBirdsongActionsRequiresEmergencyOrdersBeforeDecree(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+	}
+
+	got := ValidEyrieBirdsongActions(state)
+	want := game.Action{
+		Type: game.ActionEyrieEmergencyOrders,
+		EyrieEmergency: &game.EyrieEmergencyOrdersAction{
+			Faction: game.Eyrie,
+			Count:   1,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected emergency orders action %+v, got %+v", want, got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionAddToDecree {
+			t.Fatalf("did not expect add to decree before emergency orders, got %+v", got)
+		}
+	}
+}
+
+func TestValidEyrieBirdsongActionsOffersNewRoostAfterDecreeWhenNoRoosts(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+				},
+				{
+					ID:         2,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:         3,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Eyrie: game.EyrieState{
+			WarriorSupply: 3,
+		},
+		TurnProgress: game.TurnProgress{
+			CardsAddedToDecree:     1,
+			EyrieEmergencyResolved: true,
+		},
+	}
+
+	got := ValidEyrieBirdsongActions(state)
+	wantTwo := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 2,
+		},
+	}
+	wantThree := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 3,
+		},
+	}
+	unwantedOne := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 1,
+		},
+	}
+
+	if !containsAction(got, wantTwo) || !containsAction(got, wantThree) {
+		t.Fatalf("expected new roost in fewest-warrior clearings %+v and %+v, got %+v", wantTwo, wantThree, got)
+	}
+	if containsAction(got, unwantedOne) {
+		t.Fatalf("did not expect new roost in higher-warrior clearing, got %+v", got)
+	}
+}
+
 func TestValidEyrieRecruitActionsCharismaticRecruitsTwoWarriors(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	state := game.GameState{

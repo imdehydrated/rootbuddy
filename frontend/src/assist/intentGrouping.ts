@@ -46,6 +46,8 @@ export function actionIntentKey(action: Action): AssistIntentKey {
     case ACTION_TYPE.DAYBREAK:
     case ACTION_TYPE.BIRDSONG_WOOD:
     case ACTION_TYPE.SCORE_ROOSTS:
+    case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
       return "faction";
     case ACTION_TYPE.EVENING_DRAW:
     case ACTION_TYPE.OTHER_PLAYER_DRAW:

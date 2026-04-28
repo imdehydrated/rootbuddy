@@ -49,6 +49,16 @@ func TestValidActionsEyrieBirdsongReturnsAddToDecreeAction(t *testing.T) {
 func TestApplyActionAddToDecreeAdvancesToDaylightAndRemovesCard(t *testing.T) {
 	foxCard := firstEyrieTestCard(t, game.Fox)
 	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
 		FactionTurn:  game.Eyrie,
 		CurrentPhase: game.Birdsong,
 		CurrentStep:  game.StepBirdsong,
@@ -75,6 +85,111 @@ func TestApplyActionAddToDecreeAdvancesToDaylightAndRemovesCard(t *testing.T) {
 	}
 	if len(next.Eyrie.Decree.Recruit) != 1 || next.Eyrie.Decree.Recruit[0] != foxCard.ID {
 		t.Fatalf("expected decree recruit column to contain card %d, got %+v", foxCard.ID, next.Eyrie.Decree.Recruit)
+	}
+}
+
+func TestApplyEyrieEmergencyOrdersDrawsAndStaysInBirdsong(t *testing.T) {
+	foxCard := firstEyrieTestCard(t, game.Fox)
+	state := game.GameState{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Eyrie,
+		FactionTurn:   game.Eyrie,
+		CurrentPhase:  game.Birdsong,
+		CurrentStep:   game.StepBirdsong,
+		Deck:          []game.CardID{foxCard.ID},
+	}
+
+	action := game.Action{
+		Type: game.ActionEyrieEmergencyOrders,
+		EyrieEmergency: &game.EyrieEmergencyOrdersAction{
+			Faction: game.Eyrie,
+			Count:   1,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if len(next.Eyrie.CardsInHand) != 1 || next.Eyrie.CardsInHand[0].ID != foxCard.ID {
+		t.Fatalf("expected emergency orders to draw card %d, got %+v", foxCard.ID, next.Eyrie.CardsInHand)
+	}
+	if !next.TurnProgress.EyrieEmergencyResolved {
+		t.Fatalf("expected emergency orders to mark the step resolved")
+	}
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected emergency orders to stay in birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+}
+
+func TestApplyAddToDecreeWithoutRoostStaysInBirdsongForNewRoost(t *testing.T) {
+	foxCard := firstEyrieTestCard(t, game.Fox)
+	state := game.GameState{
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{foxCard},
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionAddToDecree,
+		AddToDecree: &game.AddToDecreeAction{
+			Faction: game.Eyrie,
+			CardIDs: []game.CardID{foxCard.ID},
+			Columns: []game.DecreeColumn{game.DecreeRecruit},
+		},
+	}
+
+	next := ApplyAction(state, action)
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected add-to-decree without roost to stay in birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if next.TurnProgress.CardsAddedToDecree != 1 {
+		t.Fatalf("expected add-to-decree to mark one added card, got %+v", next.TurnProgress)
+	}
+}
+
+func TestApplyEyrieNewRoostPlacesRoostWarriorsAndAdvances(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         2,
+					BuildSlots: 1,
+				},
+			},
+		},
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Eyrie: game.EyrieState{
+			WarriorSupply: 4,
+		},
+		TurnProgress: game.TurnProgress{
+			CardsAddedToDecree: 1,
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 2,
+		},
+	}
+
+	next := ApplyAction(state, action)
+	clearing := next.Map.Clearings[0]
+	if len(clearing.Buildings) != 1 || clearing.Buildings[0].Faction != game.Eyrie || clearing.Buildings[0].Type != game.Roost {
+		t.Fatalf("expected eyrie roost in clearing 2, got %+v", clearing.Buildings)
+	}
+	if clearing.Warriors[game.Eyrie] != 3 {
+		t.Fatalf("expected three eyrie warriors in new roost clearing, got %+v", clearing.Warriors)
+	}
+	if next.Eyrie.WarriorSupply != 1 || next.Eyrie.RoostsPlaced != 1 {
+		t.Fatalf("expected roost and warrior supply counters to update, got %+v", next.Eyrie)
+	}
+	if next.CurrentPhase != game.Daylight || next.CurrentStep != game.StepDaylightCraft {
+		t.Fatalf("expected new roost to advance to daylight craft, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
 	}
 }
 

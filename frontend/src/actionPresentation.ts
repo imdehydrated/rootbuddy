@@ -92,6 +92,10 @@ export function actionHeadline(action: Action): string {
       return "Strike";
     case ACTION_TYPE.ADD_TO_DECREE:
       return "Add To Decree";
+    case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
+      return "Emergency Orders";
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return "New Roost";
     case ACTION_TYPE.SPREAD_SYMPATHY:
       return "Spread Sympathy";
     case ACTION_TYPE.REVOLT:
@@ -171,6 +175,8 @@ export function actionContextTags(action: Action): string[] {
       return [`Clearing ${action.revolt?.clearingID ?? "?"}`];
     case ACTION_TYPE.ADD_TO_DECREE:
       return (action.addToDecree?.columns ?? []).map((column) => `Column ${column}`);
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return [`Clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`];
     case ACTION_TYPE.AID:
       return [`Clearing ${action.aid?.clearingID ?? "?"}`, `Target ${factionLabels[action.aid?.targetFaction ?? -1] ?? "?"}`];
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
@@ -225,6 +231,10 @@ export function describeAction(action: Action, state?: GameState): string {
       return `Craft ${describeKnownCardID(action.craft?.cardID ?? 0)}`;
     case ACTION_TYPE.ADD_TO_DECREE:
       return `Add decree cards ${(action.addToDecree?.cardIDs ?? []).map((cardID) => describeKnownCardID(cardID)).join(", ")}`;
+    case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
+      return `Draw ${action.eyrieEmergency?.count ?? 1} emergency card(s)`;
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return `Place a new roost in clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`;
     case ACTION_TYPE.SPREAD_SYMPATHY:
       return `Spread sympathy to clearing ${action.spreadSympathy?.clearingID ?? "?"}`;
     case ACTION_TYPE.REVOLT:

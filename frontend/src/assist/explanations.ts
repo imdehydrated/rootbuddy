@@ -57,6 +57,10 @@ export function actionExplanation(action: Action, state: GameState): string {
       return `Draw ${action.eveningDraw?.count ?? 0} card(s). Take this when the turn is functionally complete and more board actions are no longer available.`;
     case ACTION_TYPE.SCORE_ROOSTS:
       return `Score ${action.scoreRoosts?.points ?? 0} point(s) from roost count. This is bookkeeping progress for the Eyrie end step.`;
+    case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
+      return "Resolve Emergency Orders by drawing one card before adding to the decree.";
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return `Place the replacement roost and three warriors in clearing ${action.eyrieNewRoost?.clearingID ?? "?"} before Daylight begins.`;
     case ACTION_TYPE.PASS_PHASE:
       return `Advance the turn flow from ${factionLabels[state.factionTurn] ?? "the active faction"}'s current phase. Use this only when the meaningful actions for the phase are actually done.`;
     case ACTION_TYPE.ACTIVATE_DOMINANCE:

@@ -38,6 +38,8 @@ type Action struct {
 	EyrieSetup          *EyrieSetupAction
 	VagabondSetup       *VagabondSetupAction
 	UsePersistentEffect *UsePersistentEffectAction
+	EyrieEmergency      *EyrieEmergencyOrdersAction
+	EyrieNewRoost       *EyrieNewRoostAction
 }
 
 type ActionType int
@@ -79,6 +81,8 @@ const (
 	ActionEyrieSetup
 	ActionVagabondSetup
 	ActionUsePersistentEffect
+	ActionEyrieEmergencyOrders
+	ActionEyrieNewRoost
 )
 
 type MovementAction struct {
@@ -351,4 +355,14 @@ type UsePersistentEffectAction struct {
 	TargetFaction  Faction
 	ClearingID     int
 	ObservedCardID CardID
+}
+
+type EyrieEmergencyOrdersAction struct {
+	Faction Faction
+	Count   int
+}
+
+type EyrieNewRoostAction struct {
+	Faction    Faction
+	ClearingID int
 }

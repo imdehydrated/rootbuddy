@@ -14,6 +14,21 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 	switch action.Type {
 	case game.ActionAddToDecree:
 		state.TurnProgress.BirdsongMainActionTaken = true
+		if state.FactionTurn == game.Eyrie && !eyrieHasRoostOnMap(*state) {
+			state.CurrentPhase = game.Birdsong
+			state.CurrentStep = game.StepBirdsong
+		} else {
+			state.CurrentPhase = game.Daylight
+			state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
+		}
+	case game.ActionEyrieEmergencyOrders:
+		state.TurnProgress.BirdsongMainActionTaken = true
+		state.TurnProgress.EyrieEmergencyResolved = true
+		state.CurrentPhase = game.Birdsong
+		state.CurrentStep = game.StepBirdsong
+	case game.ActionEyrieNewRoost:
+		state.TurnProgress.BirdsongMainActionTaken = true
+		state.TurnProgress.EyrieNewRoostResolved = true
 		state.CurrentPhase = game.Daylight
 		state.CurrentStep = game.DaylightEntryStep(state.FactionTurn)
 	case game.ActionBirdsongWood:

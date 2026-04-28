@@ -93,6 +93,26 @@ func roostClearings(state game.GameState) []game.Clearing {
 	return clearings
 }
 
+func eyrieHasRoost(state game.GameState) bool {
+	return len(roostClearings(state)) > 0
+}
+
+func totalWarriors(clearing game.Clearing) int {
+	total := 0
+	for _, count := range clearing.Warriors {
+		total += count
+	}
+	return total
+}
+
+func hasOpenBuildSlot(clearing game.Clearing) bool {
+	usedSlots := len(clearing.Buildings)
+	if clearing.Ruins {
+		usedSlots++
+	}
+	return usedSlots < clearing.BuildSlots
+}
+
 func roostCountInClearing(c game.Clearing) int {
 	count := 0
 	for _, building := range c.Buildings {

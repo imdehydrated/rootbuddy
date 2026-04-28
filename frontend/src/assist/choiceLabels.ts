@@ -58,6 +58,10 @@ export function factionChoiceLabel(action: Action, state: GameState): string | n
       return `Place wood in clearings ${(action.birdsongWood?.clearingIDs ?? []).join(", ")}`;
     case ACTION_TYPE.SCORE_ROOSTS:
       return `Score ${action.scoreRoosts?.points ?? 0} roost point(s)`;
+    case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
+      return `Emergency Orders: draw ${action.eyrieEmergency?.count ?? 1}`;
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return `New Roost in clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`;
     default:
       return null;
   }
@@ -87,6 +91,8 @@ export function factionSpatialChoiceLabel(action: Action): string | null {
       return `Revolt in clearing ${action.revolt?.clearingID ?? "?"}`;
     case ACTION_TYPE.ORGANIZE:
       return `Organize clearing ${action.organize?.clearingID ?? "?"}`;
+    case ACTION_TYPE.EYRIE_NEW_ROOST:
+      return `New Roost in clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`;
     case ACTION_TYPE.EXPLORE:
       return `Explore clearing ${action.explore?.clearingID ?? "?"}`;
     case ACTION_TYPE.AID:

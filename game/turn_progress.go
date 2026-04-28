@@ -11,6 +11,8 @@ type TurnProgress struct {
 	DecreeCardsResolved     int
 	ResolvedDecreeCardIDs   []CardID
 	CardsAddedToDecree      int
+	EyrieEmergencyResolved  bool
+	EyrieNewRoostResolved   bool
 	OfficerActionsUsed      int
 	HasOrganized            bool
 	HasRefreshed            bool
