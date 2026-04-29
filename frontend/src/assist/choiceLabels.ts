@@ -62,6 +62,12 @@ export function factionChoiceLabel(action: Action, state: GameState): string | n
       return `Emergency Orders: draw ${action.eyrieEmergency?.count ?? 1}`;
     case ACTION_TYPE.EYRIE_NEW_ROOST:
       return `New Roost in clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`;
+    case ACTION_TYPE.VAGABOND_REST:
+      return "Rest";
+    case ACTION_TYPE.VAGABOND_DISCARD:
+      return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).map(describeKnownCardID).join(", ") || "no cards"}`;
+    case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
+      return `Capacity: remove ${(action.vagabondCapacity?.itemIndexes ?? []).map((index) => itemIndexLabel(state, index)).join(", ") || "no items"}`;
     default:
       return null;
   }

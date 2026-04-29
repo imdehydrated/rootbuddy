@@ -96,6 +96,12 @@ export function actionHeadline(action: Action): string {
       return "Emergency Orders";
     case ACTION_TYPE.EYRIE_NEW_ROOST:
       return "New Roost";
+    case ACTION_TYPE.VAGABOND_REST:
+      return "Rest";
+    case ACTION_TYPE.VAGABOND_DISCARD:
+      return "Discard Cards";
+    case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
+      return "Check Capacity";
     case ACTION_TYPE.SPREAD_SYMPATHY:
       return "Spread Sympathy";
     case ACTION_TYPE.REVOLT:
@@ -152,6 +158,8 @@ export function actionCardReferences(action: Action): ActionCardReference[] {
       return action.addCardToHand?.cardID ? [{ cardID: action.addCardToHand.cardID, zoneLabel: "Hand" }] : [];
     case ACTION_TYPE.REMOVE_CARD_FROM_HAND:
       return action.removeCardFromHand?.cardID ? [{ cardID: action.removeCardFromHand.cardID, zoneLabel: "Hand" }] : [];
+    case ACTION_TYPE.VAGABOND_DISCARD:
+      return (action.vagabondDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
     default:
       return [];
   }
@@ -271,6 +279,12 @@ export function describeAction(action: Action, state?: GameState): string {
       return `Place wood in clearings ${(action.birdsongWood?.clearingIDs ?? []).join(", ")}`;
     case ACTION_TYPE.EVENING_DRAW:
       return `Draw ${action.eveningDraw?.count ?? 0} card(s)`;
+    case ACTION_TYPE.VAGABOND_REST:
+      return "Resolve Rest";
+    case ACTION_TYPE.VAGABOND_DISCARD:
+      return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).map((cardID) => describeKnownCardID(cardID)).join(", ") || "no cards"}`;
+    case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
+      return `Remove ${(action.vagabondCapacity?.itemIndexes ?? []).length} item(s) for capacity`;
     case ACTION_TYPE.SCORE_ROOSTS:
       return `Score ${action.scoreRoosts?.points ?? 0} roost point(s)`;
     case ACTION_TYPE.PASS_PHASE:

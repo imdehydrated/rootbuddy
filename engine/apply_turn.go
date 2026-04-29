@@ -177,6 +177,20 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.TurnProgress.EveningMainActionTaken = true
 		state.CurrentPhase = game.Evening
 		state.CurrentStep = game.StepEvening
+	case game.ActionVagabondRest:
+		state.TurnProgress.EveningMainActionTaken = true
+		state.TurnProgress.VagabondRestResolved = true
+		state.CurrentPhase = game.Evening
+		state.CurrentStep = game.StepEvening
+	case game.ActionVagabondDiscard:
+		state.TurnProgress.EveningMainActionTaken = true
+		state.TurnProgress.VagabondDiscardResolved = true
+		state.CurrentPhase = game.Evening
+		state.CurrentStep = game.StepEvening
+	case game.ActionVagabondItemCapacity:
+		state.TurnProgress.EveningMainActionTaken = true
+		state.TurnProgress.VagabondCapacityChecked = true
+		beginNextFactionTurn(state)
 	case game.ActionPassPhase:
 		switch state.CurrentPhase {
 		case game.Birdsong:
@@ -195,11 +209,22 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 				state.CurrentStep = game.StepEvening
 			}
 		case game.Evening:
+			if state.FactionTurn == game.Vagabond && !state.TurnProgress.VagabondCapacityChecked {
+				state.CurrentPhase = game.Evening
+				state.CurrentStep = game.StepEvening
+				return
+			}
 			beginNextFactionTurn(state)
 		}
 	case game.ActionEveningDraw:
 		state.TurnProgress.EveningMainActionTaken = true
-		beginNextFactionTurn(state)
+		if action.EveningDraw != nil && action.EveningDraw.Faction == game.Vagabond {
+			state.TurnProgress.VagabondEveningDrawn = true
+			state.CurrentPhase = game.Evening
+			state.CurrentStep = game.StepEvening
+		} else {
+			beginNextFactionTurn(state)
+		}
 	case game.ActionDiscardEffect:
 		state.CurrentStep = game.StepDaylightActions
 	case game.ActionUsePersistentEffect:

@@ -79,32 +79,6 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 			},
 			wantFaction: game.Vagabond,
 		},
-		{
-			name: "vagabond draw wraps to marquise",
-			state: game.GameState{
-				FactionTurn:  game.Vagabond,
-				CurrentPhase: game.Evening,
-				CurrentStep:  game.StepEvening,
-				TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
-				TurnProgress: game.TurnProgress{
-					HasSlipped: true,
-				},
-				Vagabond: game.VagabondState{
-					InForest: true,
-					Items: []game.Item{
-						{Type: game.ItemSword, Status: game.ItemDamaged},
-					},
-				},
-			},
-			action: game.Action{
-				Type: game.ActionEveningDraw,
-				EveningDraw: &game.EveningDrawAction{
-					Faction: game.Vagabond,
-					Count:   1,
-				},
-			},
-			wantFaction: game.Marquise,
-		},
 	}
 
 	for _, tt := range tests {
@@ -124,6 +98,67 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 				t.Fatalf("expected turn order to be preserved, got %+v", next.TurnOrder)
 			}
 		})
+	}
+}
+
+func TestApplyActionVagabondEveningDrawStaysInEveningForDiscard(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved: true,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionEveningDraw,
+		EveningDraw: &game.EveningDrawAction{
+			Faction: game.Vagabond,
+			Count:   1,
+		},
+	})
+
+	if next.FactionTurn != game.Vagabond {
+		t.Fatalf("expected Vagabond turn to continue after draw, got %v", next.FactionTurn)
+	}
+	if next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+		t.Fatalf("expected Vagabond to remain in evening after draw, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if !next.TurnProgress.VagabondEveningDrawn {
+		t.Fatalf("expected Vagabond evening draw to be marked resolved")
+	}
+}
+
+func TestApplyActionVagabondItemCapacityAdvancesTurnOrderAndResetsProgress(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved:    true,
+			VagabondEveningDrawn:    true,
+			VagabondDiscardResolved: true,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondItemCapacity,
+		VagabondCapacity: &game.VagabondItemCapacityAction{
+			Faction: game.Vagabond,
+		},
+	})
+
+	if next.FactionTurn != game.Marquise {
+		t.Fatalf("expected Vagabond capacity check to advance to Marquise, got %v", next.FactionTurn)
+	}
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if !reflect.DeepEqual(next.TurnProgress, game.TurnProgress{}) {
+		t.Fatalf("expected turn progress reset, got %+v", next.TurnProgress)
 	}
 }
 

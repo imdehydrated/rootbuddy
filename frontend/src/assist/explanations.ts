@@ -61,6 +61,12 @@ export function actionExplanation(action: Action, state: GameState): string {
       return "Resolve Emergency Orders by drawing one card before adding to the decree.";
     case ACTION_TYPE.EYRIE_NEW_ROOST:
       return `Place the replacement roost and three warriors in clearing ${action.eyrieNewRoost?.clearingID ?? "?"} before Daylight begins.`;
+    case ACTION_TYPE.VAGABOND_REST:
+      return "Resolve Rest before drawing. If the Vagabond is in a forest, all damaged items are repaired.";
+    case ACTION_TYPE.VAGABOND_DISCARD:
+      return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).length} card(s) so the Vagabond hand is at the Evening limit.`;
+    case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
+      return `Resolve item capacity by removing ${(action.vagabondCapacity?.itemIndexes ?? []).length} item(s), then end the Vagabond turn.`;
     case ACTION_TYPE.PASS_PHASE:
       return `Advance the turn flow from ${factionLabels[state.factionTurn] ?? "the active faction"}'s current phase. Use this only when the meaningful actions for the phase are actually done.`;
     case ACTION_TYPE.ACTIVATE_DOMINANCE:

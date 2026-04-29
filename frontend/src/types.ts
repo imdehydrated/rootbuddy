@@ -193,6 +193,12 @@ export interface GameState {
     hasOrganized: boolean;
     hasRefreshed: boolean;
     hasSlipped: boolean;
+    eyrieEmergencyResolved: boolean;
+    eyrieNewRoostResolved: boolean;
+    vagabondRestResolved: boolean;
+    vagabondEveningDrawn: boolean;
+    vagabondDiscardResolved: boolean;
+    vagabondCapacityChecked: boolean;
     usedPersistentEffectIDs: string[];
     birdsongMainActionTaken: boolean;
     spreadSympathyStarted: boolean;
@@ -423,6 +429,17 @@ export interface Action {
   eyrieNewRoost?: {
     faction: number;
     clearingID: number;
+  } | null;
+  vagabondRest?: {
+    faction: number;
+  } | null;
+  vagabondDiscard?: {
+    faction: number;
+    cardIDs: number[];
+  } | null;
+  vagabondCapacity?: {
+    faction: number;
+    itemIndexes: number[];
   } | null;
 }
 

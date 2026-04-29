@@ -17,6 +17,10 @@ type TurnProgress struct {
 	HasOrganized            bool
 	HasRefreshed            bool
 	HasSlipped              bool
+	VagabondRestResolved    bool
+	VagabondEveningDrawn    bool
+	VagabondDiscardResolved bool
+	VagabondCapacityChecked bool
 	UsedPersistentEffectIDs []string
 	BirdsongMainActionTaken bool
 	SpreadSympathyStarted   bool

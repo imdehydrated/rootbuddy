@@ -1,6 +1,10 @@
 package engine
 
-import "github.com/imdehydrated/rootbuddy/game"
+import (
+	"sort"
+
+	"github.com/imdehydrated/rootbuddy/game"
+)
 
 func vagabondRelationshipLevel(state game.GameState, faction game.Faction) game.RelationshipLevel {
 	if state.Vagabond.Relationships == nil {
@@ -484,6 +488,43 @@ func applyRepair(state *game.GameState, action game.Action) {
 	}
 
 	repairDamagedItem(state, action.Repair.ItemIndex)
+}
+
+func applyVagabondRest(state *game.GameState, action game.Action) {
+	if action.VagabondRest == nil || action.VagabondRest.Faction != game.Vagabond {
+		return
+	}
+
+	if state.Vagabond.InForest {
+		repairAllDamagedItems(state)
+	}
+}
+
+func applyVagabondDiscard(state *game.GameState, action game.Action) {
+	if action.VagabondDiscard == nil || action.VagabondDiscard.Faction != game.Vagabond {
+		return
+	}
+
+	for _, cardID := range action.VagabondDiscard.CardIDs {
+		if _, ok := spendFactionHandCard(state, game.Vagabond, cardID); ok {
+			DiscardCard(state, cardID)
+		}
+	}
+}
+
+func applyVagabondItemCapacity(state *game.GameState, action game.Action) {
+	if action.VagabondCapacity == nil || action.VagabondCapacity.Faction != game.Vagabond {
+		return
+	}
+
+	indexes := append([]int(nil), action.VagabondCapacity.ItemIndexes...)
+	sort.Sort(sort.Reverse(sort.IntSlice(indexes)))
+	for _, index := range indexes {
+		if index < 0 || index >= len(state.Vagabond.Items) {
+			continue
+		}
+		state.Vagabond.Items = append(state.Vagabond.Items[:index], state.Vagabond.Items[index+1:]...)
+	}
 }
 
 func vagabondItemIndexesByStatus(state game.GameState, itemType game.ItemType, status game.ItemStatus) []int {

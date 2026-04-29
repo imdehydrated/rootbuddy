@@ -56,10 +56,6 @@ func applyEveningDraw(state *game.GameState, action game.Action) {
 		return
 	}
 
-	if action.EveningDraw.Faction == game.Vagabond && state.Vagabond.InForest {
-		repairAllDamagedItems(state)
-	}
-
 	DrawCards(state, action.EveningDraw.Faction, action.EveningDraw.Count)
 }
 

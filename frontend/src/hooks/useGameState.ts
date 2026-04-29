@@ -68,6 +68,12 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.turnProgress.resolvedDecreeCardIDs ??= [];
   normalized.turnProgress.usedPersistentEffectIDs ??= [];
   normalized.turnProgress.hasRefreshed ??= false;
+  normalized.turnProgress.eyrieEmergencyResolved ??= false;
+  normalized.turnProgress.eyrieNewRoostResolved ??= false;
+  normalized.turnProgress.vagabondRestResolved ??= false;
+  normalized.turnProgress.vagabondEveningDrawn ??= false;
+  normalized.turnProgress.vagabondDiscardResolved ??= false;
+  normalized.turnProgress.vagabondCapacityChecked ??= false;
   normalized.turnProgress.birdsongMainActionTaken ??= false;
   normalized.turnProgress.spreadSympathyStarted ??= false;
   normalized.turnProgress.daylightMainActionTaken ??= false;

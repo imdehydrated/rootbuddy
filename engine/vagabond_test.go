@@ -300,10 +300,9 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 	}
 
 	action := game.Action{
-		Type: game.ActionEveningDraw,
-		EveningDraw: &game.EveningDrawAction{
+		Type: game.ActionVagabondRest,
+		VagabondRest: &game.VagabondRestAction{
 			Faction: game.Vagabond,
-			Count:   1,
 		},
 	}
 
@@ -312,6 +311,73 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 		if item.Status != game.ItemReady {
 			t.Fatalf("expected forest rest to repair all items, got %+v", next.Vagabond.Items)
 		}
+	}
+}
+
+func TestApplyVagabondDiscardRemovesSelectedCards(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	rabbitCard := firstVagabondTestCard(t, game.Rabbit)
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard, rabbitCard},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondDiscard,
+		VagabondDiscard: &game.VagabondDiscardAction{
+			Faction: game.Vagabond,
+			CardIDs: []game.CardID{
+				foxCard.ID,
+			},
+		},
+	})
+
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.CardsInHand[0].ID != rabbitCard.ID {
+		t.Fatalf("expected only rabbit card to remain, got %+v", next.Vagabond.CardsInHand)
+	}
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != foxCard.ID {
+		t.Fatalf("expected fox card in discard pile, got %+v", next.DiscardPile)
+	}
+	if !next.TurnProgress.VagabondDiscardResolved {
+		t.Fatalf("expected discard step to be marked resolved")
+	}
+}
+
+func TestApplyVagabondItemCapacityRemovesSelectedItems(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondItemCapacity,
+		VagabondCapacity: &game.VagabondItemCapacityAction{
+			Faction:     game.Vagabond,
+			ItemIndexes: []int{1},
+		},
+	})
+
+	if len(next.Vagabond.Items) != 2 {
+		t.Fatalf("expected one item removed, got %+v", next.Vagabond.Items)
+	}
+	if next.Vagabond.Items[0].Type != game.ItemBoots || next.Vagabond.Items[1].Type != game.ItemTorch {
+		t.Fatalf("expected selected sword to be removed, got %+v", next.Vagabond.Items)
+	}
+	if next.FactionTurn != game.Marquise {
+		t.Fatalf("expected capacity check to advance turn, got %v", next.FactionTurn)
 	}
 }
 

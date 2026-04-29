@@ -41,6 +41,9 @@ var applyActionHandlers = map[game.ActionType]actionHandler{
 	game.ActionVagabondSetup:        applyVagabondSetup,
 	game.ActionEyrieEmergencyOrders: applyEyrieEmergencyOrders,
 	game.ActionEyrieNewRoost:        applyEyrieNewRoost,
+	game.ActionVagabondRest:         applyVagabondRest,
+	game.ActionVagabondDiscard:      applyVagabondDiscard,
+	game.ActionVagabondItemCapacity: applyVagabondItemCapacity,
 }
 
 func ApplyAction(state game.GameState, action game.Action) game.GameState {

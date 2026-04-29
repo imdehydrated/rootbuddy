@@ -387,6 +387,9 @@ func TestValidVagabondEveningActionsDrawsBaseCardPlusCoins(t *testing.T) {
 				{Type: game.ItemCoin, Status: game.ItemDamaged},
 			},
 		},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved: true,
+		},
 	}
 
 	got := ValidVagabondEveningActions(state)
@@ -410,6 +413,9 @@ func TestValidVagabondEveningActionsDrawsBaseCardInForest(t *testing.T) {
 		Vagabond: game.VagabondState{
 			InForest: true,
 		},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved: true,
+		},
 	}
 
 	got := ValidVagabondEveningActions(state)
@@ -422,6 +428,107 @@ func TestValidVagabondEveningActionsDrawsBaseCardInForest(t *testing.T) {
 	}
 	if !containsAction(got, want) {
 		t.Fatalf("expected forest evening draw action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondEveningActionsResolvesRestBeforeDraw(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+	}
+
+	got := ValidVagabondEveningActions(state)
+	want := game.Action{
+		Type: game.ActionVagabondRest,
+		VagabondRest: &game.VagabondRestAction{
+			Faction: game.Vagabond,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected rest before draw %+v, got %+v", want, got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionEveningDraw {
+			t.Fatalf("did not expect draw before rest, got %+v", got)
+		}
+	}
+}
+
+func TestValidVagabondEveningActionsRequiresDiscardBeforeCapacity(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	rabbitCard := firstCardOfSuit(t, game.Rabbit)
+	mouseCard := firstCardOfSuit(t, game.Mouse)
+	birdCard := firstCardOfSuit(t, game.Bird)
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard, rabbitCard, mouseCard, birdCard, {ID: 7001}, {ID: 7002}},
+		},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved: true,
+			VagabondEveningDrawn: true,
+		},
+	}
+
+	got := ValidVagabondEveningActions(state)
+	want := game.Action{
+		Type: game.ActionVagabondDiscard,
+		VagabondDiscard: &game.VagabondDiscardAction{
+			Faction: game.Vagabond,
+			CardIDs: []game.CardID{
+				foxCard.ID,
+			},
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected one-card discard choice %+v, got %+v", want, got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionVagabondItemCapacity {
+			t.Fatalf("did not expect capacity before discard, got %+v", got)
+		}
+	}
+}
+
+func TestValidVagabondEveningActionsChecksItemCapacityAfterDiscard(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemExhausted},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemExhausted},
+				{Type: game.ItemHammer, Status: game.ItemReady},
+				{Type: game.ItemCrossbow, Status: game.ItemReady},
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved:    true,
+			VagabondEveningDrawn:    true,
+			VagabondDiscardResolved: true,
+		},
+	}
+
+	got := ValidVagabondEveningActions(state)
+	want := game.Action{
+		Type: game.ActionVagabondItemCapacity,
+		VagabondCapacity: &game.VagabondItemCapacityAction{
+			Faction:     game.Vagabond,
+			ItemIndexes: []int{0},
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected item-capacity removal choice %+v, got %+v", want, got)
 	}
 }
 

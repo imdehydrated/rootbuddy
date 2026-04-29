@@ -48,6 +48,9 @@ export function actionIntentKey(action: Action): AssistIntentKey {
     case ACTION_TYPE.SCORE_ROOSTS:
     case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
     case ACTION_TYPE.EYRIE_NEW_ROOST:
+    case ACTION_TYPE.VAGABOND_REST:
+    case ACTION_TYPE.VAGABOND_DISCARD:
+    case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return "faction";
     case ACTION_TYPE.EVENING_DRAW:
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
