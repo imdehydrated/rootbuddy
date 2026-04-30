@@ -20,6 +20,14 @@ func ResolveBattle(state game.GameState, action game.Action, attackerRoll int, d
 	return ResolveBattleWithModifiers(state, action, attackerRoll, defenderRoll, game.BattleModifiers{})
 }
 
+func defenderIsDefenseless(state game.GameState, clearingID int, defender game.Faction) bool {
+	if defender == game.Vagabond {
+		return vagabondBattleHitCap(state) == 0
+	}
+
+	return warriorCountInClearing(state, clearingID, defender) == 0
+}
+
 func ResolveBattleWithModifiers(state game.GameState, action game.Action, attackerRoll int, defenderRoll int, modifiers game.BattleModifiers) game.Action {
 	if action.Battle == nil {
 		return game.Action{}
@@ -98,6 +106,9 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 
 	attackerExtraHits := modifiers.AttackerHitModifier
 	defenderExtraHits := modifiers.DefenderHitModifier
+	if defenderIsDefenseless(simulatedState, action.Battle.ClearingID, action.Battle.TargetFaction) {
+		attackerExtraHits++
+	}
 	if attackerUsedBrutalTactics {
 		attackerExtraHits++
 	}

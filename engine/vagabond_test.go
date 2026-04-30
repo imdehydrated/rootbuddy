@@ -59,6 +59,48 @@ func TestResolveBattleVagabondCapsHitsByExhaustedSwords(t *testing.T) {
 	}
 }
 
+func TestResolveBattleVagabondWithoutUndamagedSwordIsDefenseless(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemDamaged},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+		},
+	}
+
+	action := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Vagabond,
+		},
+	}
+
+	resolved := ResolveBattle(state, action, 0, 3)
+	if resolved.BattleResolution == nil {
+		t.Fatalf("expected battle resolution payload")
+	}
+	if resolved.BattleResolution.DefenderLosses != 1 {
+		t.Fatalf("expected Vagabond to take defenseless hit with no undamaged sword, got %d", resolved.BattleResolution.DefenderLosses)
+	}
+	if resolved.BattleResolution.AttackerLosses != 0 {
+		t.Fatalf("expected Vagabond with no undamaged sword to deal no rolled hits, got %d", resolved.BattleResolution.AttackerLosses)
+	}
+}
+
 func TestApplyDaybreakMarksVagabondRefreshResolved(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Vagabond,

@@ -46,7 +46,7 @@ func TestResolveBattleCapsHitsByWarriorsPresent(t *testing.T) {
 	}
 }
 
-func TestResolveBattleDefenderWithoutWarriorsDealsNoHits(t *testing.T) {
+func TestResolveBattleDefenderWithoutWarriorsTakesDefenselessHit(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -77,11 +77,55 @@ func TestResolveBattleDefenderWithoutWarriorsDealsNoHits(t *testing.T) {
 	if resolved.BattleResolution == nil {
 		t.Fatalf("expected battle resolution payload")
 	}
-	if resolved.BattleResolution.DefenderLosses != 2 {
-		t.Fatalf("expected defender losses to be 2, got %d", resolved.BattleResolution.DefenderLosses)
+	if resolved.BattleResolution.DefenderLosses != 3 {
+		t.Fatalf("expected defender losses to include defenseless extra hit, got %d", resolved.BattleResolution.DefenderLosses)
 	}
 	if resolved.BattleResolution.AttackerLosses != 0 {
 		t.Fatalf("expected attacker losses to be 0 when defender has no warriors, got %d", resolved.BattleResolution.AttackerLosses)
+	}
+}
+
+func TestResolveBattleDefenderArmorersDoesNotIgnoreDefenselessHit(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Eyrie: {1},
+		},
+	}
+
+	initiated := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Eyrie,
+		},
+	}
+
+	resolved := ResolveBattleWithModifiers(state, initiated, 3, 0, game.BattleModifiers{
+		DefenderUsesArmorers: true,
+	})
+
+	if resolved.BattleResolution == nil {
+		t.Fatalf("expected battle resolution payload")
+	}
+	if resolved.BattleResolution.DefenderLosses != 1 {
+		t.Fatalf("expected Armorers to ignore rolled hits but not defenseless hit, got %d", resolved.BattleResolution.DefenderLosses)
+	}
+	if !resolved.BattleResolution.DefenderUsedArmorers {
+		t.Fatalf("expected defender Armorers use to be recorded")
 	}
 }
 
