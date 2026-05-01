@@ -66,6 +66,8 @@ export function factionChoiceLabel(action: Action, state: GameState): string | n
       return "Rest";
     case ACTION_TYPE.VAGABOND_DISCARD:
       return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).map(describeKnownCardID).join(", ") || "no cards"}`;
+    case ACTION_TYPE.EVENING_DISCARD:
+      return `Discard ${(action.eveningDiscard?.cardIDs ?? []).map(describeKnownCardID).join(", ") || `${action.eveningDiscard?.count ?? 0} hidden card(s)`}`;
     case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return `Capacity: remove ${(action.vagabondCapacity?.itemIndexes ?? []).map((index) => itemIndexLabel(state, index)).join(", ") || "no items"}`;
     default:

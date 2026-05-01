@@ -65,6 +65,8 @@ export function actionExplanation(action: Action, state: GameState): string {
       return "Resolve Rest before drawing. If the Vagabond is in a forest, all damaged items are repaired.";
     case ACTION_TYPE.VAGABOND_DISCARD:
       return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).length} card(s) so the Vagabond hand is at the Evening limit.`;
+    case ACTION_TYPE.EVENING_DISCARD:
+      return `Discard ${(action.eveningDiscard?.cardIDs ?? []).length || action.eveningDiscard?.count || 0} card(s) so the faction hand is at the Evening limit.`;
     case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return `Resolve item capacity by removing ${(action.vagabondCapacity?.itemIndexes ?? []).length} item(s), then end the Vagabond turn.`;
     case ACTION_TYPE.PASS_PHASE:

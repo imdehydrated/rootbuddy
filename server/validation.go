@@ -130,6 +130,18 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.EveningDraw == nil {
 			return "evening draw payload is required"
 		}
+	case game.ActionEveningDiscard:
+		if req.Action.EveningDiscard == nil {
+			return "evening discard payload is required"
+		}
+		if req.Action.EveningDiscard.Count > 0 && len(req.Action.EveningDiscard.CardIDs) < req.Action.EveningDiscard.Count {
+			return "evening discard action must include public discarded card IDs"
+		}
+		for _, cardID := range req.Action.EveningDiscard.CardIDs {
+			if cardID <= 0 {
+				return "evening discard action must have valid card IDs"
+			}
+		}
 	case game.ActionScoreRoosts:
 		if req.Action.ScoreRoosts == nil {
 			return "score roosts payload is required"
@@ -220,6 +232,15 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		}
 		if req.Action.UsePersistentEffect.EffectID == "" {
 			return "use persistent effect action must have an effect ID"
+		}
+	case game.ActionVagabondDiscard:
+		if req.Action.VagabondDiscard == nil {
+			return "vagabond discard payload is required"
+		}
+		for _, cardID := range req.Action.VagabondDiscard.CardIDs {
+			if cardID <= 0 {
+				return "vagabond discard action must have valid card IDs"
+			}
 		}
 	default:
 		return "unsupported action type"

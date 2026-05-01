@@ -53,6 +53,7 @@ export function actionIntentKey(action: Action): AssistIntentKey {
     case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return "faction";
     case ACTION_TYPE.EVENING_DRAW:
+    case ACTION_TYPE.EVENING_DISCARD:
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
     case ACTION_TYPE.PASS_PHASE:
       return "draw_advance";

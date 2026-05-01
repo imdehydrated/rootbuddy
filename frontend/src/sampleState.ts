@@ -147,6 +147,8 @@ export const sampleState: GameState = {
     vagabondEveningDrawn: false,
     vagabondDiscardResolved: false,
     vagabondCapacityChecked: false,
+    eveningDrawn: false,
+    eveningDiscardResolved: false,
     usedPersistentEffectIDs: [],
     birdsongMainActionTaken: false,
     spreadSympathyStarted: false,

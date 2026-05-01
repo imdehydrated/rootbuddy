@@ -199,6 +199,8 @@ export interface GameState {
     vagabondEveningDrawn: boolean;
     vagabondDiscardResolved: boolean;
     vagabondCapacityChecked: boolean;
+    eveningDrawn: boolean;
+    eveningDiscardResolved: boolean;
     usedPersistentEffectIDs: string[];
     birdsongMainActionTaken: boolean;
     spreadSympathyStarted: boolean;
@@ -369,6 +371,11 @@ export interface Action {
   } | null;
   eveningDraw?: {
     faction: number;
+    count: number;
+  } | null;
+  eveningDiscard?: {
+    faction: number;
+    cardIDs: number[];
     count: number;
   } | null;
   scoreRoosts?: {

@@ -27,6 +27,7 @@ var applyActionHandlers = map[game.ActionType]actionHandler{
 	game.ActionTurmoil:              applyTurmoil,
 	game.ActionBirdsongWood:         applyBirdsongWood,
 	game.ActionEveningDraw:          applyEveningDraw,
+	game.ActionEveningDiscard:       applyEveningDiscard,
 	game.ActionScoreRoosts:          applyScoreRoosts,
 	game.ActionPassPhase:            applyPassPhase,
 	game.ActionAddCardToHand:        applyAddCardToHand,

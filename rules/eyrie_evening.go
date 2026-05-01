@@ -36,6 +36,10 @@ func ValidEyrieEveningActions(state game.GameState) []game.Action {
 	}
 
 	if state.TurnProgress.EveningMainActionTaken {
+		if state.TurnProgress.EveningDrawn && !state.TurnProgress.EveningDiscardResolved {
+			return eveningDiscardActions(state, game.Eyrie)
+		}
+
 		return []game.Action{
 			{
 				Type: game.ActionEveningDraw,

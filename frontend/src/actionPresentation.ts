@@ -100,6 +100,8 @@ export function actionHeadline(action: Action): string {
       return "Rest";
     case ACTION_TYPE.VAGABOND_DISCARD:
       return "Discard Cards";
+    case ACTION_TYPE.EVENING_DISCARD:
+      return "Discard Cards";
     case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return "Check Capacity";
     case ACTION_TYPE.SPREAD_SYMPATHY:
@@ -160,6 +162,8 @@ export function actionCardReferences(action: Action): ActionCardReference[] {
       return action.removeCardFromHand?.cardID ? [{ cardID: action.removeCardFromHand.cardID, zoneLabel: "Hand" }] : [];
     case ACTION_TYPE.VAGABOND_DISCARD:
       return (action.vagabondDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
+    case ACTION_TYPE.EVENING_DISCARD:
+      return (action.eveningDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
     default:
       return [];
   }
@@ -283,6 +287,8 @@ export function describeAction(action: Action, state?: GameState): string {
       return "Resolve Rest";
     case ACTION_TYPE.VAGABOND_DISCARD:
       return `Discard ${(action.vagabondDiscard?.cardIDs ?? []).map((cardID) => describeKnownCardID(cardID)).join(", ") || "no cards"}`;
+    case ACTION_TYPE.EVENING_DISCARD:
+      return `Discard ${(action.eveningDiscard?.cardIDs ?? []).map((cardID) => describeKnownCardID(cardID)).join(", ") || `${action.eveningDiscard?.count ?? 0} hidden card(s)`}`;
     case ACTION_TYPE.VAGABOND_ITEM_CAPACITY:
       return `Remove ${(action.vagabondCapacity?.itemIndexes ?? []).length} item(s) for capacity`;
     case ACTION_TYPE.SCORE_ROOSTS:

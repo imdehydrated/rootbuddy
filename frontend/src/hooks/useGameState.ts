@@ -74,6 +74,8 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.turnProgress.vagabondEveningDrawn ??= false;
   normalized.turnProgress.vagabondDiscardResolved ??= false;
   normalized.turnProgress.vagabondCapacityChecked ??= false;
+  normalized.turnProgress.eveningDrawn ??= false;
+  normalized.turnProgress.eveningDiscardResolved ??= false;
   normalized.turnProgress.birdsongMainActionTaken ??= false;
   normalized.turnProgress.spreadSympathyStarted ??= false;
   normalized.turnProgress.daylightMainActionTaken ??= false;

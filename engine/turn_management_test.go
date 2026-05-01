@@ -7,12 +7,11 @@ import (
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
-func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) {
+func TestApplyActionEveningDrawStaysInEveningForDiscard(t *testing.T) {
 	tests := []struct {
-		name        string
-		state       game.GameState
-		action      game.Action
-		wantFaction game.Faction
+		name   string
+		state  game.GameState
+		action game.Action
 	}{
 		{
 			name: "marquise draw advances to eyrie",
@@ -36,7 +35,6 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 					Count:   1,
 				},
 			},
-			wantFaction: game.Eyrie,
 		},
 		{
 			name: "eyrie draw advances to alliance",
@@ -56,7 +54,6 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 					Count:   1,
 				},
 			},
-			wantFaction: game.Alliance,
 		},
 		{
 			name: "alliance draw advances to vagabond",
@@ -77,7 +74,6 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 					Count:   2,
 				},
 			},
-			wantFaction: game.Vagabond,
 		},
 	}
 
@@ -85,19 +81,68 @@ func TestApplyActionEveningDrawAdvancesTurnOrderAndResetsProgress(t *testing.T) 
 		t.Run(tt.name, func(t *testing.T) {
 			next := ApplyAction(tt.state, tt.action)
 
-			if next.FactionTurn != tt.wantFaction {
-				t.Fatalf("expected next faction %v, got %v", tt.wantFaction, next.FactionTurn)
+			if next.FactionTurn != tt.state.FactionTurn {
+				t.Fatalf("expected faction %v to remain active for discard, got %v", tt.state.FactionTurn, next.FactionTurn)
 			}
-			if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
-				t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+			if next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+				t.Fatalf("expected turn to remain in evening for discard, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
 			}
-			if !reflect.DeepEqual(next.TurnProgress, game.TurnProgress{}) {
-				t.Fatalf("expected turn progress reset, got %+v", next.TurnProgress)
+			if !next.TurnProgress.EveningDrawn {
+				t.Fatalf("expected evening draw to be marked before discard")
 			}
 			if !reflect.DeepEqual(next.TurnOrder, tt.state.TurnOrder) {
 				t.Fatalf("expected turn order to be preserved, got %+v", next.TurnOrder)
 			}
 		})
+	}
+}
+
+func TestApplyActionEveningDiscardAdvancesTurnOrderAndResetsProgress(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		TurnProgress: game.TurnProgress{
+			EveningDrawn: true,
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 8},
+				{ID: 9},
+				{ID: 10},
+				{ID: 11},
+				{ID: 12},
+				{ID: 13},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionEveningDiscard,
+		EveningDiscard: &game.EveningDiscardAction{
+			Faction: game.Marquise,
+			CardIDs: []game.CardID{
+				8,
+			},
+			Count: 1,
+		},
+	})
+
+	if next.FactionTurn != game.Eyrie {
+		t.Fatalf("expected discard to advance to Eyrie, got %v", next.FactionTurn)
+	}
+	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
+		t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if !reflect.DeepEqual(next.TurnProgress, game.TurnProgress{}) {
+		t.Fatalf("expected turn progress reset, got %+v", next.TurnProgress)
+	}
+	if hasCard(next.Marquise.CardsInHand, 8) {
+		t.Fatalf("expected discarded card to leave Marquise hand, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 8 {
+		t.Fatalf("expected discarded card in discard pile, got %+v", next.DiscardPile)
 	}
 }
 
@@ -201,18 +246,20 @@ func TestApplyActionScoreRoostsStaysInEyrieEveningForDraw(t *testing.T) {
 	}
 }
 
-func TestApplyActionEveningDrawUsesDefaultTurnOrderWhenUnset(t *testing.T) {
+func TestApplyActionEveningDiscardUsesDefaultTurnOrderWhenUnset(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Evening,
 		CurrentStep:  game.StepEvening,
+		TurnProgress: game.TurnProgress{
+			EveningDrawn: true,
+		},
 	}
 
 	action := game.Action{
-		Type: game.ActionEveningDraw,
-		EveningDraw: &game.EveningDrawAction{
+		Type: game.ActionEveningDiscard,
+		EveningDiscard: &game.EveningDiscardAction{
 			Faction: game.Marquise,
-			Count:   1,
 		},
 	}
 

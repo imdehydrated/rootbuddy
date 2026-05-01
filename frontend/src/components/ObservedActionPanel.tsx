@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { describeKnownCardID } from "../cardCatalog";
-import { factionLabels, suitLabels } from "../labels";
+import { ACTION_TYPE, factionLabels, suitLabels } from "../labels";
 import type { Action, GameState } from "../types";
 import { ReferenceCard } from "./CardUi";
 import { TokenListEditor } from "./TokenListEditor";
@@ -25,6 +25,7 @@ export type ObservedTemplateKey =
   | "mobilize"
   | "train"
   | "aid"
+  | "evening_discard"
   | "other_player_draw"
   | "other_player_play"
   | "activate_dominance"
@@ -49,6 +50,7 @@ type ObservedFormState = {
   dominanceCardID: string;
   usedWorkshopClearings: number[];
   supporterCardIDs: number[];
+  discardCardIDs: number[];
   decreeCardIDs: number[];
   decreeColumns: number[];
   defenderAmbushed: boolean;
@@ -75,6 +77,7 @@ const templateLabels: Record<ObservedTemplateKey, string> = {
   mobilize: "Mobilize",
   train: "Train",
   aid: "Aid",
+  evening_discard: "Evening Discard",
   other_player_draw: "Other Player Draw",
   other_player_play: "Other Player Play",
   activate_dominance: "Activate Dominance",
@@ -89,13 +92,13 @@ function parseNumber(value: string, fallback = 0): number {
 function templatesForFaction(faction: number): ObservedTemplateKey[] {
   switch (faction) {
     case 0:
-      return ["battle_resolution", "craft", "overwork", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "craft", "overwork", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 1:
-      return ["battle_resolution", "spread_sympathy", "revolt", "mobilize", "train", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "spread_sympathy", "revolt", "mobilize", "train", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 2:
-      return ["battle_resolution", "add_to_decree", "craft", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "add_to_decree", "craft", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 3:
-      return ["battle_resolution", "aid", "craft", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "aid", "craft", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     default:
       return ["battle_resolution", "other_player_draw", "other_player_play", "pass_phase"];
   }
@@ -127,6 +130,7 @@ function initialFormState(state: GameState): ObservedFormState {
     dominanceCardID: "14",
     usedWorkshopClearings: [],
     supporterCardIDs: [24],
+    discardCardIDs: [24],
     decreeCardIDs: [24],
     decreeColumns: [1],
     defenderAmbushed: false,
@@ -248,6 +252,24 @@ function buildObservedAction(form: ObservedFormState): Action {
           itemIndex: parseNumber(form.itemIndex, 0)
         }
       };
+    case "evening_discard":
+      if (faction === 3) {
+        return {
+          type: ACTION_TYPE.VAGABOND_DISCARD,
+          vagabondDiscard: {
+            faction,
+            cardIDs: form.discardCardIDs
+          }
+        };
+      }
+      return {
+        type: ACTION_TYPE.EVENING_DISCARD,
+        eveningDiscard: {
+          faction,
+          cardIDs: form.discardCardIDs,
+          count: form.discardCardIDs.length
+        }
+      };
     case "other_player_draw":
       return {
         type: 27,
@@ -314,6 +336,8 @@ function templateHint(template: ObservedTemplateKey): string {
       return "Use when Alliance spent a known hand card to gain an officer.";
     case "aid":
       return "Use when Vagabond gave a known card to another faction.";
+    case "evening_discard":
+      return "Use when a faction discarded public card identities down to the Evening hand limit.";
     case "other_player_draw":
       return "Use for hidden draws when only the count is known.";
     case "other_player_play":
@@ -366,6 +390,13 @@ function observedFormIssues(form: ObservedFormState): ObservedIssue[] {
     if (drawIssue) {
       issues.push(drawIssue);
     }
+  }
+
+  if (form.template === "evening_discard" && form.discardCardIDs.length === 0) {
+    issues.push({
+      message: "Add the public discarded card IDs.",
+      blocking: true
+    });
   }
 
   if (form.template === "battle_resolution") {
@@ -470,6 +501,7 @@ export function ObservedActionPanel({
   const enteredDominanceCardID = parseNumber(form.dominanceCardID);
   const enteredSpentCardID = parseNumber(form.spentCardID);
   const enteredSupporterCardIDs = form.supporterCardIDs;
+  const enteredDiscardCardIDs = form.discardCardIDs;
   const enteredDecreeCardIDs = form.decreeCardIDs;
   const enteredWorkshopClearings = form.usedWorkshopClearings;
   const enteredDecreeColumns = form.decreeColumns;
@@ -480,6 +512,9 @@ export function ObservedActionPanel({
       : null,
     enteredSupporterCardIDs.length > 0
       ? { label: "Supporters", items: enteredSupporterCardIDs.map(previewCardLabel) }
+      : null,
+    enteredDiscardCardIDs.length > 0
+      ? { label: "Discarded Cards", items: enteredDiscardCardIDs.map(previewCardLabel) }
       : null,
     enteredDecreeCardIDs.length > 0
       ? { label: "Decree Cards", items: enteredDecreeCardIDs.map(previewCardLabel) }
@@ -679,6 +714,16 @@ export function ObservedActionPanel({
             onChange={(values) => updateForm("supporterCardIDs", values)}
             formatValue={previewCardLabel}
             placeholder="Add supporter card IDs"
+          />
+        ) : null}
+
+        {form.template === "evening_discard" ? (
+          <TokenListEditor
+            label="Discarded Cards"
+            values={form.discardCardIDs}
+            onChange={(values) => updateForm("discardCardIDs", values)}
+            formatValue={previewCardLabel}
+            placeholder="Add discarded card IDs"
           />
         ) : null}
 

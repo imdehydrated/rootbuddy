@@ -95,6 +95,80 @@ func TestApplyActionTrainObservedHiddenCardInAssistMode(t *testing.T) {
 	}
 }
 
+func TestApplyActionEveningDiscardObservedHiddenCardsInAssistMode(t *testing.T) {
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Marquise,
+		FactionTurn:   game.Eyrie,
+		CurrentPhase:  game.Evening,
+		CurrentStep:   game.StepEvening,
+		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		OtherHandCounts: map[game.Faction]int{
+			game.Eyrie: 7,
+		},
+		TurnProgress: game.TurnProgress{
+			EveningDrawn: true,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionEveningDiscard,
+		EveningDiscard: &game.EveningDiscardAction{
+			Faction: game.Eyrie,
+			CardIDs: []game.CardID{8, 9},
+			Count:   2,
+		},
+	})
+
+	if next.OtherHandCounts[game.Eyrie] != 5 {
+		t.Fatalf("expected hidden evening discard to reduce Eyrie hand count to five, got %+v", next.OtherHandCounts)
+	}
+	if hiddenCardCount(next, game.Eyrie, game.HiddenCardZoneHand) != 5 {
+		t.Fatalf("expected hidden card placeholders to stay in sync, got %+v", next.HiddenCards)
+	}
+	if len(next.DiscardPile) != 2 || next.DiscardPile[0] != 8 || next.DiscardPile[1] != 9 {
+		t.Fatalf("expected observed hidden discard identities in public discard pile, got %+v", next.DiscardPile)
+	}
+	if next.FactionTurn != game.Alliance {
+		t.Fatalf("expected discard to advance to Alliance turn, got %v", next.FactionTurn)
+	}
+}
+
+func TestApplyActionEveningDiscardWithoutPublicIdsDoesNotResolveHiddenDiscard(t *testing.T) {
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Marquise,
+		FactionTurn:   game.Eyrie,
+		CurrentPhase:  game.Evening,
+		CurrentStep:   game.StepEvening,
+		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		OtherHandCounts: map[game.Faction]int{
+			game.Eyrie: 7,
+		},
+		TurnProgress: game.TurnProgress{
+			EveningDrawn: true,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionEveningDiscard,
+		EveningDiscard: &game.EveningDiscardAction{
+			Faction: game.Eyrie,
+			Count:   2,
+		},
+	})
+
+	if next.OtherHandCounts[game.Eyrie] != 7 {
+		t.Fatalf("expected hidden count-only evening discard to leave hand count unchanged, got %+v", next.OtherHandCounts)
+	}
+	if next.FactionTurn != game.Eyrie || !next.TurnProgress.EveningDrawn {
+		t.Fatalf("expected hidden count-only evening discard not to advance turn, got faction=%v progress=%+v", next.FactionTurn, next.TurnProgress)
+	}
+	if len(next.DiscardPile) != 0 {
+		t.Fatalf("expected no public discard without card IDs, got %+v", next.DiscardPile)
+	}
+}
+
 func TestApplyActionMobilizeMovesHiddenHandPlaceholderToSupporters(t *testing.T) {
 	state := game.GameState{
 		GameMode:      game.GameModeAssist,

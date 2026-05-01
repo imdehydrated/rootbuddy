@@ -313,7 +313,7 @@ func TestApplyMovementIntoSympathyTransfersOutrageCard(t *testing.T) {
 	}
 }
 
-func TestAllianceEveningDrawAdvancesToVagabondBirdsong(t *testing.T) {
+func TestAllianceEveningDrawStaysInEveningForDiscard(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -345,10 +345,13 @@ func TestAllianceEveningDrawAdvancesToVagabondBirdsong(t *testing.T) {
 	}
 
 	next := ApplyAction(state, draw)
-	if next.FactionTurn != game.Vagabond {
-		t.Fatalf("expected alliance draw to advance to vagabond, got %v", next.FactionTurn)
+	if next.FactionTurn != game.Alliance {
+		t.Fatalf("expected alliance draw to keep Alliance active for discard, got %v", next.FactionTurn)
 	}
-	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
-		t.Fatalf("expected alliance draw to start vagabond birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	if next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+		t.Fatalf("expected alliance draw to remain in evening for discard, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+	if !next.TurnProgress.EveningDrawn {
+		t.Fatalf("expected alliance evening draw to be marked before discard")
 	}
 }

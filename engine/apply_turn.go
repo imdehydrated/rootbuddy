@@ -223,8 +223,17 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			state.CurrentPhase = game.Evening
 			state.CurrentStep = game.StepEvening
 		} else {
-			beginNextFactionTurn(state)
+			state.TurnProgress.EveningDrawn = true
+			state.CurrentPhase = game.Evening
+			state.CurrentStep = game.StepEvening
 		}
+	case game.ActionEveningDiscard:
+		if action.EveningDiscard != nil && action.EveningDiscard.Count > 0 && len(action.EveningDiscard.CardIDs) < action.EveningDiscard.Count {
+			return
+		}
+		state.TurnProgress.EveningMainActionTaken = true
+		state.TurnProgress.EveningDiscardResolved = true
+		beginNextFactionTurn(state)
 	case game.ActionDiscardEffect:
 		state.CurrentStep = game.StepDaylightActions
 	case game.ActionUsePersistentEffect:

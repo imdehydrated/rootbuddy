@@ -59,6 +59,18 @@ func applyEveningDraw(state *game.GameState, action game.Action) {
 	DrawCards(state, action.EveningDraw.Faction, action.EveningDraw.Count)
 }
 
+func applyEveningDiscard(state *game.GameState, action game.Action) {
+	if action.EveningDiscard == nil {
+		return
+	}
+
+	for _, cardID := range action.EveningDiscard.CardIDs {
+		if _, ok := spendFactionHandCard(state, action.EveningDiscard.Faction, cardID); ok {
+			DiscardCard(state, cardID)
+		}
+	}
+}
+
 func applyScoreRoosts(state *game.GameState, action game.Action) {
 	if action.ScoreRoosts == nil {
 		return

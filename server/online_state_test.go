@@ -119,6 +119,7 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 		TrackAllHands: true,
 		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie},
 		Deck:          []game.CardID{8, 12},
+		DiscardPile:   []game.CardID{9},
 		Marquise: game.MarquiseState{
 			CardsInHand: []game.Card{{ID: 24, Name: "Bird Card"}},
 		},
@@ -159,6 +160,9 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 	}
 	if len(resp.State.Deck) != 2 || resp.State.Deck[0] != 0 || resp.State.Deck[1] != 0 {
 		t.Fatalf("expected deck order to stay hidden on load, got %+v", resp.State.Deck)
+	}
+	if len(resp.State.DiscardPile) != 1 || resp.State.DiscardPile[0] != 9 {
+		t.Fatalf("expected discard pile to remain public on load, got %+v", resp.State.DiscardPile)
 	}
 }
 

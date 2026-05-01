@@ -75,6 +75,10 @@ func ValidAllianceEveningActions(state game.GameState) []game.Action {
 		return nil
 	}
 
+	if state.TurnProgress.EveningDrawn && !state.TurnProgress.EveningDiscardResolved {
+		return eveningDiscardActions(state, game.Alliance)
+	}
+
 	actions := []game.Action{
 		{
 			Type: game.ActionEveningDraw,

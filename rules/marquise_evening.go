@@ -26,6 +26,10 @@ func ValidMarquiseEveningActions(state game.GameState) []game.Action {
 		return []game.Action{}
 	}
 
+	if state.TurnProgress.EveningDrawn && !state.TurnProgress.EveningDiscardResolved {
+		return eveningDiscardActions(state, game.Marquise)
+	}
+
 	return []game.Action{
 		{
 			Type: game.ActionEveningDraw,
