@@ -124,6 +124,20 @@ type BattleModifiers struct {
 	DefenderUsesSappers       bool
 }
 
+type BattlePieceKind int
+
+const (
+	BattlePieceBuilding BattlePieceKind = iota
+	BattlePieceToken
+	BattlePieceWood
+)
+
+type BattlePieceLoss struct {
+	Kind         BattlePieceKind
+	BuildingType BuildingType
+	TokenType    TokenType
+}
+
 type BattleResolutionAction struct {
 	Faction                   Faction
 	ClearingID                int
@@ -144,6 +158,8 @@ type BattleResolutionAction struct {
 	AmbushHitsToAttacker      int
 	AttackerLosses            int
 	DefenderLosses            int
+	AttackerPieceLosses       []BattlePieceLoss
+	DefenderPieceLosses       []BattlePieceLoss
 	SourceEffectID            string
 }
 

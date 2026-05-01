@@ -116,29 +116,71 @@ func decrementPlacedBuildingCounter(state *game.GameState, buildingType game.Bui
 	}
 }
 
-func removeBuildingLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) {
+func removeBuildingLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) int {
 	if losses <= 0 || len(clearing.Buildings) == 0 {
-		return
+		return 0
 	}
 
+	removed := 0
 	remaining := make([]game.Building, 0, len(clearing.Buildings))
 	for _, building := range clearing.Buildings {
 		if losses > 0 && building.Faction == faction {
-			if faction == game.Marquise {
-				decrementPlacedBuildingCounter(state, building.Type)
-			}
-			if faction == game.Eyrie && building.Type == game.Roost && state.Eyrie.RoostsPlaced > 0 {
-				state.Eyrie.RoostsPlaced--
-			}
-			if faction == game.Alliance && building.Type == game.Base {
-				setAllianceBasePlaced(state, clearing.Suit, false)
-			}
+			removeBuildingFromTracks(state, clearing, building)
 			losses--
+			removed++
 			continue
 		}
 		remaining = append(remaining, building)
 	}
 	clearing.Buildings = remaining
+	return removed
+}
+
+func removeBuildingFromTracks(state *game.GameState, clearing *game.Clearing, building game.Building) {
+	if building.Faction == game.Marquise {
+		decrementPlacedBuildingCounter(state, building.Type)
+	}
+	if building.Faction == game.Eyrie && building.Type == game.Roost && state.Eyrie.RoostsPlaced > 0 {
+		state.Eyrie.RoostsPlaced--
+	}
+	if building.Faction == game.Alliance && building.Type == game.Base {
+		setAllianceBasePlaced(state, clearing.Suit, false)
+	}
+}
+
+func removeSelectedBuildingLoss(state *game.GameState, clearing *game.Clearing, faction game.Faction, buildingType game.BuildingType) bool {
+	for index, building := range clearing.Buildings {
+		if building.Faction != faction || building.Type != buildingType {
+			continue
+		}
+
+		removeBuildingFromTracks(state, clearing, building)
+		clearing.Buildings = append(clearing.Buildings[:index], clearing.Buildings[index+1:]...)
+		return true
+	}
+
+	return false
+}
+
+func removeSelectedTokenLoss(state *game.GameState, clearing *game.Clearing, faction game.Faction, tokenType game.TokenType) (bool, bool) {
+	for index, token := range clearing.Tokens {
+		if token.Faction != faction || token.Type != tokenType {
+			continue
+		}
+
+		removedSympathy := false
+		if token.Faction == game.Alliance && token.Type == game.TokenSympathy && state.Alliance.SympathyPlaced > 0 {
+			state.Alliance.SympathyPlaced--
+			removedSympathy = true
+		}
+		if token.Faction == game.Marquise && token.Type == game.TokenKeep {
+			state.Marquise.KeepClearingID = 0
+		}
+		clearing.Tokens = append(clearing.Tokens[:index], clearing.Tokens[index+1:]...)
+		return true, removedSympathy
+	}
+
+	return false, false
 }
 
 func removeTokenLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) (int, int, int) {
@@ -181,6 +223,83 @@ func removeTokenLosses(state *game.GameState, clearing *game.Clearing, faction g
 	return losses, removedTokens, removedSympathy
 }
 
+type battleRemovalSummary struct {
+	warriors  int
+	buildings int
+	tokens    int
+	sympathy  int
+}
+
+func applySelectedPieceLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int, selected []game.BattlePieceLoss) (int, battleRemovalSummary) {
+	summary := battleRemovalSummary{}
+	if losses <= 0 || len(selected) == 0 {
+		return losses, summary
+	}
+
+	for _, loss := range selected {
+		if losses <= 0 {
+			break
+		}
+
+		switch loss.Kind {
+		case game.BattlePieceBuilding:
+			if removeSelectedBuildingLoss(state, clearing, faction, loss.BuildingType) {
+				losses--
+				summary.buildings++
+			}
+		case game.BattlePieceToken:
+			removed, removedSympathy := removeSelectedTokenLoss(state, clearing, faction, loss.TokenType)
+			if removed {
+				losses--
+				summary.tokens++
+				if removedSympathy {
+					summary.sympathy++
+				}
+			}
+		case game.BattlePieceWood:
+			if faction == game.Marquise && clearing.Wood > 0 {
+				clearing.Wood--
+				losses--
+				summary.tokens++
+			}
+		}
+	}
+
+	return losses, summary
+}
+
+func applyNonVagabondBattleLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int, selected []game.BattlePieceLoss) battleRemovalSummary {
+	summary := battleRemovalSummary{}
+	if losses <= 0 {
+		return summary
+	}
+
+	warriorsBefore := 0
+	if clearing.Warriors != nil {
+		warriorsBefore = clearing.Warriors[faction]
+	}
+	remainingLosses := removeWarriorLosses(clearing, faction, losses)
+	if clearing.Warriors != nil {
+		summary.warriors = warriorsBefore - clearing.Warriors[faction]
+	}
+
+	selectedSummary := battleRemovalSummary{}
+	remainingLosses, selectedSummary = applySelectedPieceLosses(state, clearing, faction, remainingLosses, selected)
+	summary.buildings += selectedSummary.buildings
+	summary.tokens += selectedSummary.tokens
+	summary.sympathy += selectedSummary.sympathy
+
+	removedBuildings := removeBuildingLosses(state, clearing, faction, remainingLosses)
+	summary.buildings += removedBuildings
+	remainingLosses -= removedBuildings
+
+	_, removedTokens, removedSympathy := removeTokenLosses(state, clearing, faction, remainingLosses)
+	summary.tokens += removedTokens
+	summary.sympathy += removedSympathy
+
+	return summary
+}
+
 func applyBattleCardSideEffects(state *game.GameState, action game.Action) {
 	if action.BattleResolution == nil {
 		return
@@ -221,39 +340,46 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	applyBattleCardSideEffects(state, action)
 
 	clearing := &state.Map.Clearings[index]
+	attackerSummary := battleRemovalSummary{}
 	if action.BattleResolution.Faction == game.Vagabond {
 		exhaustReadyItemsByType(state, game.ItemSword, 1)
 		damageVagabondItems(state, action.BattleResolution.AttackerLosses)
 	} else {
-		removeWarriorLosses(clearing, action.BattleResolution.Faction, action.BattleResolution.AttackerLosses)
+		attackerSummary = applyNonVagabondBattleLosses(
+			state,
+			clearing,
+			action.BattleResolution.Faction,
+			action.BattleResolution.AttackerLosses,
+			action.BattleResolution.AttackerPieceLosses,
+		)
+		scoreBattleRemovals(state, action.BattleResolution.TargetFaction, attackerSummary.buildings, attackerSummary.tokens)
+		if attackerSummary.sympathy > 0 && action.BattleResolution.TargetFaction != game.Alliance {
+			transferOutrageCard(state, action.BattleResolution.TargetFaction, clearing.Suit)
+		}
 	}
 
 	if action.BattleResolution.TargetFaction == game.Vagabond {
 		exhaustReadyItemsByType(state, game.ItemSword, 1)
 		damageVagabondItems(state, action.BattleResolution.DefenderLosses)
+		if attackerSummary.warriors+attackerSummary.buildings+attackerSummary.tokens > 0 {
+			setVagabondRelationship(state, action.BattleResolution.Faction, game.RelHostile)
+		}
 		return
 	}
 
-	targetWarriorsBefore := 0
-	if clearing.Warriors != nil {
-		targetWarriorsBefore = clearing.Warriors[action.BattleResolution.TargetFaction]
-	}
-	remainingDefenderLosses := removeWarriorLosses(clearing, action.BattleResolution.TargetFaction, action.BattleResolution.DefenderLosses)
-	beforeBuildings := len(clearing.Buildings)
-	removeBuildingLosses(state, clearing, action.BattleResolution.TargetFaction, remainingDefenderLosses)
-	removedBuildings := beforeBuildings - len(clearing.Buildings)
-	remainingDefenderLosses -= removedBuildings
-	_, removedTokens, removedSympathy := removeTokenLosses(state, clearing, action.BattleResolution.TargetFaction, remainingDefenderLosses)
-	removedWarriors := targetWarriorsBefore
-	if clearing.Warriors != nil {
-		removedWarriors -= clearing.Warriors[action.BattleResolution.TargetFaction]
-	}
-	scoreBattleRemovals(state, action.BattleResolution.Faction, removedBuildings, removedTokens)
+	defenderSummary := applyNonVagabondBattleLosses(
+		state,
+		clearing,
+		action.BattleResolution.TargetFaction,
+		action.BattleResolution.DefenderLosses,
+		action.BattleResolution.DefenderPieceLosses,
+	)
+	scoreBattleRemovals(state, action.BattleResolution.Faction, defenderSummary.buildings, defenderSummary.tokens)
 
-	if removedSympathy > 0 && action.BattleResolution.Faction != game.Alliance {
+	if defenderSummary.sympathy > 0 && action.BattleResolution.Faction != game.Alliance {
 		transferOutrageCard(state, action.BattleResolution.Faction, clearing.Suit)
 	}
-	if action.BattleResolution.Faction == game.Vagabond && removedWarriors+removedBuildings+removedTokens > 0 {
+	if action.BattleResolution.Faction == game.Vagabond && defenderSummary.warriors+defenderSummary.buildings+defenderSummary.tokens > 0 {
 		setVagabondRelationship(state, action.BattleResolution.TargetFaction, game.RelHostile)
 	}
 }

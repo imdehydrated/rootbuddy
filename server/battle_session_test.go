@@ -204,8 +204,31 @@ func TestBattleSessionAttackerResponseUsesServerOwnedRolls(t *testing.T) {
 	if openResp.Prompt == nil || openResp.Prompt.Stage != BattlePromptAttackerTurn {
 		t.Fatalf("expected attacker prompt, got %+v", openResp.Prompt)
 	}
+	if openResp.Prompt.AttackerRoll != 3 || openResp.Prompt.DefenderRoll != 2 {
+		t.Fatalf("expected attacker prompt to show server-owned rolls 3/2 before effect choices, got %+v", openResp.Prompt)
+	}
 	if !openResp.Prompt.CanUseAttackerArmorers || !openResp.Prompt.CanUseBrutalTactics {
 		t.Fatalf("expected attacker prompt options, got %+v", openResp.Prompt)
+	}
+	sessionAfterOpen, ok := battleSessions.get(gameID)
+	if !ok {
+		t.Fatalf("expected battle session after open")
+	}
+	if responder := currentBattleResponder(sessionAfterOpen); responder != game.Marquise {
+		t.Fatalf("expected attacker to remain current responder after post-roll prompt, got responder=%v session=%+v", responder, sessionAfterOpen)
+	}
+
+	prematureResolveBody, _ := json.Marshal(ResolveBattleRequest{
+		GameID: gameID,
+		State:  visible,
+		Action: battleAction(game.Marquise, game.Eyrie),
+	})
+	prematureResolveReq := httptest.NewRequest(http.MethodPost, "/api/battles/resolve", bytes.NewReader(prematureResolveBody))
+	prematureResolveReq.Header.Set("X-Player-Token", hostToken)
+	prematureResolveRec := httptest.NewRecorder()
+	NewServer().ServeHTTP(prematureResolveRec, prematureResolveReq)
+	if prematureResolveRec.Code != http.StatusConflict {
+		t.Fatalf("expected resolve to wait for post-roll attacker response, got %d body=%s", prematureResolveRec.Code, prematureResolveRec.Body.String())
 	}
 
 	useArmorers := true

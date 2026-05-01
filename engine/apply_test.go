@@ -359,6 +359,161 @@ func TestApplyActionBattleResolutionSpillsIntoBuildings(t *testing.T) {
 	}
 }
 
+func TestApplyActionBattleResolutionUsesSelectedDefenderBuildingLoss(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 2,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			SawmillsPlaced:  1,
+			WorkshopsPlaced: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	action := game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Eyrie,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			AttackerLosses: 0,
+			DefenderLosses: 1,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceBuilding, BuildingType: game.Sawmill},
+			},
+		},
+	}
+
+	next := ApplyAction(state, action)
+	buildings := next.Map.Clearings[0].Buildings
+	if len(buildings) != 1 || buildings[0].Type != game.Workshop {
+		t.Fatalf("expected selected sawmill to be removed and workshop to remain, got %+v", buildings)
+	}
+	if next.Marquise.SawmillsPlaced != 0 || next.Marquise.WorkshopsPlaced != 1 {
+		t.Fatalf("expected selected building counters to update, got sawmills=%d workshops=%d", next.Marquise.SawmillsPlaced, next.Marquise.WorkshopsPlaced)
+	}
+	if next.VictoryPoints[game.Eyrie] != 1 {
+		t.Fatalf("expected attacker to score selected building removal, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionBattleResolutionUsesSelectedDefenderTokenLoss(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			FoxBasePlaced:  true,
+			SympathyPlaced: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	action := game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Alliance,
+			AttackerLosses: 0,
+			DefenderLosses: 1,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceToken, TokenType: game.TokenSympathy},
+			},
+		},
+	}
+
+	next := ApplyAction(state, action)
+	clearing := next.Map.Clearings[0]
+	if len(clearing.Tokens) != 0 {
+		t.Fatalf("expected selected sympathy token to be removed, got %+v", clearing.Tokens)
+	}
+	if len(clearing.Buildings) != 1 || clearing.Buildings[0].Type != game.Base {
+		t.Fatalf("expected base to remain after selected token loss, got %+v", clearing.Buildings)
+	}
+	if next.Alliance.SympathyPlaced != 0 || !next.Alliance.FoxBasePlaced {
+		t.Fatalf("expected selected token state update only, got sympathy=%d foxBase=%v", next.Alliance.SympathyPlaced, next.Alliance.FoxBasePlaced)
+	}
+	if next.VictoryPoints[game.Marquise] != 1 {
+		t.Fatalf("expected attacker to score selected token removal, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionBattleResolutionSpillsAttackerLossesIntoSelectedBuilding(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    3,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WorkshopsPlaced: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	action := game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Eyrie,
+			AttackerLosses: 2,
+			DefenderLosses: 0,
+			AttackerPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceBuilding, BuildingType: game.Workshop},
+			},
+		},
+	}
+
+	next := ApplyAction(state, action)
+	clearing := next.Map.Clearings[0]
+	if clearing.Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected attacker warrior to be removed first, got %d", clearing.Warriors[game.Marquise])
+	}
+	if len(clearing.Buildings) != 0 {
+		t.Fatalf("expected selected attacker building to be removed, got %+v", clearing.Buildings)
+	}
+	if next.Marquise.WorkshopsPlaced != 0 {
+		t.Fatalf("expected attacker building counter to update, got %d", next.Marquise.WorkshopsPlaced)
+	}
+	if next.VictoryPoints[game.Eyrie] != 1 {
+		t.Fatalf("expected defender to score attacker building removal, got %+v", next.VictoryPoints)
+	}
+}
+
 func TestApplyActionCraft(t *testing.T) {
 	state := game.GameState{
 		Marquise: game.MarquiseState{

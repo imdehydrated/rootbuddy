@@ -255,6 +255,16 @@ export interface Action {
     ambushHitsToAttacker: number;
     attackerLosses: number;
     defenderLosses: number;
+    attackerPieceLosses?: Array<{
+      kind: number;
+      buildingType: number;
+      tokenType: number;
+    }> | null;
+    defenderPieceLosses?: Array<{
+      kind: number;
+      buildingType: number;
+      tokenType: number;
+    }> | null;
     sourceEffectID: string;
   } | null;
   build?: {
@@ -482,6 +492,8 @@ export interface BattlePrompt {
     | "ready_to_resolve";
   waitingOnFaction: number;
   battleContext: BattleContext;
+  attackerRoll?: number;
+  defenderRoll?: number;
   canUseAmbush?: boolean;
   canUseDefenderArmorers?: boolean;
   canUseSappers?: boolean;

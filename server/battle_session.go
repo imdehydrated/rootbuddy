@@ -32,6 +32,16 @@ const (
 	BattlePromptReadyToResolve  BattlePromptStage = "ready_to_resolve"
 )
 
+type battleResponseKind int
+
+const (
+	battleResponseNone battleResponseKind = iota
+	battleResponseDefenderAmbush
+	battleResponseAttackerCounterAmbush
+	battleResponseDefenderEffects
+	battleResponseAttackerEffects
+)
+
 type BattlePrompt struct {
 	GameID                    string             `json:"gameID"`
 	Revision                  int64              `json:"revision"`
@@ -39,6 +49,8 @@ type BattlePrompt struct {
 	Stage                     BattlePromptStage  `json:"stage"`
 	WaitingOnFaction          game.Faction       `json:"waitingOnFaction"`
 	BattleContext             game.BattleContext `json:"battleContext"`
+	AttackerRoll              int                `json:"attackerRoll,omitempty"`
+	DefenderRoll              int                `json:"defenderRoll,omitempty"`
 	CanUseAmbush              bool               `json:"canUseAmbush,omitempty"`
 	CanUseDefenderArmorers    bool               `json:"canUseDefenderArmorers,omitempty"`
 	CanUseSappers             bool               `json:"canUseSappers,omitempty"`
@@ -64,17 +76,22 @@ type battleSession struct {
 	DefenderCanAmbush         bool
 	DefenderCanArmorers       bool
 	DefenderCanSappers        bool
-	DefenderResponded         bool
+	DefenderAmbushResponded   bool
 	DefenderAmbush            bool
+	DefenderEffectsResponded  bool
 	DefenderUsedArmorers      bool
 	DefenderUsedSappers       bool
 	AttackerCanCounterAmbush  bool
 	AttackerCanArmorers       bool
 	AttackerCanBrutalTactics  bool
-	AttackerResponded         bool
+	AttackerCounterResponded  bool
 	AttackerCounterAmbush     bool
+	AttackerEffectsResponded  bool
 	AttackerUsedArmorers      bool
 	AttackerUsedBrutalTactics bool
+	RollsResolved             bool
+	AttackerRoll              int
+	DefenderRoll              int
 	ResolvedAction            *game.Action
 }
 
@@ -223,22 +240,25 @@ func (s *battleSessionStore) applyResponse(gameID string, revision int64, perspe
 	if session.Revision != revision {
 		return battleSession{}, errBattleSessionStale
 	}
+	responseKind := currentBattleResponseKind(session)
 	if perspective != currentBattleResponder(session) {
 		return battleSession{}, errBattleResponseForbidden
 	}
-	switch perspective {
-	case session.DefenderFaction:
-		if session.DefenderResponded {
+	switch responseKind {
+	case battleResponseDefenderAmbush:
+		if session.DefenderAmbushResponded {
 			return battleSession{}, errBattleResponseAlreadyProvided
-		}
-		if !requiresDefenderResponse(session.BattleContext) {
-			return battleSession{}, errBattleResponseNotAvailable
 		}
 		if req.UseAmbush != nil {
 			if !session.DefenderCanAmbush && *req.UseAmbush {
 				return battleSession{}, errBattleResponseNotAvailable
 			}
 			session.DefenderAmbush = session.DefenderCanAmbush && *req.UseAmbush
+		}
+		session.DefenderAmbushResponded = true
+	case battleResponseDefenderEffects:
+		if session.DefenderEffectsResponded {
+			return battleSession{}, errBattleResponseAlreadyProvided
 		}
 		if req.UseDefenderArmorers != nil {
 			if !session.DefenderCanArmorers && *req.UseDefenderArmorers {
@@ -252,19 +272,21 @@ func (s *battleSessionStore) applyResponse(gameID string, revision int64, perspe
 			}
 			session.DefenderUsedSappers = session.DefenderCanSappers && *req.UseSappers
 		}
-		session.DefenderResponded = true
-	case session.AttackerFaction:
-		if session.AttackerResponded {
+		session.DefenderEffectsResponded = true
+	case battleResponseAttackerCounterAmbush:
+		if session.AttackerCounterResponded {
 			return battleSession{}, errBattleResponseAlreadyProvided
-		}
-		if !requiresAttackerResponse(session) {
-			return battleSession{}, errBattleResponseNotAvailable
 		}
 		if req.UseCounterAmbush != nil {
 			if !canSessionUseCounterAmbush(session) && *req.UseCounterAmbush {
 				return battleSession{}, errBattleResponseNotAvailable
 			}
 			session.AttackerCounterAmbush = canSessionUseCounterAmbush(session) && *req.UseCounterAmbush
+		}
+		session.AttackerCounterResponded = true
+	case battleResponseAttackerEffects:
+		if session.AttackerEffectsResponded {
+			return battleSession{}, errBattleResponseAlreadyProvided
 		}
 		if req.UseAttackerArmorers != nil {
 			if !session.AttackerCanArmorers && *req.UseAttackerArmorers {
@@ -278,42 +300,101 @@ func (s *battleSessionStore) applyResponse(gameID string, revision int64, perspe
 			}
 			session.AttackerUsedBrutalTactics = session.AttackerCanBrutalTactics && *req.UseBrutalTactics
 		}
-		session.AttackerResponded = true
+		session.AttackerEffectsResponded = true
 	default:
-		return battleSession{}, errBattleResponseForbidden
+		return battleSession{}, errBattleResponseNotAvailable
 	}
 
 	s.byGame[gameID] = session
 	return session, nil
 }
 
-func requiresDefenderResponse(context game.BattleContext) bool {
-	return context.CanDefenderAmbush || context.CanDefenderArmorers || context.CanDefenderSappers
+func (s *battleSessionStore) storeRolls(gameID string, revision int64, attackerRoll int, defenderRoll int) (battleSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session, ok := s.byGame[gameID]
+	if !ok {
+		return battleSession{}, errBattleSessionNotFound
+	}
+	if session.Revision != revision {
+		return battleSession{}, errBattleSessionStale
+	}
+	if session.RollsResolved {
+		return session, nil
+	}
+
+	session.AttackerRoll = attackerRoll
+	session.DefenderRoll = defenderRoll
+	session.RollsResolved = true
+	s.byGame[gameID] = session
+	return session, nil
+}
+
+func requiresBattleSession(context game.BattleContext) bool {
+	return context.CanDefenderAmbush ||
+		context.CanAttackerCounterAmbush ||
+		context.CanDefenderArmorers ||
+		context.CanDefenderSappers ||
+		context.CanAttackerArmorers ||
+		context.CanAttackerBrutalTactics
+}
+
+func requiresDefenderAmbushResponse(context game.BattleContext) bool {
+	return context.CanDefenderAmbush
+}
+
+func requiresPostRollResponse(context game.BattleContext) bool {
+	return context.CanDefenderArmorers ||
+		context.CanDefenderSappers ||
+		context.CanAttackerArmorers ||
+		context.CanAttackerBrutalTactics
 }
 
 func requiresAttackerBaseResponse(context game.BattleContext) bool {
 	return context.CanAttackerArmorers || context.CanAttackerBrutalTactics
 }
 
-func requiresAttackerResponse(session battleSession) bool {
-	if !session.DefenderResponded && requiresDefenderResponse(session.BattleContext) {
-		return false
-	}
-	return canSessionUseCounterAmbush(session) || session.AttackerCanArmorers || session.AttackerCanBrutalTactics
+func requiresDefenderEffectsResponse(session battleSession) bool {
+	return session.RollsResolved && (session.DefenderCanArmorers || session.DefenderCanSappers)
+}
+
+func requiresAttackerEffectsResponse(session battleSession) bool {
+	return session.RollsResolved && (session.AttackerCanArmorers || session.AttackerCanBrutalTactics)
 }
 
 func canSessionUseCounterAmbush(session battleSession) bool {
 	return session.DefenderAmbush && session.AttackerCanCounterAmbush
 }
 
+func currentBattleResponseKind(session battleSession) battleResponseKind {
+	if !session.DefenderAmbushResponded && requiresDefenderAmbushResponse(session.BattleContext) {
+		return battleResponseDefenderAmbush
+	}
+	if !session.AttackerCounterResponded && canSessionUseCounterAmbush(session) {
+		return battleResponseAttackerCounterAmbush
+	}
+	if !session.RollsResolved {
+		return battleResponseNone
+	}
+	if !session.DefenderEffectsResponded && requiresDefenderEffectsResponse(session) {
+		return battleResponseDefenderEffects
+	}
+	if !session.AttackerEffectsResponded && requiresAttackerEffectsResponse(session) {
+		return battleResponseAttackerEffects
+	}
+	return battleResponseNone
+}
+
 func currentBattleResponder(session battleSession) game.Faction {
-	if !session.DefenderResponded && requiresDefenderResponse(session.BattleContext) {
+	switch currentBattleResponseKind(session) {
+	case battleResponseDefenderAmbush, battleResponseDefenderEffects:
 		return session.DefenderFaction
-	}
-	if !session.AttackerResponded && requiresAttackerResponse(session) {
+	case battleResponseAttackerCounterAmbush, battleResponseAttackerEffects:
 		return session.AttackerFaction
+	default:
+		return 0
 	}
-	return 0
 }
 
 func battleSessionsMatch(left battleSession, right battleSession) bool {
@@ -344,13 +425,14 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 
 	stage := BattlePromptReadyToResolve
 	waitingOn := session.AttackerFaction
-	if !session.DefenderResponded && requiresDefenderResponse(session.BattleContext) {
+	responseKind := currentBattleResponseKind(session)
+	if responseKind == battleResponseDefenderAmbush || responseKind == battleResponseDefenderEffects {
 		stage = BattlePromptWaitingDefender
 		waitingOn = session.DefenderFaction
 		if perspective == session.DefenderFaction {
 			stage = BattlePromptDefenderTurn
 		}
-	} else if !session.AttackerResponded && requiresAttackerResponse(session) {
+	} else if responseKind == battleResponseAttackerCounterAmbush || responseKind == battleResponseAttackerEffects {
 		stage = BattlePromptWaitingAttacker
 		waitingOn = session.AttackerFaction
 		if perspective == session.AttackerFaction {
@@ -366,24 +448,36 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 		WaitingOnFaction: waitingOn,
 		BattleContext:    redactBattleContextForPerspective(session.BattleContext, perspective),
 	}
+	if session.RollsResolved {
+		prompt.AttackerRoll = session.AttackerRoll
+		prompt.DefenderRoll = session.DefenderRoll
+	}
 
-	if perspective == session.DefenderFaction && !session.DefenderResponded {
+	if perspective == session.DefenderFaction && responseKind == battleResponseDefenderAmbush {
 		prompt.CanUseAmbush = session.DefenderCanAmbush
+	}
+	if perspective == session.DefenderFaction && responseKind == battleResponseDefenderEffects {
 		prompt.CanUseDefenderArmorers = session.DefenderCanArmorers
 		prompt.CanUseSappers = session.DefenderCanSappers
 	}
-	if perspective == session.AttackerFaction && currentBattleResponder(session) == session.AttackerFaction {
+	if perspective == session.AttackerFaction && responseKind == battleResponseAttackerCounterAmbush {
 		prompt.CanUseCounterAmbush = canSessionUseCounterAmbush(session)
+	}
+	if perspective == session.AttackerFaction && responseKind == battleResponseAttackerEffects {
 		prompt.CanUseAttackerArmorers = session.AttackerCanArmorers
 		prompt.CanUseBrutalTactics = session.AttackerCanBrutalTactics
 	}
-	if session.DefenderResponded {
+	if session.DefenderAmbushResponded {
 		prompt.DefenderAmbush = session.DefenderAmbush
+	}
+	if session.DefenderEffectsResponded {
 		prompt.DefenderUsedArmorers = session.DefenderUsedArmorers
 		prompt.DefenderUsedSappers = session.DefenderUsedSappers
 	}
-	if session.AttackerResponded {
+	if session.AttackerCounterResponded {
 		prompt.AttackerCounterAmbush = session.AttackerCounterAmbush
+	}
+	if session.AttackerEffectsResponded {
 		prompt.AttackerUsedArmorers = session.AttackerUsedArmorers
 		prompt.AttackerUsedBrutalTactics = session.AttackerUsedBrutalTactics
 	}
@@ -416,7 +510,7 @@ func redactBattleContextForPerspective(context game.BattleContext, perspective g
 
 func pendingBattleSessionError(gameID string, revision int64, context game.BattleContext) ErrorResponse {
 	err := errBattleSessionPendingResponse
-	if !requiresDefenderResponse(context) && requiresAttackerBaseResponse(context) {
+	if !requiresDefenderAmbushResponse(context) && requiresAttackerBaseResponse(context) {
 		err = errBattleSessionPendingAttacker
 	}
 

@@ -231,6 +231,35 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if context.multiplayer {
+		if session, ok := battleSessions.get(req.GameID); ok {
+			if session.Revision != context.record.Revision || !battleActionsMatch(session.Action, req.Action) {
+				battleSessions.clear(req.GameID)
+				if lobby, ok := lobbies.getByGameID(req.GameID); ok {
+					globalHub.broadcastBattlePrompt(lobby.JoinCode, nil)
+				}
+				writeJSON(w, http.StatusConflict, ErrorResponse{
+					Error:    errBattleSessionStale.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			if responseKind := currentBattleResponseKind(session); responseKind != battleResponseNone {
+				responder := currentBattleResponder(session)
+				errResp := ErrorResponse{
+					Error:    errBattleSessionPendingResponse.Error(),
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				}
+				if responder == session.AttackerFaction {
+					errResp.Error = errBattleSessionPendingAttacker.Error()
+				}
+				writeJSON(w, http.StatusConflict, errResp)
+				return
+			}
+		}
+	}
 
 	effectiveReq := req
 	effectiveReq.State = context.state
@@ -250,12 +279,14 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 	modifiers := req.Modifiers
 	attackerRoll := req.AttackerRoll
 	defenderRoll := req.DefenderRoll
+	rollsResolved := false
+	skipBattleRoll := false
 	var battleContext game.BattleContext
 	if context.multiplayer {
 		battleContext = engine.BattleContext(context.state, req.Action)
-		if requiresDefenderResponse(battleContext) || requiresAttackerBaseResponse(battleContext) {
-			session, ok := battleSessions.get(req.GameID)
-			if !ok {
+		session, sessionOK := battleSessions.get(req.GameID)
+		if sessionOK || requiresBattleSession(battleContext) {
+			if !sessionOK {
 				writeJSON(w, http.StatusConflict, pendingBattleSessionError(req.GameID, context.record.Revision, battleContext))
 				return
 			}
@@ -271,7 +302,8 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			if responder := currentBattleResponder(session); responder != 0 {
+			if responseKind := currentBattleResponseKind(session); responseKind != battleResponseNone {
+				responder := currentBattleResponder(session)
 				errResp := ErrorResponse{
 					Error:    errBattleSessionPendingResponse.Error(),
 					GameID:   req.GameID,
@@ -289,18 +321,26 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 			modifiers.AttackerCounterAmbush = session.AttackerCounterAmbush
 			modifiers.AttackerUsesArmorers = session.AttackerUsedArmorers
 			modifiers.AttackerUsesBrutalTactics = session.AttackerUsedBrutalTactics
+			if session.RollsResolved {
+				attackerRoll = session.AttackerRoll
+				defenderRoll = session.DefenderRoll
+				rollsResolved = true
+			}
+			skipBattleRoll = battleAmbushEndsBeforeRoll(context.state, session)
 		}
-		rolledAttacker, rolledDefender, err := battleRoller()
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, &ErrorResponse{
-				Error:    "failed to roll battle dice",
-				GameID:   req.GameID,
-				Revision: context.record.Revision,
-			})
-			return
+		if !rollsResolved && !skipBattleRoll {
+			rolledAttacker, rolledDefender, err := battleRoller()
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, &ErrorResponse{
+					Error:    "failed to roll battle dice",
+					GameID:   req.GameID,
+					Revision: context.record.Revision,
+				})
+				return
+			}
+			attackerRoll = rolledAttacker
+			defenderRoll = rolledDefender
 		}
-		attackerRoll = rolledAttacker
-		defenderRoll = rolledDefender
 	}
 
 	useModifiers := req.UseModifiers
@@ -437,7 +477,7 @@ func HandleOpenBattle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	battleContext := engine.BattleContext(context.state, req.Action)
-	if !requiresDefenderResponse(battleContext) && !requiresAttackerBaseResponse(battleContext) {
+	if !requiresBattleSession(battleContext) {
 		writeJSON(w, http.StatusOK, BattlePromptResponse{
 			Prompt: battlePromptView(battleSession{
 				GameID:          req.GameID,
@@ -454,6 +494,15 @@ func HandleOpenBattle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session, _ := battleSessions.open(req.GameID, context.record.Revision, req.Action, battleContext)
+	session, err := advanceBattleSessionAfterResponses(req.GameID, context.record.Revision, context.state, session)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, &ErrorResponse{
+			Error:    "failed to roll battle dice",
+			GameID:   req.GameID,
+			Revision: context.record.Revision,
+		})
+		return
+	}
 	if lobby, ok := lobbies.getByGameID(req.GameID); ok {
 		globalHub.broadcastBattlePrompt(lobby.JoinCode, &session)
 	}
@@ -551,6 +600,15 @@ func HandleBattleResponse(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	session, err = advanceBattleSessionAfterResponses(req.GameID, record.Revision, record.State, session)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, &ErrorResponse{
+			Error:    "failed to roll battle dice",
+			GameID:   req.GameID,
+			Revision: record.Revision,
+		})
+		return
+	}
 
 	if lobby, ok := lobbies.getByGameID(req.GameID); ok {
 		globalHub.broadcastBattlePrompt(lobby.JoinCode, &session)
@@ -561,6 +619,43 @@ func HandleBattleResponse(w http.ResponseWriter, r *http.Request) {
 		GameID:   req.GameID,
 		Revision: record.Revision,
 	})
+}
+
+func advanceBattleSessionAfterResponses(gameID string, revision int64, state game.GameState, session battleSession) (battleSession, error) {
+	if !shouldRollBattleSession(state, session) {
+		return session, nil
+	}
+
+	attackerRoll, defenderRoll, err := battleRoller()
+	if err != nil {
+		return battleSession{}, err
+	}
+	return battleSessions.storeRolls(gameID, revision, attackerRoll, defenderRoll)
+}
+
+func shouldRollBattleSession(state game.GameState, session battleSession) bool {
+	if session.RollsResolved || !requiresPostRollResponse(session.BattleContext) {
+		return false
+	}
+	if currentBattleResponseKind(session) != battleResponseNone {
+		return false
+	}
+	return !battleAmbushEndsBeforeRoll(state, session)
+}
+
+func battleAmbushEndsBeforeRoll(state game.GameState, session battleSession) bool {
+	if !session.DefenderAmbush || session.AttackerCounterAmbush || session.AttackerFaction == game.Vagabond {
+		return false
+	}
+
+	for _, clearing := range state.Map.Clearings {
+		if clearing.ID != session.Action.Battle.ClearingID {
+			continue
+		}
+		return clearing.Warriors[session.AttackerFaction] <= 2
+	}
+
+	return false
 }
 
 func HandleSetup(w http.ResponseWriter, r *http.Request) {

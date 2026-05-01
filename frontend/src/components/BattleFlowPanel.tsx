@@ -192,6 +192,7 @@ export function BattleFlowPanel({
     }
   ].filter((effect) => (effect.key === "scouting-party" ? effect.available : effect.available || effect.selected));
   const chosenEffects = effectOptions.filter((effect) => effect.selected);
+  const promptHasRolls = multiplayerBattlePrompt?.attackerRoll !== undefined && multiplayerBattlePrompt?.defenderRoll !== undefined;
 
   return (
     <section className={`panel ${surface === "modal" ? "battle-event-panel" : "sidebar-panel"}`}>
@@ -242,10 +243,14 @@ export function BattleFlowPanel({
             <span className="summary-line">Waiting on {multiplayerWaitingLabel} to respond.</span>
           ) : null}
           {isDefenderPrompt ? (
-            <span className="summary-line">Defender response required before battle resolution.</span>
+            <span className="summary-line">
+              {promptHasRolls ? "Dice are rolled. Defender after-roll response required." : "Defender response required before battle resolution."}
+            </span>
           ) : null}
           {isAttackerPrompt ? (
-            <span className="summary-line">Attacker follow-up response required before battle resolution.</span>
+            <span className="summary-line">
+              {promptHasRolls ? "Dice are rolled. Attacker after-roll response required." : "Attacker follow-up response required before battle resolution."}
+            </span>
           ) : null}
           {isReadyPrompt ? (
             <span className="summary-line">
@@ -261,6 +266,12 @@ export function BattleFlowPanel({
                   {effect.owner}: {effect.label}
                 </span>
               ))}
+            </div>
+          ) : null}
+          {promptHasRolls ? (
+            <div className="known-card-pill-list">
+              <span className="known-card-pill">Attacker roll: {multiplayerBattlePrompt.attackerRoll}</span>
+              <span className="known-card-pill">Defender roll: {multiplayerBattlePrompt.defenderRoll}</span>
             </div>
           ) : null}
         </div>
