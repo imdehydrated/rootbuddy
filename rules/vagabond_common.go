@@ -67,6 +67,38 @@ func vagabondItemIndexes(state game.GameState, itemType game.ItemType, statuses 
 	return indexes
 }
 
+func vagabondItemIndexesInZone(state game.GameState, itemType game.ItemType, zone game.ItemZone) []int {
+	indexes := []int{}
+	for index, item := range state.Vagabond.Items {
+		if item.Type != itemType {
+			continue
+		}
+		if game.ItemCurrentZone(item) != zone {
+			continue
+		}
+		indexes = append(indexes, index)
+	}
+
+	return indexes
+}
+
+func vagabondItemIndexesInZones(state game.GameState, zones ...game.ItemZone) []int {
+	zoneSet := map[game.ItemZone]bool{}
+	for _, zone := range zones {
+		zoneSet[zone] = true
+	}
+
+	indexes := []int{}
+	for index, item := range state.Vagabond.Items {
+		if !zoneSet[game.ItemCurrentZone(item)] {
+			continue
+		}
+		indexes = append(indexes, index)
+	}
+
+	return indexes
+}
+
 func vagabondReadyItemIndexes(state game.GameState) []int {
 	indexes := []int{}
 	for index, item := range state.Vagabond.Items {

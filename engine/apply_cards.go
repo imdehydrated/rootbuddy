@@ -23,6 +23,7 @@ func applyCraft(state *game.GameState, action game.Action) {
 				Type:   *card.CraftedItem,
 				Status: game.ItemReady,
 			})
+			state.Vagabond.Items[len(state.Vagabond.Items)-1] = game.NormalizeItemZone(state.Vagabond.Items[len(state.Vagabond.Items)-1])
 		}
 	}
 	if found {

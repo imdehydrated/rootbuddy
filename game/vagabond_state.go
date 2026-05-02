@@ -29,9 +29,47 @@ const (
 	ItemDamaged
 )
 
+type ItemZone int
+
+const (
+	ItemZoneUnspecified ItemZone = iota
+	ItemZoneTrack
+	ItemZoneSatchel
+	ItemZoneDamaged
+)
+
 type Item struct {
 	Type   ItemType
 	Status ItemStatus
+	Zone   ItemZone
+}
+
+func IsTrackItemType(itemType ItemType) bool {
+	switch itemType {
+	case ItemTea, ItemCoin, ItemBag:
+		return true
+	default:
+		return false
+	}
+}
+
+func ItemZoneForStatus(itemType ItemType, status ItemStatus) ItemZone {
+	if status == ItemDamaged {
+		return ItemZoneDamaged
+	}
+	if IsTrackItemType(itemType) && status == ItemReady {
+		return ItemZoneTrack
+	}
+	return ItemZoneSatchel
+}
+
+func NormalizeItemZone(item Item) Item {
+	item.Zone = ItemZoneForStatus(item.Type, item.Status)
+	return item
+}
+
+func ItemCurrentZone(item Item) ItemZone {
+	return NormalizeItemZone(item).Zone
 }
 
 type RelationshipLevel int

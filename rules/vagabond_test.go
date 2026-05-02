@@ -375,16 +375,16 @@ func TestValidExploreActionsUsesRuinItems(t *testing.T) {
 	}
 }
 
-func TestValidVagabondEveningActionsDrawsBaseCardPlusCoins(t *testing.T) {
+func TestValidVagabondEveningActionsDrawsBaseCardPlusTrackCoins(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Vagabond,
 		CurrentPhase: game.Evening,
 		CurrentStep:  game.StepEvening,
 		Vagabond: game.VagabondState{
 			Items: []game.Item{
-				{Type: game.ItemCoin, Status: game.ItemReady},
-				{Type: game.ItemCoin, Status: game.ItemExhausted},
-				{Type: game.ItemCoin, Status: game.ItemDamaged},
+				{Type: game.ItemCoin, Status: game.ItemReady, Zone: game.ItemZoneTrack},
+				{Type: game.ItemCoin, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemCoin, Status: game.ItemDamaged, Zone: game.ItemZoneDamaged},
 			},
 		},
 		TurnProgress: game.TurnProgress{
@@ -397,11 +397,39 @@ func TestValidVagabondEveningActionsDrawsBaseCardPlusCoins(t *testing.T) {
 		Type: game.ActionEveningDraw,
 		EveningDraw: &game.EveningDrawAction{
 			Faction: game.Vagabond,
-			Count:   3,
+			Count:   2,
 		},
 	}
 	if !containsAction(got, want) {
 		t.Fatalf("expected evening draw action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondBirdsongRefreshCountsOnlyTrackTea(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemTea, Status: game.ItemReady, Zone: game.ItemZoneTrack},
+				{Type: game.ItemTea, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemSword, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTorch, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemHammer, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+			},
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
+	if len(got) == 0 {
+		t.Fatalf("expected refresh choices")
+	}
+	for _, action := range got {
+		if action.Daybreak != nil && len(action.Daybreak.RefreshedItemIndexes) != 4 {
+			t.Fatalf("expected one track tea to allow four refreshed items, got %+v", action)
+		}
 	}
 }
 
@@ -529,6 +557,56 @@ func TestValidVagabondEveningActionsChecksItemCapacityAfterDiscard(t *testing.T)
 
 	if !containsAction(got, want) {
 		t.Fatalf("expected item-capacity removal choice %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondEveningCapacityCountsSatchelAndDamagedButNotTrack(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Evening,
+		CurrentStep:  game.StepEvening,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemBag, Status: game.ItemReady, Zone: game.ItemZoneTrack},
+				{Type: game.ItemBag, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemSword, Status: game.ItemDamaged, Zone: game.ItemZoneDamaged},
+			},
+		},
+		TurnProgress: game.TurnProgress{
+			VagabondRestResolved:    true,
+			VagabondEveningDrawn:    true,
+			VagabondDiscardResolved: true,
+		},
+	}
+
+	got := ValidVagabondEveningActions(state)
+	wantDamaged := game.Action{
+		Type: game.ActionVagabondItemCapacity,
+		VagabondCapacity: &game.VagabondItemCapacityAction{
+			Faction:     game.Vagabond,
+			ItemIndexes: []int{9},
+		},
+	}
+	unwantTrackBag := game.Action{
+		Type: game.ActionVagabondItemCapacity,
+		VagabondCapacity: &game.VagabondItemCapacityAction{
+			Faction:     game.Vagabond,
+			ItemIndexes: []int{0},
+		},
+	}
+
+	if !containsAction(got, wantDamaged) {
+		t.Fatalf("expected damaged item to count against capacity %+v, got %+v", wantDamaged, got)
+	}
+	if containsAction(got, unwantTrackBag) {
+		t.Fatalf("did not expect ready track bag to be removable for capacity, got %+v", got)
 	}
 }
 

@@ -82,6 +82,9 @@ func TestVagabondStartingItemsAreSeparateFromSharedSupply(t *testing.T) {
 				if got[index].Type != itemType || got[index].Status != game.ItemReady {
 					t.Fatalf("expected starting item %d to be ready %v, got %+v", index, itemType, got)
 				}
+				if got[index].Zone != game.ItemZoneForStatus(itemType, game.ItemReady) {
+					t.Fatalf("expected starting item %d to have law-derived zone, got %+v", index, got[index])
+				}
 			}
 		})
 	}
@@ -121,6 +124,9 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 	}
 	if len(next.Vagabond.Items) != 2 || next.Vagabond.Items[1].Type != game.ItemSword {
 		t.Fatalf("expected crafted sword to be added to Vagabond items, got %+v", next.Vagabond.Items)
+	}
+	if next.Vagabond.Items[1].Zone != game.ItemZoneSatchel {
+		t.Fatalf("expected crafted sword to enter satchel, got %+v", next.Vagabond.Items[1])
 	}
 	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 33 {
 		t.Fatalf("expected crafted card to be discarded, got %+v", next.DiscardPile)

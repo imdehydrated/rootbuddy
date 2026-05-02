@@ -1,4 +1,4 @@
-import { factionLabels, itemStatusLabels, itemTypeLabels, relationshipLabels, vagabondCharacterLabels } from "../../labels";
+import { factionLabels, itemStatusLabels, itemTypeLabels, itemZoneLabels, relationshipLabels, vagabondCharacterLabels } from "../../labels";
 import type { GameState } from "../../types";
 
 type VagabondEditorProps = {
@@ -78,7 +78,8 @@ export function VagabondEditor({ state, onUpdateState }: VagabondEditorProps) {
             ) : (
               state.vagabond.items.map((item, index) => (
                 <span key={`${item.type}-${index}`}>
-                  {index + 1}. {itemStatusLabels[item.status] ?? "Unknown"} {itemTypeLabels[item.type] ?? `Item ${item.type}`}
+                  {index + 1}. {itemStatusLabels[item.status] ?? "Unknown"} {itemTypeLabels[item.type] ?? `Item ${item.type}`} -{" "}
+                  {itemZoneLabels[item.zone] ?? "Unknown Zone"}
                 </span>
               ))
             )}

@@ -20,6 +20,16 @@ function hasWarriors(clearing: Clearing): boolean {
   return Object.values(clearing.warriors).some((count) => count > 0);
 }
 
+function itemZoneForStatus(itemType: number, status: number): number {
+  if (status === 2) {
+    return 3;
+  }
+  if ((itemType === 0 || itemType === 1 || itemType === 7) && status === 0) {
+    return 1;
+  }
+  return 2;
+}
+
 export function isBoardEmpty(state: GameState): boolean {
   return state.map.clearings.every(
     (clearing) => clearing.wood === 0 && !hasWarriors(clearing) && clearing.buildings.length === 0
@@ -60,6 +70,10 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.alliance.supporters ??= [];
   normalized.vagabond.cardsInHand ??= [];
   normalized.vagabond.items ??= [];
+  normalized.vagabond.items = normalized.vagabond.items.map((item) => ({
+    ...item,
+    zone: itemZoneForStatus(item.type, item.status)
+  }));
   normalized.vagabond.relationships ??= {};
   normalized.vagabond.forestID ??= 0;
   normalized.vagabond.questsAvailable ??= [];

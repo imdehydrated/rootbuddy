@@ -23,6 +23,7 @@ export interface Forest {
 export interface Item {
   type: number;
   status: number;
+  zone: number;
 }
 
 export interface Quest {

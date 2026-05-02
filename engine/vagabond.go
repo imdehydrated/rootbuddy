@@ -46,6 +46,11 @@ func vagabondItemIndex(state game.GameState, itemType game.ItemType, status game
 	return -1, false
 }
 
+func setVagabondItemStatus(state *game.GameState, index int, status game.ItemStatus) {
+	state.Vagabond.Items[index].Status = status
+	state.Vagabond.Items[index].Zone = game.ItemZoneForStatus(state.Vagabond.Items[index].Type, status)
+}
+
 func exhaustReadyItemsByType(state *game.GameState, itemType game.ItemType, count int) int {
 	exhausted := 0
 	for exhausted < count {
@@ -54,7 +59,7 @@ func exhaustReadyItemsByType(state *game.GameState, itemType game.ItemType, coun
 			return exhausted
 		}
 
-		state.Vagabond.Items[index].Status = game.ItemExhausted
+		setVagabondItemStatus(state, index, game.ItemExhausted)
 		exhausted++
 	}
 
@@ -70,7 +75,7 @@ func exhaustAnyReadyItems(state *game.GameState, count int) int {
 				continue
 			}
 
-			state.Vagabond.Items[index].Status = game.ItemExhausted
+			setVagabondItemStatus(state, index, game.ItemExhausted)
 			exhausted++
 			found = true
 			break
@@ -96,7 +101,7 @@ func exhaustReadyItemsByIndexes(state *game.GameState, indexes []int) bool {
 	}
 
 	for _, index := range indexes {
-		state.Vagabond.Items[index].Status = game.ItemExhausted
+		setVagabondItemStatus(state, index, game.ItemExhausted)
 	}
 
 	return true
@@ -110,14 +115,14 @@ func repairDamagedItem(state *game.GameState, index int) bool {
 		return false
 	}
 
-	state.Vagabond.Items[index].Status = game.ItemReady
+	setVagabondItemStatus(state, index, game.ItemReady)
 	return true
 }
 
 func repairAllDamagedItems(state *game.GameState) {
 	for index, item := range state.Vagabond.Items {
 		if item.Status == game.ItemDamaged {
-			state.Vagabond.Items[index].Status = game.ItemReady
+			setVagabondItemStatus(state, index, game.ItemReady)
 		}
 	}
 }
@@ -131,7 +136,7 @@ func damageVagabondItems(state *game.GameState, count int) int {
 				continue
 			}
 
-			state.Vagabond.Items[index].Status = game.ItemDamaged
+			setVagabondItemStatus(state, index, game.ItemDamaged)
 			damaged++
 			found = true
 			break
@@ -331,13 +336,13 @@ func applyDaybreak(state *game.GameState, action game.Action) {
 		return
 	}
 
-	readyTeaCount := len(vagabondItemIndexesByStatus(*state, game.ItemTea, game.ItemReady))
+	readyTeaCount := vagabondTrackItemCount(*state, game.ItemTea)
 	for _, index := range action.Daybreak.RefreshedItemIndexes {
 		if index < 0 || index >= len(state.Vagabond.Items) {
 			continue
 		}
 		if state.Vagabond.Items[index].Status == game.ItemExhausted {
-			state.Vagabond.Items[index].Status = game.ItemReady
+			setVagabondItemStatus(state, index, game.ItemReady)
 		}
 	}
 
@@ -382,6 +387,7 @@ func applyExplore(state *game.GameState, action game.Action) {
 		Type:   action.Explore.ItemType,
 		Status: game.ItemReady,
 	})
+	state.Vagabond.Items[len(state.Vagabond.Items)-1] = game.NormalizeItemZone(state.Vagabond.Items[len(state.Vagabond.Items)-1])
 	addVictoryPoints(state, game.Vagabond, 1)
 }
 
@@ -419,7 +425,7 @@ func applyAid(state *game.GameState, action game.Action) {
 	if !ok {
 		return
 	}
-	state.Vagabond.Items[action.Aid.ItemIndex].Status = game.ItemExhausted
+	setVagabondItemStatus(state, action.Aid.ItemIndex, game.ItemExhausted)
 
 	appendCardToFactionHand(state, action.Aid.TargetFaction, card)
 	improveVagabondRelationship(state, action.Aid.TargetFaction)
@@ -535,6 +541,16 @@ func vagabondItemIndexesByStatus(state game.GameState, itemType game.ItemType, s
 		}
 	}
 	return indexes
+}
+
+func vagabondTrackItemCount(state game.GameState, itemType game.ItemType) int {
+	count := 0
+	for _, item := range state.Vagabond.Items {
+		if item.Type == itemType && game.ItemCurrentZone(item) == game.ItemZoneTrack {
+			count++
+		}
+	}
+	return count
 }
 
 func vagabondReadyItemCount(state game.GameState) int {

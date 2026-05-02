@@ -128,8 +128,40 @@ func TestApplyDaybreakMarksVagabondRefreshResolved(t *testing.T) {
 	if next.Vagabond.Items[0].Status != game.ItemReady {
 		t.Fatalf("expected exhausted item to refresh, got %v", next.Vagabond.Items[0].Status)
 	}
+	if next.Vagabond.Items[0].Zone != game.ItemZoneSatchel {
+		t.Fatalf("expected refreshed boots to stay in satchel, got %v", next.Vagabond.Items[0].Zone)
+	}
 	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
 		t.Fatalf("expected vagabond to remain in birdsong after refresh, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+}
+
+func TestApplyDaybreakMovesTrackItemsBetweenSatchelAndTrack(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemCoin, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTea, Status: game.ItemReady, Zone: game.ItemZoneTrack},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionDaybreak,
+		Daybreak: &game.DaybreakAction{
+			Faction:              game.Vagabond,
+			RefreshedItemIndexes: []int{0},
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[0].Zone != game.ItemZoneTrack {
+		t.Fatalf("expected refreshed coin to return to track, got %+v", next.Vagabond.Items[0])
+	}
+	if next.Vagabond.Items[1].Status != game.ItemExhausted || next.Vagabond.Items[1].Zone != game.ItemZoneSatchel {
+		t.Fatalf("expected spent tea to move to satchel exhausted, got %+v", next.Vagabond.Items[1])
 	}
 }
 
@@ -336,7 +368,7 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 			InForest: true,
 			Items: []game.Item{
 				{Type: game.ItemSword, Status: game.ItemDamaged},
-				{Type: game.ItemBoots, Status: game.ItemDamaged},
+				{Type: game.ItemTea, Status: game.ItemDamaged},
 			},
 		},
 	}
@@ -353,6 +385,12 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 		if item.Status != game.ItemReady {
 			t.Fatalf("expected forest rest to repair all items, got %+v", next.Vagabond.Items)
 		}
+	}
+	if next.Vagabond.Items[0].Zone != game.ItemZoneSatchel {
+		t.Fatalf("expected repaired sword to return to satchel, got %+v", next.Vagabond.Items[0])
+	}
+	if next.Vagabond.Items[1].Zone != game.ItemZoneTrack {
+		t.Fatalf("expected repaired tea to return to track, got %+v", next.Vagabond.Items[1])
 	}
 }
 

@@ -114,11 +114,11 @@ export const sampleState: GameState = {
     forestID: 0,
     inForest: false,
     items: [
-      { type: 6, status: 0 },
-      { type: 5, status: 0 },
-      { type: 4, status: 0 },
-      { type: 3, status: 0 },
-      { type: 0, status: 1 }
+      { type: 6, status: 0, zone: 2 },
+      { type: 5, status: 0, zone: 2 },
+      { type: 4, status: 0, zone: 2 },
+      { type: 3, status: 0, zone: 2 },
+      { type: 0, status: 1, zone: 2 }
     ],
     relationships: { "0": 1, "1": 2, "2": 1 },
     questsCompleted: [],

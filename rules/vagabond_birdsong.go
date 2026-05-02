@@ -14,7 +14,7 @@ func ValidVagabondBirdsongActions(state game.GameState) []game.Action {
 	actions := []game.Action{}
 	if !state.TurnProgress.HasRefreshed {
 		exhausted := vagabondExhaustedItemIndexes(state)
-		refreshLimit := 3 + len(vagabondItemIndexes(state, game.ItemTea, game.ItemReady))
+		refreshLimit := 3 + len(vagabondItemIndexesInZone(state, game.ItemTea, game.ItemZoneTrack))
 		if refreshLimit > len(exhausted) {
 			refreshLimit = len(exhausted)
 		}

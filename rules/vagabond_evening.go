@@ -3,7 +3,7 @@ package rules
 import "github.com/imdehydrated/rootbuddy/game"
 
 func vagabondDrawCount(state game.GameState) int {
-	coinCount := len(vagabondItemIndexes(state, game.ItemCoin, game.ItemReady, game.ItemExhausted))
+	coinCount := len(vagabondItemIndexesInZone(state, game.ItemCoin, game.ItemZoneTrack))
 	if coinCount > 3 {
 		return 3
 	}
@@ -44,32 +44,13 @@ func vagabondDiscardCardActions(state game.GameState) []game.Action {
 }
 
 func vagabondCapacityLimit(state game.GameState) int {
-	bags := len(vagabondItemIndexes(state, game.ItemBag, game.ItemReady, game.ItemExhausted))
+	bags := len(vagabondItemIndexesInZone(state, game.ItemBag, game.ItemZoneTrack))
 	return 6 + bags*2
 }
 
-func isVagabondSatchelItem(item game.Item) bool {
-	switch item.Type {
-	case game.ItemCrossbow, game.ItemHammer, game.ItemSword, game.ItemTorch, game.ItemBoots:
-		return item.Status != game.ItemDamaged
-	default:
-		return false
-	}
-}
-
-func vagabondSatchelItemIndexes(state game.GameState) []int {
-	indexes := []int{}
-	for index, item := range state.Vagabond.Items {
-		if isVagabondSatchelItem(item) {
-			indexes = append(indexes, index)
-		}
-	}
-	return indexes
-}
-
 func vagabondItemCapacityActions(state game.GameState) []game.Action {
-	satchelIndexes := vagabondSatchelItemIndexes(state)
-	excess := len(satchelIndexes) - vagabondCapacityLimit(state)
+	capacityIndexes := vagabondItemIndexesInZones(state, game.ItemZoneSatchel, game.ItemZoneDamaged)
+	excess := len(capacityIndexes) - vagabondCapacityLimit(state)
 	if excess <= 0 {
 		return []game.Action{
 			{
@@ -82,7 +63,7 @@ func vagabondItemCapacityActions(state game.GameState) []game.Action {
 	}
 
 	actions := []game.Action{}
-	for _, itemIndexes := range chooseItemIndexSubsets(satchelIndexes, excess) {
+	for _, itemIndexes := range chooseItemIndexSubsets(capacityIndexes, excess) {
 		actions = append(actions, game.Action{
 			Type: game.ActionVagabondItemCapacity,
 			VagabondCapacity: &game.VagabondItemCapacityAction{

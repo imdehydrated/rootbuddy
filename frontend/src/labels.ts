@@ -8,6 +8,7 @@ export const eyrieLeaderLabels = ["Builder", "Charismatic", "Commander", "Despot
 export const vagabondCharacterLabels = ["Thief", "Tinker", "Ranger"];
 export const itemTypeLabels = ["Tea", "Coin", "Crossbow", "Hammer", "Sword", "Torch", "Boots", "Bag"];
 export const itemStatusLabels = ["Ready", "Exhausted", "Damaged"];
+export const itemZoneLabels = ["Unspecified", "Track", "Satchel", "Damaged"];
 export const relationshipLabels = ["Hostile", "Indifferent", "Friendly", "Allied"];
 
 export const ACTION_TYPE = {

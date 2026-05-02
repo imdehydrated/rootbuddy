@@ -27,24 +27,24 @@ func VagabondStartingItems(character game.VagabondCharacter) []game.Item {
 	switch character {
 	case game.CharThief:
 		return []game.Item{
-			{Type: game.ItemBoots, Status: game.ItemReady},
-			{Type: game.ItemTorch, Status: game.ItemReady},
-			{Type: game.ItemTea, Status: game.ItemReady},
-			{Type: game.ItemSword, Status: game.ItemReady},
+			game.NormalizeItemZone(game.Item{Type: game.ItemBoots, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemTorch, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemTea, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemSword, Status: game.ItemReady}),
 		}
 	case game.CharTinker:
 		return []game.Item{
-			{Type: game.ItemBoots, Status: game.ItemReady},
-			{Type: game.ItemTorch, Status: game.ItemReady},
-			{Type: game.ItemBag, Status: game.ItemReady},
-			{Type: game.ItemHammer, Status: game.ItemReady},
+			game.NormalizeItemZone(game.Item{Type: game.ItemBoots, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemTorch, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemBag, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemHammer, Status: game.ItemReady}),
 		}
 	case game.CharRanger:
 		return []game.Item{
-			{Type: game.ItemBoots, Status: game.ItemReady},
-			{Type: game.ItemTorch, Status: game.ItemReady},
-			{Type: game.ItemCrossbow, Status: game.ItemReady},
-			{Type: game.ItemSword, Status: game.ItemReady},
+			game.NormalizeItemZone(game.Item{Type: game.ItemBoots, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemTorch, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemCrossbow, Status: game.ItemReady}),
+			game.NormalizeItemZone(game.Item{Type: game.ItemSword, Status: game.ItemReady}),
 		}
 	default:
 		return nil
