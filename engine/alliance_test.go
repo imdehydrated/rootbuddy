@@ -313,6 +313,114 @@ func TestApplyMovementIntoSympathyTransfersOutrageCard(t *testing.T) {
 	}
 }
 
+func TestApplyMovementIntoSympathyDrawsSupporterWhenNoMatchingCard(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Adj:  []int{2},
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Adj:  []int{1},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Deck: []game.CardID{rabbitCard.ID},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{foxCard},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	})
+
+	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != foxCard.ID {
+		t.Fatalf("expected non-matching hand to remain after Outrage draw fallback, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.Alliance.Supporters) != 1 || next.Alliance.Supporters[0].ID != rabbitCard.ID {
+		t.Fatalf("expected Alliance to draw supporter from deck, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.Deck) != 0 {
+		t.Fatalf("expected supporter draw to consume deck card, got %+v", next.Deck)
+	}
+}
+
+func TestApplyMovementIntoSympathyDiscardsSupporterWhenStackIsCapped(t *testing.T) {
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+	foxCard := firstAllianceTestCard(t, game.Fox)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Adj:  []int{2},
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Adj:  []int{1},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{rabbitCard},
+		},
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard, foxCard, foxCard, foxCard, foxCard},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	})
+
+	if len(next.Marquise.CardsInHand) != 0 {
+		t.Fatalf("expected matching Outrage card to leave Marquise hand, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.Alliance.Supporters) != 5 {
+		t.Fatalf("expected capped supporter stack to stay at 5, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != rabbitCard.ID {
+		t.Fatalf("expected capped supporter gain to discard the card, got %+v", next.DiscardPile)
+	}
+}
+
 func TestAllianceEveningDrawStaysInEveningForDiscard(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

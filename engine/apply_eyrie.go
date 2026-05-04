@@ -164,6 +164,9 @@ func applyTurmoil(state *game.GameState, action game.Action) {
 		state.VictoryPoints = map[game.Faction]int{}
 	}
 	state.VictoryPoints[game.Eyrie] -= birdCardsInDecree(state.Eyrie.Decree)
+	if state.VictoryPoints[game.Eyrie] < 0 {
+		state.VictoryPoints[game.Eyrie] = 0
+	}
 
 	DiscardCards(state, state.Eyrie.Decree.Recruit)
 	DiscardCards(state, state.Eyrie.Decree.Move)

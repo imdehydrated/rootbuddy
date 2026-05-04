@@ -144,7 +144,7 @@ func applyMobilize(state *game.GameState, action game.Action) {
 		if _, ok := spendFactionHandCard(state, game.Alliance, card.ID); !ok {
 			return
 		}
-		addAllianceSupporter(state, card)
+		gainAllianceSupporter(state, card)
 		return
 	}
 }

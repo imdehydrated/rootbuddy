@@ -229,3 +229,55 @@ func TestApplyActionCraftScoresItemCardVictoryPoints(t *testing.T) {
 		t.Fatalf("expected item craft to discard card after scoring, got %+v", next.DiscardPile)
 	}
 }
+
+func TestApplyActionCraftEyrieDisdainScoresOnePointForItems(t *testing.T) {
+	state := game.GameState{
+		ItemSupply: map[game.ItemType]int{
+			game.ItemCoin: 1,
+		},
+		Eyrie: game.EyrieState{
+			Leader: game.LeaderCommander,
+			CardsInHand: []game.Card{
+				{ID: 21, Name: "Bake Sale"},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction: game.Eyrie,
+			CardID:  21,
+		},
+	})
+
+	if next.VictoryPoints[game.Eyrie] != 1 {
+		t.Fatalf("expected Eyrie Disdain for Trade to score 1 VP, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionCraftEyrieBuilderScoresPrintedItemPoints(t *testing.T) {
+	state := game.GameState{
+		ItemSupply: map[game.ItemType]int{
+			game.ItemCoin: 1,
+		},
+		Eyrie: game.EyrieState{
+			Leader: game.LeaderBuilder,
+			CardsInHand: []game.Card{
+				{ID: 21, Name: "Bake Sale"},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction: game.Eyrie,
+			CardID:  21,
+		},
+	})
+
+	if next.VictoryPoints[game.Eyrie] != 3 {
+		t.Fatalf("expected Builder to ignore Disdain and score printed VP, got %+v", next.VictoryPoints)
+	}
+}

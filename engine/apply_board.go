@@ -367,6 +367,7 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 		return
 	}
 
+	defenderWasHostileToVagabond := game.VagabondHostileTo(*state, action.BattleResolution.TargetFaction)
 	defenderSummary := applyNonVagabondBattleLosses(
 		state,
 		clearing,
@@ -379,7 +380,17 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	if defenderSummary.sympathy > 0 && action.BattleResolution.Faction != game.Alliance {
 		transferOutrageCard(state, action.BattleResolution.Faction, clearing.Suit)
 	}
-	if action.BattleResolution.Faction == game.Vagabond && defenderSummary.warriors+defenderSummary.buildings+defenderSummary.tokens > 0 {
+	if action.BattleResolution.Faction == game.Vagabond && state.FactionTurn == game.Vagabond {
+		removedPieces := defenderSummary.warriors + defenderSummary.buildings + defenderSummary.tokens
+		infamyPieces := 0
+		if defenderWasHostileToVagabond {
+			infamyPieces = removedPieces
+		} else if defenderSummary.warriors > 0 {
+			infamyPieces = removedPieces - 1
+		}
+		addVictoryPoints(state, game.Vagabond, infamyPieces)
+	}
+	if action.BattleResolution.Faction == game.Vagabond && !defenderWasHostileToVagabond && defenderSummary.warriors > 0 {
 		setVagabondRelationship(state, action.BattleResolution.TargetFaction, game.RelHostile)
 	}
 }

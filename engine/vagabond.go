@@ -172,11 +172,7 @@ func vagabondExhaustedSwordCount(state game.GameState) int {
 }
 
 func vagabondBattleHitCap(state game.GameState) int {
-	cap := vagabondExhaustedSwordCount(state)
-	if vagabondReadySwordCount(state) > 0 {
-		cap++
-	}
-	return cap
+	return vagabondReadySwordCount(state) + vagabondExhaustedSwordCount(state)
 }
 
 func appendCardToFactionHand(state *game.GameState, faction game.Faction, card game.Card) {
@@ -237,10 +233,10 @@ func removeRuinItem(clearing *game.Clearing, itemType game.ItemType) bool {
 	return false
 }
 
-func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Clearing, faction game.Faction) (bool, int, int) {
+func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Clearing, faction game.Faction) (bool, int, int, int) {
 	if clearing.Warriors != nil && clearing.Warriors[faction] > 0 {
 		clearing.Warriors[faction]--
-		return true, 0, 0
+		return true, 1, 0, 0
 	}
 
 	for index, building := range clearing.Buildings {
@@ -259,7 +255,7 @@ func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Cleari
 		}
 
 		clearing.Buildings = append(clearing.Buildings[:index], clearing.Buildings[index+1:]...)
-		return true, 1, 0
+		return true, 0, 1, 0
 	}
 
 	for index, token := range clearing.Tokens {
@@ -275,15 +271,15 @@ func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Cleari
 		}
 
 		clearing.Tokens = append(clearing.Tokens[:index], clearing.Tokens[index+1:]...)
-		return true, 0, 1
+		return true, 0, 0, 1
 	}
 
 	if faction == game.Marquise && clearing.Wood > 0 {
 		clearing.Wood--
-		return true, 0, 1
+		return true, 0, 0, 1
 	}
 
-	return false, 0, 0
+	return false, 0, 0, 0
 }
 
 func questCountBySuit(quests []game.Quest, suit game.Suit) int {
@@ -476,13 +472,15 @@ func applyStrike(state *game.GameState, action game.Action) {
 		return
 	}
 
-	removed, removedBuildings, removedTokens := removeOneFactionPieceForStrike(state, &state.Map.Clearings[index], action.Strike.TargetFaction)
+	removed, removedWarriors, removedBuildings, removedTokens := removeOneFactionPieceForStrike(state, &state.Map.Clearings[index], action.Strike.TargetFaction)
 	if !removed {
 		return
 	}
 
 	scoreBattleRemovals(state, game.Vagabond, removedBuildings, removedTokens)
-	setVagabondRelationship(state, action.Strike.TargetFaction, game.RelHostile)
+	if removedWarriors > 0 {
+		setVagabondRelationship(state, action.Strike.TargetFaction, game.RelHostile)
+	}
 }
 
 func applyRepair(state *game.GameState, action game.Action) {

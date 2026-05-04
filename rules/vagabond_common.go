@@ -197,14 +197,13 @@ func vagabondFactionsInClearing(clearing game.Clearing) []game.Faction {
 }
 
 func hostileFactionCountInClearing(state game.GameState, clearing game.Clearing) int {
-	count := 0
 	for _, faction := range vagabondFactionsInClearing(clearing) {
 		if game.VagabondHostileTo(state, faction) {
-			count++
+			return 1
 		}
 	}
 
-	return count
+	return 0
 }
 
 func forestIDsAdjacentToClearing(m game.Map, clearingID int) []int {

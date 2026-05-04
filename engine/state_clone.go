@@ -286,12 +286,32 @@ func allianceHasAnyBase(state game.GameState) bool {
 	return state.Alliance.FoxBasePlaced || state.Alliance.RabbitBasePlaced || state.Alliance.MouseBasePlaced
 }
 
-func addAllianceSupporter(state *game.GameState, card game.Card) {
+func addAllianceSupporter(state *game.GameState, card game.Card) bool {
 	if !allianceHasAnyBase(*state) && len(state.Alliance.Supporters) >= 5 {
-		return
+		return false
 	}
 
 	state.Alliance.Supporters = append(state.Alliance.Supporters, card)
+	return true
+}
+
+func gainAllianceSupporter(state *game.GameState, card game.Card) {
+	if !addAllianceSupporter(state, card) {
+		DiscardCard(state, card.ID)
+	}
+}
+
+func drawAllianceSupporter(state *game.GameState) {
+	cardID, ok := drawOneCardID(state)
+	if !ok {
+		return
+	}
+
+	card, found := CardByID(cardID)
+	if !found {
+		return
+	}
+	gainAllianceSupporter(state, card)
 }
 
 func cardMatchesSuitOrBird(card game.Card, suit game.Suit) bool {
@@ -320,10 +340,12 @@ func transferOutrageCard(state *game.GameState, faction game.Faction, suit game.
 			continue
 		}
 
-		addAllianceSupporter(state, card)
+		gainAllianceSupporter(state, card)
 		*hand = append((*hand)[:i], (*hand)[i+1:]...)
 		return
 	}
+
+	drawAllianceSupporter(state)
 }
 
 func hasAllianceSympathy(clearing game.Clearing) bool {

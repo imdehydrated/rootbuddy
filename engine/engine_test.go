@@ -48,6 +48,29 @@ func TestValidActionsReturnsBirdsongWoodActionForBirdsong(t *testing.T) {
 	}
 }
 
+func TestValidActionsReturnsNoActionsAfterGameOver(t *testing.T) {
+	state := game.GameState{
+		GamePhase:    game.LifecycleGameOver,
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+			},
+		},
+	}
+
+	if got := ValidActions(state); len(got) != 0 {
+		t.Fatalf("expected no legal actions after game over, got %+v", got)
+	}
+}
+
 func TestValidActionsReturnsRecruitAndMovementActionsForDaylightStep(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -114,6 +137,83 @@ func TestValidActionsReturnsOnlyPassPhaseWhenActionLimitIsReached(t *testing.T) 
 	got := ValidActions(state)
 	if len(got) != 1 || got[0].Type != game.ActionPassPhase {
 		t.Fatalf("expected only pass-phase action at action limit, got %+v", got)
+	}
+}
+
+func TestMarquiseMarchAllowsTwoMovesForOneActionAndMultipleMarches(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:       1,
+					Adj:      []int{2},
+					Warriors: map[game.Faction]int{game.Marquise: 1},
+				},
+				{
+					ID:  2,
+					Adj: []int{1, 3},
+				},
+				{
+					ID:  3,
+					Adj: []int{2},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+	}
+
+	firstMove := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	}
+	secondMove := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     2,
+			To:       3,
+		},
+	}
+	thirdMove := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     3,
+			To:       2,
+		},
+	}
+
+	afterFirst := ApplyAction(state, firstMove)
+	if afterFirst.TurnProgress.ActionsUsed != 1 || afterFirst.TurnProgress.MarchesUsed != 1 {
+		t.Fatalf("expected first move to start one March action, got %+v", afterFirst.TurnProgress)
+	}
+	if !containsAction(ValidActions(afterFirst), secondMove) {
+		t.Fatalf("expected second move inside same March to remain legal, got %+v", ValidActions(afterFirst))
+	}
+
+	afterSecond := ApplyAction(afterFirst, secondMove)
+	if afterSecond.TurnProgress.ActionsUsed != 1 || afterSecond.TurnProgress.MarchesUsed != 0 {
+		t.Fatalf("expected second move to finish March without spending another action, got %+v", afterSecond.TurnProgress)
+	}
+	if !containsAction(ValidActions(afterSecond), thirdMove) {
+		t.Fatalf("expected a later March to be legal within action budget, got %+v", ValidActions(afterSecond))
+	}
+
+	afterThird := ApplyAction(afterSecond, thirdMove)
+	if afterThird.TurnProgress.ActionsUsed != 2 || afterThird.TurnProgress.MarchesUsed != 1 {
+		t.Fatalf("expected third move to start a second March action, got %+v", afterThird.TurnProgress)
 	}
 }
 

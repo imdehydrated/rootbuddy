@@ -46,6 +46,7 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.CurrentStep = game.StepBirdsong
 		state.TurnProgress.HasSlipped = true
 	case game.ActionRecruit:
+		state.TurnProgress.MarchesUsed = 0
 		if action.Recruit != nil && action.Recruit.Faction == game.Alliance {
 			state.TurnProgress.EveningMainActionTaken = true
 		} else {
@@ -86,13 +87,23 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			state.CurrentStep = game.StepDaylightActions
 		}
 		if action.Movement != nil && action.Movement.Faction == game.Marquise && action.Movement.SourceEffectID == "" {
-			state.TurnProgress.ActionsUsed++
 			state.TurnProgress.MarchesUsed++
+			if state.TurnProgress.MarchesUsed == 1 {
+				state.TurnProgress.ActionsUsed++
+			}
+			if state.TurnProgress.MarchesUsed >= 2 {
+				state.TurnProgress.MarchesUsed = 0
+			}
 		}
 		if action.Movement != nil && action.Movement.Faction == game.Eyrie && action.Movement.SourceEffectID == "" {
 			markResolvedDecreeCard(state, action.Movement.DecreeCardID)
 		}
 	case game.ActionBattleResolution, game.ActionBuild, game.ActionOverwork:
+		if (action.Type == game.ActionBattleResolution && action.BattleResolution != nil && action.BattleResolution.Faction == game.Marquise && action.BattleResolution.SourceEffectID == "") ||
+			(action.Type == game.ActionBuild && action.Build != nil && action.Build.Faction == game.Marquise) ||
+			action.Type == game.ActionOverwork {
+			state.TurnProgress.MarchesUsed = 0
+		}
 		state.CurrentStep = game.StepDaylightActions
 		if action.Type == game.ActionBattleResolution && action.BattleResolution != nil {
 			if action.BattleResolution.SourceEffectID == "" {
@@ -192,6 +203,9 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		state.TurnProgress.VagabondCapacityChecked = true
 		beginNextFactionTurn(state)
 	case game.ActionPassPhase:
+		if state.FactionTurn == game.Marquise {
+			state.TurnProgress.MarchesUsed = 0
+		}
 		switch state.CurrentPhase {
 		case game.Birdsong:
 			if state.FactionTurn == game.Vagabond && !state.TurnProgress.HasSlipped {

@@ -314,6 +314,184 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	}
 }
 
+func TestVagabondBattleScoresInfamyForHostilePieces(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Vagabond,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WorkshopsPlaced: 1,
+		},
+		Vagabond: game.VagabondState{
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Vagabond,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 2,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceBuilding, BuildingType: game.Workshop},
+			},
+		},
+	})
+
+	if next.VictoryPoints[game.Vagabond] != 3 {
+		t.Fatalf("expected 1 building VP plus 2 infamy VP, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestVagabondBattleOnlyTurnsNonHostileFactionHostileForWarriorRemoval(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Vagabond,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WorkshopsPlaced: 1,
+		},
+		Vagabond: game.VagabondState{
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelIndifferent,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Vagabond,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 1,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceBuilding, BuildingType: game.Workshop},
+			},
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Marquise] != game.RelIndifferent {
+		t.Fatalf("expected building removal not to make Marquise hostile, got %+v", next.Vagabond.Relationships)
+	}
+	if next.VictoryPoints[game.Vagabond] != 1 {
+		t.Fatalf("expected only building VP with no infamy, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestVagabondBattleNewHostileInfamySkipsFirstWarrior(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Vagabond,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			KeepClearingID: 1,
+		},
+		Vagabond: game.VagabondState{
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelIndifferent,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Vagabond,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 3,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceToken, TokenType: game.TokenKeep},
+			},
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Marquise] != game.RelHostile {
+		t.Fatalf("expected warrior removal to make Marquise hostile, got %+v", next.Vagabond.Relationships)
+	}
+	if next.VictoryPoints[game.Vagabond] != 3 {
+		t.Fatalf("expected 1 token VP plus 2 infamy VP after skipping first warrior, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestResolveBattleVagabondHitCapCountsAllUndamagedSwords(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemExhausted},
+				{Type: game.ItemSword, Status: game.ItemDamaged},
+			},
+		},
+	}
+
+	resolved := ResolveBattle(state, game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	}, 3, 0)
+
+	if resolved.BattleResolution == nil || resolved.BattleResolution.DefenderLosses != 3 {
+		t.Fatalf("expected three undamaged swords to cap Vagabond hits at 3, got %+v", resolved)
+	}
+}
+
 func TestApplyActionBattleResolutionDamagesVagabondItems(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

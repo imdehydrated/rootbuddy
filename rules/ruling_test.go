@@ -54,6 +54,30 @@ func TestRuler(t *testing.T) {
 			wantHasRuler: false,
 		},
 		{
+			name: "eyrie rules tied clearing with lords of the forest",
+			clearing: game.Clearing{
+				Warriors: map[game.Faction]int{
+					game.Marquise: 2,
+					game.Eyrie:    2,
+				},
+			},
+			wantFaction:  game.Eyrie,
+			wantHasRuler: true,
+		},
+		{
+			name: "eyrie buildings count for lords of the forest tie",
+			clearing: game.Clearing{
+				Warriors: map[game.Faction]int{
+					game.Marquise: 1,
+				},
+				Buildings: []game.Building{
+					{Faction: game.Eyrie, Type: game.Roost},
+				},
+			},
+			wantFaction:  game.Eyrie,
+			wantHasRuler: true,
+		},
+		{
 			name: "single faction present rules",
 			clearing: game.Clearing{
 				Warriors: map[game.Faction]int{

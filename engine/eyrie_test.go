@@ -234,6 +234,35 @@ func TestApplyTurmoilReassignsLeaderAndViziers(t *testing.T) {
 	}
 }
 
+func TestApplyTurmoilDoesNotDropVictoryPointsBelowZero(t *testing.T) {
+	state := game.GameState{
+		FactionTurn: game.Eyrie,
+		Eyrie: game.EyrieState{
+			Leader:           game.LeaderCommander,
+			AvailableLeaders: []game.EyrieLeader{game.LeaderBuilder},
+			Decree: game.Decree{
+				Move:   []game.CardID{game.LoyalVizier1},
+				Battle: []game.CardID{game.LoyalVizier2},
+			},
+		},
+		VictoryPoints: map[game.Faction]int{
+			game.Eyrie: 1,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionTurmoil,
+		Turmoil: &game.TurmoilAction{
+			Faction:   game.Eyrie,
+			NewLeader: game.LeaderBuilder,
+		},
+	})
+
+	if next.VictoryPoints[game.Eyrie] != 0 {
+		t.Fatalf("expected turmoil VP loss to stop at zero, got %d", next.VictoryPoints[game.Eyrie])
+	}
+}
+
 func TestApplyTurmoilRecyclesLeadersWhenNoneAreAvailable(t *testing.T) {
 	state := game.GameState{
 		FactionTurn: game.Eyrie,

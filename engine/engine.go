@@ -10,6 +10,10 @@ func effectiveStep(state game.GameState) game.TurnStep {
 }
 
 func ValidActions(state game.GameState) []game.Action {
+	if state.GamePhase == game.LifecycleGameOver {
+		return []game.Action{}
+	}
+
 	if state.GamePhase == game.LifecycleSetup && state.SetupStage != game.SetupStageUnspecified {
 		return ValidSetupActions(state)
 	}

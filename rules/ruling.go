@@ -45,7 +45,13 @@ func Ruler(c game.Clearing) (game.Faction, bool) {
 		}
 	}
 
-	if !hasRuler || tied {
+	if !hasRuler {
+		return 0, false
+	}
+	if tied {
+		if scores[game.Eyrie] == maxScore {
+			return game.Eyrie, true
+		}
 		return 0, false
 	}
 	return ruler, true

@@ -270,6 +270,59 @@ func TestValidVagabondMoveActionsCountsHostileBootTax(t *testing.T) {
 	}
 }
 
+func TestValidVagabondMoveActionsChargesOneBootForMultipleHostileFactions(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:  1,
+					Adj: []int{2},
+				},
+				{
+					ID:  2,
+					Adj: []int{1},
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+				game.Eyrie:    game.RelHostile,
+			},
+		},
+	}
+
+	got := ValidVagabondMoveActions(state)
+	want := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Vagabond,
+			Count:    2,
+			MaxCount: 2,
+			From:     1,
+			To:       2,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected one extra boot for hostile clearing %+v, got %+v", want, got)
+	}
+	for _, action := range got {
+		if action.Movement != nil && action.Movement.Count > 2 {
+			t.Fatalf("did not expect hostile tax per faction, got %+v", action)
+		}
+	}
+}
+
 func TestValidVagabondMoveActionsCanExitForestButCannotEnterForest(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

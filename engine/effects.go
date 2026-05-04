@@ -188,7 +188,11 @@ func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Car
 }
 
 func resolveCraftedCard(state *game.GameState, faction game.Faction, card game.Card) {
-	addVictoryPoints(state, faction, card.VP)
+	points := card.VP
+	if faction == game.Eyrie && card.CraftedItem != nil && state.Eyrie.Leader != game.LeaderBuilder {
+		points = 1
+	}
+	addVictoryPoints(state, faction, points)
 
 	switch card.Kind {
 	case game.PersistentEffectCard:
