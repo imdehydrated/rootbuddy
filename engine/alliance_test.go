@@ -207,6 +207,7 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 		},
 		Marquise: game.MarquiseState{
 			KeepClearingID: 1,
+			WarriorSupply:  6,
 		},
 		Alliance: game.AllianceState{
 			Supporters:    []game.Card{foxCard, birdCard},
@@ -252,6 +253,9 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 	if clearing.Warriors[game.Marquise] != 0 || clearing.Wood != 0 {
 		t.Fatalf("expected enemy pieces to be removed, got warriors=%d wood=%d", clearing.Warriors[game.Marquise], clearing.Wood)
 	}
+	if next.Marquise.WarriorSupply != 7 {
+		t.Fatalf("expected revolted marquise warrior to return to supply, got %d", next.Marquise.WarriorSupply)
+	}
 	if next.Marquise.KeepClearingID != 0 {
 		t.Fatalf("expected keep token to be removed, got keep clearing %d", next.Marquise.KeepClearingID)
 	}
@@ -260,6 +264,40 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 	}
 	if !next.Alliance.FoxBasePlaced {
 		t.Fatalf("expected fox base flag to be set")
+	}
+}
+
+func TestApplyOrganizeReturnsAllianceWarriorToSupply(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Warriors: map[game.Faction]int{
+						game.Alliance: 1,
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 4,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionOrganize,
+		Organize: &game.OrganizeAction{
+			Faction:    game.Alliance,
+			ClearingID: 1,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Alliance] != 0 {
+		t.Fatalf("expected organize to remove the alliance warrior, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Alliance.WarriorSupply != 5 {
+		t.Fatalf("expected organized alliance warrior to return to supply, got %d", next.Alliance.WarriorSupply)
 	}
 }
 

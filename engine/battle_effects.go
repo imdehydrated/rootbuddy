@@ -77,7 +77,7 @@ func applyHypotheticalAmbushHits(state *game.GameState, faction game.Faction, cl
 		return 0
 	}
 
-	remaining := removeWarriorLosses(&state.Map.Clearings[index], faction, hits)
+	remaining := removeWarriorLosses(state, &state.Map.Clearings[index], faction, hits)
 	return hits - remaining
 }
 

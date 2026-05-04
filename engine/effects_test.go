@@ -38,7 +38,8 @@ func TestApplyActionCraftFavorResolvesAndScores(t *testing.T) {
 			},
 		},
 		Eyrie: game.EyrieState{
-			RoostsPlaced: 1,
+			RoostsPlaced:  1,
+			WarriorSupply: 5,
 		},
 		Alliance: game.AllianceState{
 			SympathyPlaced: 1,
@@ -67,6 +68,9 @@ func TestApplyActionCraftFavorResolvesAndScores(t *testing.T) {
 	}
 	if next.Eyrie.RoostsPlaced != 0 {
 		t.Fatalf("expected removed roost to update placed count, got %d", next.Eyrie.RoostsPlaced)
+	}
+	if next.Eyrie.WarriorSupply != 7 {
+		t.Fatalf("expected favor-removed eyrie warriors to return to supply, got %d", next.Eyrie.WarriorSupply)
 	}
 	if next.Alliance.SympathyPlaced != 0 {
 		t.Fatalf("expected removed sympathy to update placed count, got %d", next.Alliance.SympathyPlaced)

@@ -221,6 +221,9 @@ func TestApplyActionUseTaxCollectorRemovesWarriorAndDrawsForHiddenFaction(t *tes
 		OtherHandCounts: map[game.Faction]int{
 			game.Marquise: 1,
 		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 8,
+		},
 	}
 
 	next := ApplyAction(state, game.Action{
@@ -234,6 +237,9 @@ func TestApplyActionUseTaxCollectorRemovesWarriorAndDrawsForHiddenFaction(t *tes
 
 	if next.Map.Clearings[0].Warriors[game.Marquise] != 1 {
 		t.Fatalf("expected Tax Collector to remove one warrior, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Marquise.WarriorSupply != 9 {
+		t.Fatalf("expected Tax Collector warrior to return to supply, got %d", next.Marquise.WarriorSupply)
 	}
 	if next.OtherHandCounts[game.Marquise] != 2 {
 		t.Fatalf("expected Tax Collector to draw for hidden faction, got %+v", next.OtherHandCounts)

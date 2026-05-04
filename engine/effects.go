@@ -135,6 +135,7 @@ func removeAllFactionPiecesFromClearing(state *game.GameState, clearing *game.Cl
 	if clearing.Warriors != nil {
 		removedWarriors = clearing.Warriors[faction]
 		clearing.Warriors[faction] = 0
+		returnWarriorsToSupply(state, faction, removedWarriors)
 	}
 
 	buildingLosses := len(clearing.Buildings)

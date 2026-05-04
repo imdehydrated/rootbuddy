@@ -80,7 +80,22 @@ func applyMovement(state *game.GameState, action game.Action) {
 	}
 }
 
-func removeWarriorLosses(clearing *game.Clearing, faction game.Faction, losses int) int {
+func returnWarriorsToSupply(state *game.GameState, faction game.Faction, count int) {
+	if count <= 0 {
+		return
+	}
+
+	switch faction {
+	case game.Marquise:
+		state.Marquise.WarriorSupply += count
+	case game.Eyrie:
+		state.Eyrie.WarriorSupply += count
+	case game.Alliance:
+		state.Alliance.WarriorSupply += count
+	}
+}
+
+func removeWarriorLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) int {
 	if losses <= 0 || clearing.Warriors == nil {
 		return losses
 	}
@@ -96,6 +111,7 @@ func removeWarriorLosses(clearing *game.Clearing, faction game.Faction, losses i
 	}
 
 	clearing.Warriors[faction] = available - removed
+	returnWarriorsToSupply(state, faction, removed)
 	return losses - removed
 }
 
@@ -278,7 +294,7 @@ func applyNonVagabondBattleLosses(state *game.GameState, clearing *game.Clearing
 	if clearing.Warriors != nil {
 		warriorsBefore = clearing.Warriors[faction]
 	}
-	remainingLosses := removeWarriorLosses(clearing, faction, losses)
+	remainingLosses := removeWarriorLosses(state, clearing, faction, losses)
 	if clearing.Warriors != nil {
 		summary.warriors = warriorsBefore - clearing.Warriors[faction]
 	}

@@ -273,6 +273,12 @@ func TestApplyActionBattleResolutionRemovesWarriors(t *testing.T) {
 				},
 			},
 		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 4,
+		},
+		Eyrie: game.EyrieState{
+			WarriorSupply: 6,
+		},
 	}
 
 	action := game.Action{
@@ -296,12 +302,21 @@ func TestApplyActionBattleResolutionRemovesWarriors(t *testing.T) {
 	if next.Map.Clearings[0].Warriors[game.Eyrie] != 0 {
 		t.Fatalf("expected eyrie warriors to decrease to 0, got %d", next.Map.Clearings[0].Warriors[game.Eyrie])
 	}
+	if next.Marquise.WarriorSupply != 5 {
+		t.Fatalf("expected removed marquise warrior to return to supply, got %d", next.Marquise.WarriorSupply)
+	}
+	if next.Eyrie.WarriorSupply != 8 {
+		t.Fatalf("expected removed eyrie warriors to return to supply, got %d", next.Eyrie.WarriorSupply)
+	}
 
 	if state.Map.Clearings[0].Warriors[game.Marquise] != 3 {
 		t.Fatalf("expected original marquise warriors to remain 3, got %d", state.Map.Clearings[0].Warriors[game.Marquise])
 	}
 	if state.Map.Clearings[0].Warriors[game.Eyrie] != 2 {
 		t.Fatalf("expected original eyrie warriors to remain 2, got %d", state.Map.Clearings[0].Warriors[game.Eyrie])
+	}
+	if state.Marquise.WarriorSupply != 4 || state.Eyrie.WarriorSupply != 6 {
+		t.Fatalf("expected original warrior supplies to remain unchanged, got marquise=%d eyrie=%d", state.Marquise.WarriorSupply, state.Eyrie.WarriorSupply)
 	}
 }
 

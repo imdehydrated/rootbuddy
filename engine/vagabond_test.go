@@ -314,6 +314,46 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	}
 }
 
+func TestApplyActionStrikeReturnsRemovedWarriorToSupply(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 3,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionStrike,
+		Strike: &game.StrikeAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected strike to remove marquise warrior, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Marquise.WarriorSupply != 4 {
+		t.Fatalf("expected struck marquise warrior to return to supply, got %d", next.Marquise.WarriorSupply)
+	}
+}
+
 func TestVagabondBattleScoresInfamyForHostilePieces(t *testing.T) {
 	state := game.GameState{
 		GamePhase:   game.LifecyclePlaying,
