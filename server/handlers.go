@@ -87,7 +87,7 @@ func HandleValidActions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if context.multiplayer && context.perspective != context.record.State.FactionTurn {
+	if context.multiplayer && context.perspective != expectedActionPerspective(context.record.State) {
 		writeJSON(w, http.StatusOK, ValidActionsResponse{
 			Actions:  []game.Action{},
 			GameID:   req.GameID,

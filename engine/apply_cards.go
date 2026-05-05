@@ -86,6 +86,33 @@ func applyPassPhase(state *game.GameState, action game.Action) {
 	}
 }
 
+func applyMarquiseExtraAction(state *game.GameState, action game.Action) {
+	if action.MarquiseExtraAction == nil || action.MarquiseExtraAction.Faction != game.Marquise {
+		return
+	}
+
+	card, ok := game.Card{}, false
+	for _, handCard := range state.Marquise.CardsInHand {
+		if handCard.ID == action.MarquiseExtraAction.CardID {
+			card = handCard
+			ok = true
+			break
+		}
+	}
+	if !ok && canUseObservedHiddenCards(*state, game.Marquise) {
+		card, ok = CardByID(action.MarquiseExtraAction.CardID)
+	}
+	if !ok || card.Suit != game.Bird {
+		return
+	}
+	if _, ok := spendFactionHandCard(state, game.Marquise, action.MarquiseExtraAction.CardID); !ok {
+		return
+	}
+
+	DiscardCard(state, action.MarquiseExtraAction.CardID)
+	state.TurnProgress.BonusActions++
+}
+
 func applyAddCardToHand(state *game.GameState, action game.Action) {
 	if action.AddCardToHand == nil {
 		return

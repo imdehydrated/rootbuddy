@@ -18,6 +18,10 @@ func ValidActions(state game.GameState) []game.Action {
 		return ValidSetupActions(state)
 	}
 
+	if len(state.PendingFieldHospitals) > 0 {
+		return validFieldHospitalsActions(state)
+	}
+
 	switch state.FactionTurn {
 	case game.Marquise:
 		return validMarquiseActions(state)

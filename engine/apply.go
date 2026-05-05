@@ -45,6 +45,8 @@ var applyActionHandlers = map[game.ActionType]actionHandler{
 	game.ActionVagabondRest:         applyVagabondRest,
 	game.ActionVagabondDiscard:      applyVagabondDiscard,
 	game.ActionVagabondItemCapacity: applyVagabondItemCapacity,
+	game.ActionFieldHospitals:       applyFieldHospitals,
+	game.ActionMarquiseExtraAction:  applyMarquiseExtraAction,
 }
 
 func ApplyAction(state game.GameState, action game.Action) game.GameState {
@@ -67,6 +69,7 @@ func ApplyActionDetailed(state game.GameState, action game.Action) (game.GameSta
 		}
 	}
 
+	pruneFieldHospitalsPending(&next)
 	advanceTurnState(&next, action)
 	return next, result
 }

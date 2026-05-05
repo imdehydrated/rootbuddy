@@ -95,6 +95,13 @@ func returnWarriorsToSupply(state *game.GameState, faction game.Faction, count i
 	}
 }
 
+func returnRemovedWarriorsToSupply(state *game.GameState, clearing *game.Clearing, faction game.Faction, count int) {
+	returnWarriorsToSupply(state, faction, count)
+	if faction == game.Marquise && clearing != nil {
+		queueFieldHospitals(state, *clearing, count)
+	}
+}
+
 func removeWarriorLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int) int {
 	if losses <= 0 || clearing.Warriors == nil {
 		return losses
@@ -111,7 +118,7 @@ func removeWarriorLosses(state *game.GameState, clearing *game.Clearing, faction
 	}
 
 	clearing.Warriors[faction] = available - removed
-	returnWarriorsToSupply(state, faction, removed)
+	returnRemovedWarriorsToSupply(state, clearing, faction, removed)
 	return losses - removed
 }
 

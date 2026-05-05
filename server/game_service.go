@@ -74,6 +74,13 @@ func multiplayerConflictResponse(record authoritativeGameRecord, perspective gam
 	}
 }
 
+func expectedActionPerspective(state game.GameState) game.Faction {
+	if len(state.PendingFieldHospitals) > 0 {
+		return game.Marquise
+	}
+	return state.FactionTurn
+}
+
 func buildReadContext(gameID string, fallbackState game.GameState, token string) (gameRequestContext, *ErrorResponse, int) {
 	if gameID == "" {
 		return gameRequestContext{
@@ -140,7 +147,7 @@ func buildApplyContext(req ApplyActionRequest, token string) (gameRequestContext
 		if req.ClientRevision != record.Revision {
 			return gameRequestContext{}, multiplayerConflictResponse(record, perspective), http.StatusConflict
 		}
-		if perspective != record.State.FactionTurn {
+		if perspective != expectedActionPerspective(record.State) {
 			return gameRequestContext{}, &ErrorResponse{Error: "not your turn", GameID: req.GameID, Revision: record.Revision}, http.StatusForbidden
 		}
 

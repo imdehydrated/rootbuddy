@@ -242,6 +242,29 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 				return "vagabond discard action must have valid card IDs"
 			}
 		}
+	case game.ActionFieldHospitals:
+		if req.Action.FieldHospitals == nil {
+			return "field hospitals payload is required"
+		}
+		if req.Action.FieldHospitals.Faction != game.Marquise {
+			return "field hospitals action must belong to the Marquise"
+		}
+		if req.Action.FieldHospitals.ClearingID <= 0 {
+			return "field hospitals action must have a valid clearing ID"
+		}
+		if !req.Action.FieldHospitals.Decline && req.Action.FieldHospitals.CardID <= 0 {
+			return "field hospitals action must spend a card or decline"
+		}
+	case game.ActionMarquiseExtraAction:
+		if req.Action.MarquiseExtraAction == nil {
+			return "marquise extra action payload is required"
+		}
+		if req.Action.MarquiseExtraAction.Faction != game.Marquise {
+			return "marquise extra action must belong to the Marquise"
+		}
+		if req.Action.MarquiseExtraAction.CardID <= 0 {
+			return "marquise extra action must spend a valid bird card"
+		}
 	default:
 		return "unsupported action type"
 	}

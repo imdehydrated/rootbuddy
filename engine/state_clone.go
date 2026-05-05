@@ -126,6 +126,11 @@ func cloneState(state game.GameState) game.GameState {
 		copy(next.HiddenCards, state.HiddenCards)
 	}
 
+	if state.PendingFieldHospitals != nil {
+		next.PendingFieldHospitals = make([]game.FieldHospitalsPending, len(state.PendingFieldHospitals))
+		copy(next.PendingFieldHospitals, state.PendingFieldHospitals)
+	}
+
 	if state.Marquise.CardsInHand != nil {
 		next.Marquise.CardsInHand = make([]game.Card, len(state.Marquise.CardsInHand))
 		copy(next.Marquise.CardsInHand, state.Marquise.CardsInHand)

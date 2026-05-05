@@ -40,6 +40,12 @@ export interface HiddenCard {
   knownCardID: number;
 }
 
+export interface FieldHospitalsPending {
+  clearingID: number;
+  suit: number;
+  warriorCount: number;
+}
+
 export type HighlightedClearing = {
   clearingID: number;
   role: "source" | "target" | "affected";
@@ -141,6 +147,7 @@ export interface GameState {
   otherHandCounts: Record<string, number>;
   hiddenCards: HiddenCard[];
   nextHiddenCardID: number;
+  pendingFieldHospitals: FieldHospitalsPending[];
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
@@ -458,6 +465,16 @@ export interface Action {
   vagabondCapacity?: {
     faction: number;
     itemIndexes: number[];
+  } | null;
+  fieldHospitals?: {
+    faction: number;
+    clearingID: number;
+    cardID: number;
+    decline: boolean;
+  } | null;
+  marquiseExtraAction?: {
+    faction: number;
+    cardID: number;
   } | null;
 }
 

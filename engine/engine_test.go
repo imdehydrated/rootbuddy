@@ -140,6 +140,78 @@ func TestValidActionsReturnsOnlyPassPhaseWhenActionLimitIsReached(t *testing.T) 
 	}
 }
 
+func TestMarquiseCanSpendBirdCardForExtraDaylightAction(t *testing.T) {
+	birdCard := game.Card{ID: 9901, Name: "Bird Extra", Suit: game.Bird}
+	foxCard := game.Card{ID: 9902, Name: "Fox Card", Suit: game.Fox}
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:       1,
+					Warriors: map[game.Faction]int{game.Marquise: 1},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Recruiter},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		TurnProgress: game.TurnProgress{
+			ActionsUsed: 3,
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand:   []game.Card{birdCard, foxCard},
+			WarriorSupply: 1,
+		},
+	}
+
+	spendBird := game.Action{
+		Type: game.ActionMarquiseExtraAction,
+		MarquiseExtraAction: &game.MarquiseExtraActionAction{
+			Faction: game.Marquise,
+			CardID:  birdCard.ID,
+		},
+	}
+	actions := ValidActions(state)
+	if !containsAction(actions, spendBird) {
+		t.Fatalf("expected bird-card extra action %+v at Marquise action limit, got %+v", spendBird, actions)
+	}
+	for _, action := range actions {
+		if action.MarquiseExtraAction != nil && action.MarquiseExtraAction.CardID == foxCard.ID {
+			t.Fatalf("did not expect non-bird card to be spendable for extra action, got %+v", actions)
+		}
+	}
+
+	afterSpend := ApplyAction(state, spendBird)
+	if afterSpend.TurnProgress.BonusActions != 1 || afterSpend.TurnProgress.ActionsUsed != 3 {
+		t.Fatalf("expected bird spend to add one bonus action without consuming an action, got %+v", afterSpend.TurnProgress)
+	}
+	if hasCard(afterSpend.Marquise.CardsInHand, birdCard.ID) {
+		t.Fatalf("expected spent bird card to leave Marquise hand")
+	}
+	if len(afterSpend.DiscardPile) != 1 || afterSpend.DiscardPile[0] != birdCard.ID {
+		t.Fatalf("expected spent bird card to be discarded, got %+v", afterSpend.DiscardPile)
+	}
+
+	recruit := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1},
+		},
+	}
+	if !containsAction(ValidActions(afterSpend), recruit) {
+		t.Fatalf("expected extra Marquise action to unlock normal action %+v, got %+v", recruit, ValidActions(afterSpend))
+	}
+
+	afterRecruit := ApplyAction(afterSpend, recruit)
+	if afterRecruit.TurnProgress.ActionsUsed != 4 || afterRecruit.TurnProgress.BonusActions != 1 {
+		t.Fatalf("expected extra recruit to consume fourth action, got %+v", afterRecruit.TurnProgress)
+	}
+}
+
 func TestMarquiseMarchAllowsTwoMovesForOneActionAndMultipleMarches(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

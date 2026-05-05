@@ -250,6 +250,9 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 		beginNextFactionTurn(state)
 	case game.ActionDiscardEffect:
 		state.CurrentStep = game.StepDaylightActions
+	case game.ActionMarquiseExtraAction:
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
 	case game.ActionUsePersistentEffect:
 		if action.UsePersistentEffect != nil && !effectStartsPhase(action.UsePersistentEffect.EffectID) {
 			switch state.CurrentPhase {

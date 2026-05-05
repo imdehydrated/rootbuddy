@@ -30,7 +30,7 @@ func removeEnemyPiecesForRevolt(state *game.GameState, clearing *game.Clearing) 
 			continue
 		}
 		removedPieces += warriors
-		returnWarriorsToSupply(state, faction, warriors)
+		returnRemovedWarriorsToSupply(state, clearing, faction, warriors)
 		clearing.Warriors[faction] = 0
 	}
 
@@ -178,7 +178,7 @@ func applyOrganize(state *game.GameState, action game.Action) {
 	}
 
 	clearing.Warriors[game.Alliance]--
-	returnWarriorsToSupply(state, game.Alliance, 1)
+	returnRemovedWarriorsToSupply(state, clearing, game.Alliance, 1)
 	clearing.Tokens = append(clearing.Tokens, game.Token{
 		Faction: game.Alliance,
 		Type:    game.TokenSympathy,

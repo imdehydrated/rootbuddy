@@ -246,6 +246,9 @@ export function affectedClearings(action: Action): HighlightedClearing[] {
     case ACTION_TYPE.USE_PERSISTENT_EFFECT:
       add(action.usePersistentEffect?.clearingID, "affected");
       break;
+    case ACTION_TYPE.FIELD_HOSPITALS:
+      add(action.fieldHospitals?.clearingID, "source");
+      break;
     default:
       break;
   }

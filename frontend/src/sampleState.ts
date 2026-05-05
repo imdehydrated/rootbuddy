@@ -69,6 +69,7 @@ export const sampleState: GameState = {
   },
   hiddenCards: [],
   nextHiddenCardID: 1,
+  pendingFieldHospitals: [],
   victoryPoints: {
     "0": 7,
     "1": 4,

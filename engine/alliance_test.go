@@ -208,6 +208,7 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 		Marquise: game.MarquiseState{
 			KeepClearingID: 1,
 			WarriorSupply:  6,
+			CardsInHand:    []game.Card{foxCard},
 		},
 		Alliance: game.AllianceState{
 			Supporters:    []game.Card{foxCard, birdCard},
@@ -264,6 +265,9 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 	}
 	if !next.Alliance.FoxBasePlaced {
 		t.Fatalf("expected fox base flag to be set")
+	}
+	if len(next.PendingFieldHospitals) != 0 {
+		t.Fatalf("did not expect Field Hospitals when the keep is removed, got %+v", next.PendingFieldHospitals)
 	}
 }
 

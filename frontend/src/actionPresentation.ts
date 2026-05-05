@@ -114,6 +114,10 @@ export function actionHeadline(action: Action): string {
       return "Mobilize";
     case ACTION_TYPE.OVERWORK:
       return "Overwork";
+    case ACTION_TYPE.FIELD_HOSPITALS:
+      return "Field Hospitals";
+    case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
+      return "Extra Action";
     case ACTION_TYPE.ACTIVATE_DOMINANCE:
       return "Activate Dominance";
     case ACTION_TYPE.TAKE_DOMINANCE:
@@ -164,6 +168,10 @@ export function actionCardReferences(action: Action): ActionCardReference[] {
       return (action.vagabondDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
     case ACTION_TYPE.EVENING_DISCARD:
       return (action.eveningDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
+    case ACTION_TYPE.FIELD_HOSPITALS:
+      return action.fieldHospitals?.cardID ? [{ cardID: action.fieldHospitals.cardID, zoneLabel: "Hand" }] : [];
+    case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
+      return action.marquiseExtraAction?.cardID ? [{ cardID: action.marquiseExtraAction.cardID, zoneLabel: "Hand" }] : [];
     default:
       return [];
   }
@@ -193,6 +201,8 @@ export function actionContextTags(action: Action): string[] {
       return [`Clearing ${action.aid?.clearingID ?? "?"}`, `Target ${factionLabels[action.aid?.targetFaction ?? -1] ?? "?"}`];
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
       return [`Count ${action.otherPlayerDraw?.count ?? 0}`];
+    case ACTION_TYPE.FIELD_HOSPITALS:
+      return [`Clearing ${action.fieldHospitals?.clearingID ?? "?"}`];
     default:
       return [];
   }
@@ -239,6 +249,13 @@ export function describeAction(action: Action, state?: GameState): string {
       return `Recruit in clearings ${(action.recruit?.clearingIDs ?? []).join(", ")}`;
     case ACTION_TYPE.OVERWORK:
       return `Overwork in clearing ${action.overwork?.clearingID ?? "?"}`;
+    case ACTION_TYPE.FIELD_HOSPITALS:
+      if (action.fieldHospitals?.decline) {
+        return `Decline Field Hospitals for clearing ${action.fieldHospitals.clearingID}`;
+      }
+      return `Use Field Hospitals for clearing ${action.fieldHospitals?.clearingID ?? "?"} with ${describeKnownCardID(action.fieldHospitals?.cardID ?? 0)}`;
+    case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
+      return `Spend ${describeKnownCardID(action.marquiseExtraAction?.cardID ?? 0)} for an extra Marquise action`;
     case ACTION_TYPE.CRAFT:
       return `Craft ${describeKnownCardID(action.craft?.cardID ?? 0)}`;
     case ACTION_TYPE.ADD_TO_DECREE:

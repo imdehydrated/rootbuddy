@@ -3,8 +3,22 @@ package engine
 import (
 	"testing"
 
+	"github.com/imdehydrated/rootbuddy/carddata"
 	"github.com/imdehydrated/rootbuddy/game"
 )
+
+func firstTestCard(t *testing.T, suit game.Suit) game.Card {
+	t.Helper()
+
+	for _, card := range carddata.BaseDeck() {
+		if card.Suit == suit && card.Kind != game.DominanceCard {
+			return card
+		}
+	}
+
+	t.Fatalf("no non-dominance card found for suit %v", suit)
+	return game.Card{}
+}
 
 func hasCard(cards []game.Card, id game.CardID) bool {
 	for _, card := range cards {
@@ -317,6 +331,105 @@ func TestApplyActionBattleResolutionRemovesWarriors(t *testing.T) {
 	}
 	if state.Marquise.WarriorSupply != 4 || state.Eyrie.WarriorSupply != 6 {
 		t.Fatalf("expected original warrior supplies to remain unchanged, got marquise=%d eyrie=%d", state.Marquise.WarriorSupply, state.Eyrie.WarriorSupply)
+	}
+}
+
+func TestApplyActionBattleResolutionQueuesAndResolvesFieldHospitals(t *testing.T) {
+	foxCard := firstTestCard(t, game.Fox)
+	state := game.GameState{
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+						game.Eyrie:    1,
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand:    []game.Card{foxCard},
+			WarriorSupply:  5,
+			KeepClearingID: 2,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Eyrie,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 2,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected marquise warriors to be removed before Field Hospitals, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Marquise.WarriorSupply != 7 {
+		t.Fatalf("expected removed warriors to be in supply before Field Hospitals, got %d", next.Marquise.WarriorSupply)
+	}
+	if len(next.PendingFieldHospitals) != 1 {
+		t.Fatalf("expected one pending Field Hospitals choice, got %+v", next.PendingFieldHospitals)
+	}
+
+	useFieldHospitals := game.Action{
+		Type: game.ActionFieldHospitals,
+		FieldHospitals: &game.FieldHospitalsAction{
+			Faction:    game.Marquise,
+			ClearingID: 1,
+			CardID:     foxCard.ID,
+		},
+	}
+	declineFieldHospitals := game.Action{
+		Type: game.ActionFieldHospitals,
+		FieldHospitals: &game.FieldHospitalsAction{
+			Faction:    game.Marquise,
+			ClearingID: 1,
+			Decline:    true,
+		},
+	}
+	actions := ValidActions(next)
+	if len(actions) != 2 || !containsAction(actions, useFieldHospitals) || !containsAction(actions, declineFieldHospitals) {
+		t.Fatalf("expected Field Hospitals use and decline to block normal actions, got %+v", actions)
+	}
+
+	afterUse := ApplyAction(next, useFieldHospitals)
+	if len(afterUse.PendingFieldHospitals) != 0 {
+		t.Fatalf("expected pending Field Hospitals to clear, got %+v", afterUse.PendingFieldHospitals)
+	}
+	if afterUse.Map.Clearings[1].Warriors[game.Marquise] != 2 {
+		t.Fatalf("expected Field Hospitals to place 2 warriors at the keep, got %+v", afterUse.Map.Clearings[1].Warriors)
+	}
+	if afterUse.Marquise.WarriorSupply != 5 {
+		t.Fatalf("expected Field Hospitals to spend returned warriors from supply, got %d", afterUse.Marquise.WarriorSupply)
+	}
+	if hasCard(afterUse.Marquise.CardsInHand, foxCard.ID) {
+		t.Fatalf("expected Field Hospitals card to leave Marquise hand")
+	}
+	if len(afterUse.DiscardPile) != 1 || afterUse.DiscardPile[0] != foxCard.ID {
+		t.Fatalf("expected Field Hospitals card to be discarded, got %+v", afterUse.DiscardPile)
+	}
+
+	afterDecline := ApplyAction(next, declineFieldHospitals)
+	if len(afterDecline.PendingFieldHospitals) != 0 {
+		t.Fatalf("expected declined Field Hospitals to clear, got %+v", afterDecline.PendingFieldHospitals)
+	}
+	if afterDecline.Map.Clearings[1].Warriors[game.Marquise] != 0 || afterDecline.Marquise.WarriorSupply != 7 {
+		t.Fatalf("expected declined Field Hospitals to leave warriors in supply, keep=%+v supply=%d", afterDecline.Map.Clearings[1].Warriors, afterDecline.Marquise.WarriorSupply)
 	}
 }
 

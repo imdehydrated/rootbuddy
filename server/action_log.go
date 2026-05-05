@@ -198,6 +198,13 @@ func summarizeAction(action game.Action) string {
 		default:
 			return fmt.Sprintf("Use persistent effect %s", action.UsePersistentEffect.EffectID)
 		}
+	case game.ActionFieldHospitals:
+		if action.FieldHospitals.Decline {
+			return fmt.Sprintf("Decline Field Hospitals for clearing %d", action.FieldHospitals.ClearingID)
+		}
+		return fmt.Sprintf("Use Field Hospitals for clearing %d with card %d", action.FieldHospitals.ClearingID, action.FieldHospitals.CardID)
+	case game.ActionMarquiseExtraAction:
+		return fmt.Sprintf("Spend bird card %d for an extra Marquise action", action.MarquiseExtraAction.CardID)
 	default:
 		return actionTypeLabel(action.Type)
 	}
@@ -309,6 +316,10 @@ func actionTypeLabel(actionType game.ActionType) string {
 		return "Vagabond Setup"
 	case game.ActionUsePersistentEffect:
 		return "Use Persistent Effect"
+	case game.ActionFieldHospitals:
+		return "Field Hospitals"
+	case game.ActionMarquiseExtraAction:
+		return "Marquise Extra Action"
 	default:
 		return fmt.Sprintf("Action %d", actionType)
 	}

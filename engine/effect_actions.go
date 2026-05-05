@@ -196,7 +196,7 @@ func usePersistentEffect(state *game.GameState, action game.Action) *game.Effect
 			return nil
 		}
 		state.Map.Clearings[index].Warriors[effect.Faction]--
-		returnWarriorsToSupply(state, effect.Faction, 1)
+		returnRemovedWarriorsToSupply(state, &state.Map.Clearings[index], effect.Faction, 1)
 		effectDrawCards(state, effect.Faction, 1)
 		markPersistentEffectUsed(state, effect.EffectID)
 		return &game.EffectResult{

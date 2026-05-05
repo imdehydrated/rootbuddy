@@ -44,6 +44,8 @@ type Action struct {
 	VagabondRest        *VagabondRestAction
 	VagabondDiscard     *VagabondDiscardAction
 	VagabondCapacity    *VagabondItemCapacityAction
+	FieldHospitals      *FieldHospitalsAction
+	MarquiseExtraAction *MarquiseExtraActionAction
 }
 
 type ActionType int
@@ -91,6 +93,8 @@ const (
 	ActionVagabondDiscard
 	ActionVagabondItemCapacity
 	ActionEveningDiscard
+	ActionFieldHospitals
+	ActionMarquiseExtraAction
 )
 
 type MovementAction struct {
@@ -409,4 +413,22 @@ type VagabondDiscardAction struct {
 type VagabondItemCapacityAction struct {
 	Faction     Faction
 	ItemIndexes []int
+}
+
+type FieldHospitalsPending struct {
+	ClearingID   int
+	Suit         Suit
+	WarriorCount int
+}
+
+type FieldHospitalsAction struct {
+	Faction    Faction
+	ClearingID int
+	CardID     CardID
+	Decline    bool
+}
+
+type MarquiseExtraActionAction struct {
+	Faction Faction
+	CardID  CardID
 }

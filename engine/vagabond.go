@@ -236,7 +236,7 @@ func removeRuinItem(clearing *game.Clearing, itemType game.ItemType) bool {
 func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Clearing, faction game.Faction) (bool, int, int, int) {
 	if clearing.Warriors != nil && clearing.Warriors[faction] > 0 {
 		clearing.Warriors[faction]--
-		returnWarriorsToSupply(state, faction, 1)
+		returnRemovedWarriorsToSupply(state, clearing, faction, 1)
 		return true, 1, 0, 0
 	}
 
