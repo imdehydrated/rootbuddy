@@ -183,6 +183,7 @@ func initializeMarquiseSetupState(state *game.GameState, present map[game.Factio
 	}
 
 	state.Marquise.WarriorSupply = 25
+	state.Marquise.WoodSupply = 8
 }
 
 func initializeEyrieSetupState(state *game.GameState, present map[game.Faction]bool) {

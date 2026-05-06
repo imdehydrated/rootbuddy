@@ -31,6 +31,9 @@ func TestValidActionsReturnsBirdsongWoodActionForBirdsong(t *testing.T) {
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Birdsong,
 		CurrentStep:  game.StepBirdsong,
+		Marquise: game.MarquiseState{
+			WoodSupply: 8,
+		},
 	}
 
 	got := ValidActions(state)
@@ -45,6 +48,63 @@ func TestValidActionsReturnsBirdsongWoodActionForBirdsong(t *testing.T) {
 
 	if !containsAction(got, want) {
 		t.Fatalf("expected birdsong wood action %+v, got %+v", want, got)
+	}
+}
+
+func TestMarquiseBirdsongWoodIsLimitedBySupply(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+				{
+					ID: 2,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Marquise: game.MarquiseState{
+			WoodSupply: 1,
+		},
+	}
+
+	wantFirst := game.Action{
+		Type: game.ActionBirdsongWood,
+		BirdsongWood: &game.BirdsongWoodAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{1},
+			Amount:      1,
+		},
+	}
+	wantSecond := game.Action{
+		Type: game.ActionBirdsongWood,
+		BirdsongWood: &game.BirdsongWoodAction{
+			Faction:     game.Marquise,
+			ClearingIDs: []int{2},
+			Amount:      1,
+		},
+	}
+
+	actions := ValidActions(state)
+	if len(actions) != 2 || !containsAction(actions, wantFirst) || !containsAction(actions, wantSecond) {
+		t.Fatalf("expected one-wood placement choices for each sawmill, got %+v", actions)
+	}
+
+	next := ApplyAction(state, wantFirst)
+	if next.Map.Clearings[0].Wood != 1 || next.Map.Clearings[1].Wood != 0 {
+		t.Fatalf("expected only selected sawmill to receive wood, got %+v", next.Map.Clearings)
+	}
+	if next.Marquise.WoodSupply != 0 {
+		t.Fatalf("expected birdsong wood to exhaust supply, got %d", next.Marquise.WoodSupply)
 	}
 }
 
@@ -94,6 +154,7 @@ func TestValidActionsReturnsRecruitAndMovementActionsForDaylightStep(t *testing.
 		CurrentStep:  game.StepDaylightActions,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 1,
+			WoodSupply:    8,
 		},
 	}
 
@@ -317,6 +378,7 @@ func TestEngineFlowBirdsongRecruitMoveBattleResolve(t *testing.T) {
 		CurrentStep:  game.StepBirdsong,
 		Marquise: game.MarquiseState{
 			WarriorSupply: 1,
+			WoodSupply:    8,
 		},
 	}
 

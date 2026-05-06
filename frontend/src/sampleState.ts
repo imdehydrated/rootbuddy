@@ -79,6 +79,7 @@ export const sampleState: GameState = {
   marquise: {
     cardsInHand: [],
     warriorSupply: 18,
+    woodSupply: 6,
     sawmillsPlaced: 1,
     workshopsPlaced: 1,
     recruitersPlaced: 1,

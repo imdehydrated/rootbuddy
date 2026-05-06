@@ -30,6 +30,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 10, Deck: game.BaseDeck, Name: "Fox Card", Suit: game.Fox, Kind: game.ItemCard},
 					},
@@ -63,6 +64,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 20, Deck: game.BaseDeck, Name: "Bird Card", Suit: game.Bird, Kind: game.AmbushCard},
 					},
@@ -96,6 +98,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 10, Deck: game.BaseDeck, Name: "Fox Card", Suit: game.Fox, Kind: game.ItemCard},
 					},
@@ -129,6 +132,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 11, Deck: game.BaseDeck, Name: "Fox Card", Suit: game.Fox, Kind: game.ItemCard},
 					},
@@ -141,6 +145,39 @@ func TestValidOverworkActions(t *testing.T) {
 						Faction:    game.Marquise,
 						ClearingID: 1,
 						CardID:     11,
+					},
+				},
+			},
+		},
+		{
+			name: "no overwork action when marquise wood supply is empty",
+			state: game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID:   1,
+							Suit: game.Fox,
+							Buildings: []game.Building{
+								{Faction: game.Marquise, Type: game.Sawmill},
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Marquise,
+				CurrentPhase: game.Daylight,
+				Marquise: game.MarquiseState{
+					CardsInHand: []game.Card{
+						{ID: 12, Deck: game.BaseDeck, Name: "Fox Card", Suit: game.Fox, Kind: game.ItemCard},
+					},
+				},
+			},
+			unwantActions: []game.Action{
+				{
+					Type: game.ActionOverwork,
+					Overwork: &game.OverworkAction{
+						Faction:    game.Marquise,
+						ClearingID: 1,
+						CardID:     12,
 					},
 				},
 			},
@@ -162,6 +199,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Marquise,
 				CurrentPhase: game.Daylight,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 30, Deck: game.BaseDeck, Name: "Rabbit Card", Suit: game.Rabbit, Kind: game.ItemCard},
 						{ID: 31, Deck: game.BaseDeck, Name: "Bird Card", Suit: game.Bird, Kind: game.AmbushCard},
@@ -204,6 +242,7 @@ func TestValidOverworkActions(t *testing.T) {
 				FactionTurn:  game.Eyrie,
 				CurrentPhase: game.Birdsong,
 				Marquise: game.MarquiseState{
+					WoodSupply: 8,
 					CardsInHand: []game.Card{
 						{ID: 40, Deck: game.BaseDeck, Name: "Fox Card", Suit: game.Fox, Kind: game.ItemCard},
 					},

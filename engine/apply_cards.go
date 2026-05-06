@@ -48,7 +48,7 @@ func applyBirdsongWood(state *game.GameState, action game.Action) {
 			continue
 		}
 
-		state.Map.Clearings[index].Wood += action.BirdsongWood.Amount
+		placeMarquiseWood(state, &state.Map.Clearings[index], action.BirdsongWood.Amount)
 	}
 }
 

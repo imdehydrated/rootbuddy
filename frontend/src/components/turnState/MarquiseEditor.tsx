@@ -14,6 +14,10 @@ export function MarquiseEditor({ state }: MarquiseEditorProps) {
           <input type="number" value={state.marquise.warriorSupply} readOnly />
         </label>
         <label>
+          <span>Wood Supply</span>
+          <input type="number" value={state.marquise.woodSupply} readOnly />
+        </label>
+        <label>
           <span>Marquise Buildings</span>
           <input
             type="text"

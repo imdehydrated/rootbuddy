@@ -193,6 +193,44 @@ func TestApplyEyrieNewRoostPlacesRoostWarriorsAndAdvances(t *testing.T) {
 	}
 }
 
+func TestApplyEyrieRecruitPlacesAtEveryRequestedRoost(t *testing.T) {
+	foxCard := firstEyrieTestCard(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{ID: 1},
+				{ID: 3},
+			},
+		},
+		Eyrie: game.EyrieState{
+			WarriorSupply: 3,
+		},
+	}
+	action := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:      game.Eyrie,
+			ClearingIDs:  []int{1, 3, 3},
+			DecreeCardID: foxCard.ID,
+		},
+	}
+
+	next := ApplyAction(state, action)
+
+	if next.Map.Clearings[0].Warriors[game.Eyrie] != 1 {
+		t.Fatalf("expected one Eyrie warrior in clearing 1, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Map.Clearings[1].Warriors[game.Eyrie] != 2 {
+		t.Fatalf("expected two Eyrie warriors in clearing 3, got %+v", next.Map.Clearings[1].Warriors)
+	}
+	if next.Eyrie.WarriorSupply != 0 {
+		t.Fatalf("expected Eyrie warrior supply to decrement by all placements, got %d", next.Eyrie.WarriorSupply)
+	}
+	if state.Map.Clearings[0].Warriors != nil || state.Map.Clearings[1].Warriors != nil {
+		t.Fatalf("expected ApplyAction to leave original state unchanged, got %+v", state.Map.Clearings)
+	}
+}
+
 func TestApplyTurmoilReassignsLeaderAndViziers(t *testing.T) {
 	foxCard := firstEyrieTestCard(t, game.Fox)
 	state := game.GameState{

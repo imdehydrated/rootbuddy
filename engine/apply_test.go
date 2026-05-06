@@ -140,6 +140,7 @@ func TestApplyActionOverwork(t *testing.T) {
 				{ID: 10, Name: "Spent Card"},
 				{ID: 11, Name: "Kept Card"},
 			},
+			WoodSupply: 8,
 		},
 	}
 
@@ -156,6 +157,9 @@ func TestApplyActionOverwork(t *testing.T) {
 
 	if next.Map.Clearings[0].Wood != 1 {
 		t.Fatalf("expected overwork to add 1 wood, got %d", next.Map.Clearings[0].Wood)
+	}
+	if next.Marquise.WoodSupply != 7 {
+		t.Fatalf("expected overwork to spend 1 wood supply, got %d", next.Marquise.WoodSupply)
 	}
 	if hasCard(next.Marquise.CardsInHand, 10) {
 		t.Fatalf("expected spent card 10 to be removed from hand")
@@ -229,6 +233,7 @@ func TestApplyActionBuild(t *testing.T) {
 		},
 		Marquise: game.MarquiseState{
 			SawmillsPlaced: 1,
+			WoodSupply:     6,
 		},
 	}
 
@@ -258,6 +263,9 @@ func TestApplyActionBuild(t *testing.T) {
 	}
 	if next.Map.Clearings[0].Wood != 1 {
 		t.Fatalf("expected build to deduct 1 wood, got %d", next.Map.Clearings[0].Wood)
+	}
+	if next.Marquise.WoodSupply != 7 {
+		t.Fatalf("expected spent build wood to return to supply, got %d", next.Marquise.WoodSupply)
 	}
 	if next.VictoryPoints[game.Marquise] != 1 {
 		t.Fatalf("expected second sawmill to score 1 point, got %d", next.VictoryPoints[game.Marquise])
@@ -484,6 +492,46 @@ func TestApplyActionBattleResolutionSpillsIntoBuildings(t *testing.T) {
 	}
 	if state.Marquise.WorkshopsPlaced != 1 {
 		t.Fatalf("expected original workshop count to remain 1, got %d", state.Marquise.WorkshopsPlaced)
+	}
+}
+
+func TestApplyActionBattleResolutionReturnsRemovedWoodToSupply(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Wood: 2,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 1,
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WoodSupply: 6,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Eyrie,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 2,
+		},
+	})
+
+	if next.Map.Clearings[0].Wood != 0 {
+		t.Fatalf("expected battle to remove marquise wood, got %d", next.Map.Clearings[0].Wood)
+	}
+	if next.Marquise.WoodSupply != 8 {
+		t.Fatalf("expected removed wood to return to supply, got %d", next.Marquise.WoodSupply)
+	}
+	if next.VictoryPoints[game.Eyrie] != 2 {
+		t.Fatalf("expected removed wood tokens to score, got %+v", next.VictoryPoints)
 	}
 }
 

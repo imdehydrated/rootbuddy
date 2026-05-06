@@ -12,6 +12,7 @@ const ROOST = 3;
 const BASE = 4;
 const TOKEN_SYMPATHY = 1;
 const MARQUISE_WARRIOR_POOL = 25;
+const MARQUISE_WOOD_POOL = 8;
 
 export function countBuildings(buildings: Building[], faction: number, type?: number): number {
   return buildings.filter((building) => {
@@ -121,6 +122,8 @@ export function syncDerivedFactionStateFromBoard(state: GameState): void {
   );
 
   state.marquise.warriorSupply = Math.max(0, MARQUISE_WARRIOR_POOL - totalMarquiseWarriors);
+  const totalMarquiseWood = state.map.clearings.reduce((sum, clearing) => sum + clearing.wood, 0);
+  state.marquise.woodSupply = Math.max(0, MARQUISE_WOOD_POOL - totalMarquiseWood);
   state.marquise.sawmillsPlaced = state.map.clearings.reduce(
     (sum, clearing) => sum + countBuildings(clearing.buildings, MARQUISE_FACTION, SAWMILL),
     0

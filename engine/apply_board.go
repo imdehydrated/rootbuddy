@@ -95,6 +95,27 @@ func returnWarriorsToSupply(state *game.GameState, faction game.Faction, count i
 	}
 }
 
+func placeMarquiseWood(state *game.GameState, clearing *game.Clearing, amount int) int {
+	if amount <= 0 || clearing == nil || state.Marquise.WoodSupply <= 0 {
+		return 0
+	}
+
+	placed := amount
+	if placed > state.Marquise.WoodSupply {
+		placed = state.Marquise.WoodSupply
+	}
+	clearing.Wood += placed
+	state.Marquise.WoodSupply -= placed
+	return placed
+}
+
+func returnMarquiseWoodToSupply(state *game.GameState, count int) {
+	if count <= 0 {
+		return
+	}
+	state.Marquise.WoodSupply += count
+}
+
 func returnRemovedWarriorsToSupply(state *game.GameState, clearing *game.Clearing, faction game.Faction, count int) {
 	returnWarriorsToSupply(state, faction, count)
 	if faction == game.Marquise && clearing != nil {
@@ -239,6 +260,7 @@ func removeTokenLosses(state *game.GameState, clearing *game.Clearing, faction g
 			removedWood = clearing.Wood
 		}
 		clearing.Wood -= removedWood
+		returnMarquiseWoodToSupply(state, removedWood)
 		losses -= removedWood
 		removedTokens += removedWood
 	}
@@ -282,6 +304,7 @@ func applySelectedPieceLosses(state *game.GameState, clearing *game.Clearing, fa
 		case game.BattlePieceWood:
 			if faction == game.Marquise && clearing.Wood > 0 {
 				clearing.Wood--
+				returnMarquiseWoodToSupply(state, 1)
 				losses--
 				summary.tokens++
 			}
@@ -461,10 +484,12 @@ func applyBuild(state *game.GameState, action game.Action) {
 		wood := state.Map.Clearings[sourceIndex].Wood
 		if source.Amount >= wood {
 			state.Map.Clearings[sourceIndex].Wood = 0
+			returnMarquiseWoodToSupply(state, wood)
 			continue
 		}
 
 		state.Map.Clearings[sourceIndex].Wood -= source.Amount
+		returnMarquiseWoodToSupply(state, source.Amount)
 	}
 }
 
@@ -478,9 +503,12 @@ func applyOverwork(state *game.GameState, action game.Action) {
 		return
 	}
 
+	if state.Marquise.WoodSupply <= 0 {
+		return
+	}
 	if _, ok := spendFactionHandCard(state, game.Marquise, action.Overwork.CardID); !ok {
 		return
 	}
-	state.Map.Clearings[index].Wood++
+	placeMarquiseWood(state, &state.Map.Clearings[index], 1)
 	DiscardCard(state, action.Overwork.CardID)
 }

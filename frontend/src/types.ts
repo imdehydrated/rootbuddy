@@ -151,6 +151,7 @@ export interface GameState {
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
+    woodSupply: number;
     sawmillsPlaced: number;
     workshopsPlaced: number;
     recruitersPlaced: number;

@@ -8,7 +8,7 @@ func ValidOverworkActions(state game.GameState) []game.Action {
 
 func ValidMarquiseOverworkActions(state game.GameState) []game.Action {
 	actions := []game.Action{}
-	if !marquiseIsDaylightActionStep(state) || marquiseActionLimitReached(state) {
+	if !marquiseIsDaylightActionStep(state) || marquiseActionLimitReached(state) || state.Marquise.WoodSupply <= 0 {
 		return actions
 	}
 

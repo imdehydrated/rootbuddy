@@ -73,8 +73,10 @@ func removeEnemyPiecesForRevolt(state *game.GameState, clearing *game.Clearing) 
 	}
 
 	if clearing.Wood > 0 {
-		removedPieces += clearing.Wood
+		removedWood := clearing.Wood
+		removedPieces += removedWood
 		clearing.Wood = 0
+		returnMarquiseWoodToSupply(state, removedWood)
 	}
 
 	return removedPieces

@@ -191,6 +191,140 @@ func TestValidEyrieRecruitActionsCharismaticRecruitsTwoWarriors(t *testing.T) {
 	}
 }
 
+func TestValidEyrieRecruitActionsRecruitsAtAllMatchingRoosts(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+				{
+					ID:   3,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			WarriorSupply: 5,
+		},
+	}
+
+	got := ValidEyrieRecruitActions(state, foxCard.ID)
+	want := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:      game.Eyrie,
+			ClearingIDs:  []int{1, 3},
+			DecreeCardID: foxCard.ID,
+		},
+	}
+
+	if len(got) != 1 || !containsAction(got, want) {
+		t.Fatalf("expected one recruit action for all matching roosts %+v, got %+v", want, got)
+	}
+}
+
+func TestValidEyrieRecruitActionsCharismaticRecruitsAtAllMatchingRoosts(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+				{
+					ID:   3,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			Leader:        game.LeaderCharismatic,
+			WarriorSupply: 4,
+		},
+	}
+
+	got := ValidEyrieRecruitActions(state, foxCard.ID)
+	want := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:      game.Eyrie,
+			ClearingIDs:  []int{1, 1, 3, 3},
+			DecreeCardID: foxCard.ID,
+		},
+	}
+
+	if len(got) != 1 || !containsAction(got, want) {
+		t.Fatalf("expected charismatic recruit action at all matching roosts %+v, got %+v", want, got)
+	}
+}
+
+func TestValidEyrieRecruitActionsGeneratesSupplyLimitedChoices(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+				{
+					ID:   3,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			Leader:        game.LeaderCharismatic,
+			WarriorSupply: 2,
+		},
+	}
+
+	got := ValidEyrieRecruitActions(state, foxCard.ID)
+	wants := []game.Action{
+		eyrieRecruitAction(foxCard.ID, []int{1, 1}),
+		eyrieRecruitAction(foxCard.ID, []int{1, 3}),
+		eyrieRecruitAction(foxCard.ID, []int{3, 3}),
+	}
+
+	for _, want := range wants {
+		if !containsAction(got, want) {
+			t.Fatalf("expected supply-limited recruit action %+v, got %+v", want, got)
+		}
+	}
+	if len(got) != len(wants) {
+		t.Fatalf("expected only supply-limited recruit choices %+v, got %+v", wants, got)
+	}
+}
+
 func TestValidEyrieDaylightActionsReturnsTurmoilWhenCurrentCardIsUnresolvable(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	state := game.GameState{

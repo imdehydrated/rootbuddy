@@ -277,6 +277,7 @@ func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Cleari
 
 	if faction == game.Marquise && clearing.Wood > 0 {
 		clearing.Wood--
+		returnMarquiseWoodToSupply(state, 1)
 		return true, 0, 0, 1
 	}
 
