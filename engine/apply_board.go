@@ -6,6 +6,9 @@ func applyRecruit(state *game.GameState, action game.Action) {
 	if action.Recruit == nil {
 		return
 	}
+	if action.Recruit.Faction == game.Alliance && !canApplyAllianceRecruit(*state, action.Recruit.ClearingIDs) {
+		return
+	}
 
 	for _, clearingID := range action.Recruit.ClearingIDs {
 		index := findClearingIndex(state.Map, clearingID)
@@ -31,6 +34,15 @@ func applyRecruit(state *game.GameState, action game.Action) {
 	if action.Recruit.Faction == game.Marquise {
 		state.TurnProgress.RecruitUsed = true
 	}
+}
+
+func canApplyAllianceRecruit(state game.GameState, clearingIDs []int) bool {
+	if state.Alliance.WarriorSupply <= 0 || len(clearingIDs) != 1 {
+		return false
+	}
+
+	index := findClearingIndex(state.Map, clearingIDs[0])
+	return index != -1 && clearingHasAllianceBase(state.Map.Clearings[index])
 }
 
 func applyMovement(state *game.GameState, action game.Action) {
@@ -188,7 +200,7 @@ func removeBuildingFromTracks(state *game.GameState, clearing *game.Clearing, bu
 		state.Eyrie.RoostsPlaced--
 	}
 	if building.Faction == game.Alliance && building.Type == game.Base {
-		setAllianceBasePlaced(state, clearing.Suit, false)
+		removeAllianceBase(state, clearing.Suit)
 	}
 }
 

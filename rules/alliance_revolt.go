@@ -20,6 +20,9 @@ func ValidRevoltActions(state game.GameState) []game.Action {
 		if !hasAllianceSympathy(clearing) || allianceHasBaseInSuit(state, clearing.Suit) {
 			continue
 		}
+		if !hasOpenBuildSlotAfterRevolt(clearing) {
+			continue
+		}
 
 		supporterIDs := allianceSupporterCardIDs(state, clearing.Suit)
 		for _, chosenSupporters := range supporterCardSubsets(supporterIDs, 2) {

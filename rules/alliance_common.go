@@ -47,6 +47,19 @@ func hasKeepToken(clearing game.Clearing) bool {
 	return false
 }
 
+func hasOpenBuildSlotAfterRevolt(clearing game.Clearing) bool {
+	usedSlots := 0
+	for _, building := range clearing.Buildings {
+		if building.Faction == game.Alliance {
+			usedSlots++
+		}
+	}
+	if clearing.Ruins {
+		usedSlots++
+	}
+	return usedSlots < clearing.BuildSlots
+}
+
 func adjacentToAllianceSympathy(clearing game.Clearing, board game.Map) bool {
 	for _, adjacentID := range clearing.Adj {
 		adjacent, ok := findClearingByID(board, adjacentID)

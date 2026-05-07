@@ -12,23 +12,13 @@ func ValidAllianceRecruitActions(state game.GameState) []game.Action {
 		return nil
 	}
 
-	clearingIDs := make([]int, 0, len(baseClearings))
+	actions := make([]game.Action, 0, len(baseClearings))
 	for _, clearing := range baseClearings {
-		clearingIDs = append(clearingIDs, clearing.ID)
-	}
-
-	recruitCount := state.Alliance.WarriorSupply
-	if recruitCount > len(clearingIDs) {
-		recruitCount = len(clearingIDs)
-	}
-
-	actions := []game.Action{}
-	for _, chosenClearings := range recruitClearingSubsets(clearingIDs, recruitCount) {
 		actions = append(actions, game.Action{
 			Type: game.ActionRecruit,
 			Recruit: &game.RecruitAction{
 				Faction:     game.Alliance,
-				ClearingIDs: chosenClearings,
+				ClearingIDs: []int{clearing.ID},
 			},
 		})
 	}

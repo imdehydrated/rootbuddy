@@ -20,6 +20,23 @@ func firstAllianceTestCard(t *testing.T, suit game.Suit) game.Card {
 	return game.Card{}
 }
 
+func allianceTestCards(t *testing.T, suit game.Suit, count int) []game.Card {
+	t.Helper()
+
+	cards := []game.Card{}
+	for _, card := range carddata.BaseDeck() {
+		if card.Suit == suit {
+			cards = append(cards, card)
+			if len(cards) == count {
+				return cards
+			}
+		}
+	}
+
+	t.Fatalf("only found %d card(s) for suit %v, wanted %d", len(cards), suit, count)
+	return nil
+}
+
 func TestResolveBattleAllianceDefenderUsesHigherRoll(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -186,8 +203,9 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 		Map: game.Map{
 			Clearings: []game.Clearing{
 				{
-					ID:   1,
-					Suit: game.Fox,
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
 					Tokens: []game.Token{
 						{Faction: game.Alliance, Type: game.TokenSympathy},
 						{Faction: game.Marquise, Type: game.TokenKeep},
@@ -268,6 +286,202 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 	}
 	if len(next.PendingFieldHospitals) != 0 {
 		t.Fatalf("did not expect Field Hospitals when the keep is removed, got %+v", next.PendingFieldHospitals)
+	}
+}
+
+func TestApplyRevoltRejectsClearingWithNoOpenSlotAfterRemovingEnemies(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	birdCard := firstAllianceTestCard(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Ruins:      true,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			Supporters:    []game.Card{foxCard, birdCard},
+			WarriorSupply: 5,
+		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 5,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	})
+
+	if len(next.Alliance.Supporters) != 2 {
+		t.Fatalf("expected invalid revolt not to spend supporters, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.DiscardPile) != 0 {
+		t.Fatalf("expected invalid revolt not to discard supporters, got %+v", next.DiscardPile)
+	}
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 1 {
+		t.Fatalf("expected invalid revolt not to remove enemy warriors, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if len(next.Map.Clearings[0].Buildings) != 0 || next.Alliance.FoxBasePlaced || next.Alliance.Officers != 0 {
+		t.Fatalf("expected invalid revolt not to place base or add officer, clearing=%+v alliance=%+v", next.Map.Clearings[0], next.Alliance)
+	}
+}
+
+func TestApplyBattleResolutionRemovingAllianceBaseAppliesFallout(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	birdCard := firstAllianceTestCard(t, game.Bird)
+	rabbitCards := allianceTestCards(t, game.Rabbit, 6)
+	supporters := append([]game.Card{foxCard, birdCard}, rabbitCards...)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			Supporters:    supporters,
+			Officers:      3,
+			FoxBasePlaced: true,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Alliance,
+			DefenderLosses: 1,
+		},
+	})
+
+	if len(next.Map.Clearings[0].Buildings) != 0 {
+		t.Fatalf("expected Alliance base to be removed, got %+v", next.Map.Clearings[0].Buildings)
+	}
+	if next.Alliance.FoxBasePlaced {
+		t.Fatalf("expected fox base flag to clear")
+	}
+	if next.Alliance.Officers != 1 {
+		t.Fatalf("expected base removal to remove half of 3 officers rounded up, got %d", next.Alliance.Officers)
+	}
+	if len(next.Alliance.Supporters) != 5 {
+		t.Fatalf("expected no-base supporter cap to leave five supporters, got %+v", next.Alliance.Supporters)
+	}
+	for _, supporter := range next.Alliance.Supporters {
+		if supporter.Suit == game.Fox || supporter.Suit == game.Bird {
+			t.Fatalf("expected fox and bird supporters to be discarded after fox base removal, got %+v", next.Alliance.Supporters)
+		}
+	}
+	if len(next.DiscardPile) != 3 ||
+		next.DiscardPile[0] != foxCard.ID ||
+		next.DiscardPile[1] != birdCard.ID ||
+		next.DiscardPile[2] != rabbitCards[5].ID {
+		t.Fatalf("expected matching supporters and no-base excess supporter in discard, got %+v", next.DiscardPile)
+	}
+	if next.VictoryPoints[game.Marquise] != 1 {
+		t.Fatalf("expected attacker to score removed base, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyAllianceRecruitPlacesOneWarriorAtOneBase(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+				{
+					ID: 2,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 5,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Alliance,
+			ClearingIDs: []int{2},
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Alliance] != 0 || next.Map.Clearings[1].Warriors[game.Alliance] != 1 {
+		t.Fatalf("expected recruit to place one warrior at chosen base only, got %+v", next.Map.Clearings)
+	}
+	if next.Alliance.WarriorSupply != 4 {
+		t.Fatalf("expected Alliance warrior supply to decrease by one, got %d", next.Alliance.WarriorSupply)
+	}
+}
+
+func TestApplyAllianceRecruitRejectsMultiBasePayload(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+				{
+					ID: 2,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 5,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Alliance,
+			ClearingIDs: []int{1, 2},
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors != nil || next.Map.Clearings[1].Warriors != nil {
+		t.Fatalf("expected multi-base recruit payload to be rejected, got %+v", next.Map.Clearings)
+	}
+	if next.Alliance.WarriorSupply != 5 {
+		t.Fatalf("expected rejected recruit to leave supply unchanged, got %d", next.Alliance.WarriorSupply)
 	}
 }
 

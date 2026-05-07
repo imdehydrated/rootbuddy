@@ -354,6 +354,65 @@ func TestApplyActionStrikeReturnsRemovedWarriorToSupply(t *testing.T) {
 	}
 }
 
+func TestApplyActionStrikeRemovingAllianceBaseAppliesFallout(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	birdCard := firstVagabondTestCard(t, game.Bird)
+	rabbitCard := firstVagabondTestCard(t, game.Rabbit)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			Supporters:    []game.Card{foxCard, birdCard, rabbitCard},
+			Officers:      2,
+			FoxBasePlaced: true,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionStrike,
+		Strike: &game.StrikeAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Alliance,
+		},
+	})
+
+	if len(next.Map.Clearings[0].Buildings) != 0 {
+		t.Fatalf("expected strike to remove Alliance base, got %+v", next.Map.Clearings[0].Buildings)
+	}
+	if next.Alliance.FoxBasePlaced {
+		t.Fatalf("expected fox base flag to clear")
+	}
+	if next.Alliance.Officers != 1 {
+		t.Fatalf("expected base removal to remove half of 2 officers rounded up, got %d", next.Alliance.Officers)
+	}
+	if len(next.Alliance.Supporters) != 1 || next.Alliance.Supporters[0].ID != rabbitCard.ID {
+		t.Fatalf("expected only off-suit supporter to remain, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.DiscardPile) != 2 || next.DiscardPile[0] != foxCard.ID || next.DiscardPile[1] != birdCard.ID {
+		t.Fatalf("expected fox and bird supporters in discard, got %+v", next.DiscardPile)
+	}
+	if next.VictoryPoints[game.Vagabond] != 1 {
+		t.Fatalf("expected Vagabond to score removed base, got %+v", next.VictoryPoints)
+	}
+}
+
 func TestVagabondBattleScoresInfamyForHostilePieces(t *testing.T) {
 	state := game.GameState{
 		GamePhase:   game.LifecyclePlaying,

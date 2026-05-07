@@ -252,7 +252,7 @@ func removeOneFactionPieceForStrike(state *game.GameState, clearing *game.Cleari
 			state.Eyrie.RoostsPlaced--
 		}
 		if faction == game.Alliance && building.Type == game.Base {
-			setAllianceBasePlaced(state, clearing.Suit, false)
+			removeAllianceBase(state, clearing.Suit)
 		}
 
 		clearing.Buildings = append(clearing.Buildings[:index], clearing.Buildings[index+1:]...)

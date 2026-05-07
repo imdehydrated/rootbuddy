@@ -161,8 +161,9 @@ func TestValidRevoltActionsRequiresSympathyAndTwoSupporters(t *testing.T) {
 		Map: game.Map{
 			Clearings: []game.Clearing{
 				{
-					ID:   4,
-					Suit: game.Fox,
+					ID:         4,
+					Suit:       game.Fox,
+					BuildSlots: 1,
 					Tokens: []game.Token{
 						{Faction: game.Alliance, Type: game.TokenSympathy},
 					},
@@ -190,6 +191,71 @@ func TestValidRevoltActionsRequiresSympathyAndTwoSupporters(t *testing.T) {
 
 	if !containsAction(got, want) {
 		t.Fatalf("expected revolt action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidRevoltActionsRequiresOpenSlotAfterRemovingEnemies(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	birdCard := firstCardOfSuit(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         4,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Ruins:      true,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+				{
+					ID:         5,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard, birdCard},
+		},
+	}
+
+	got := ValidRevoltActions(state)
+	want := game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       5,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	}
+	unwanted := game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       4,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected revolt to allow an enemy building slot that will be cleared, got %+v", got)
+	}
+	if containsAction(got, unwanted) {
+		t.Fatalf("did not expect revolt in clearing with no slot after revolt, got %+v", got)
 	}
 }
 
@@ -313,6 +379,65 @@ func TestValidAllianceEveningActionsIncludesDrawAndOfficerActionChoices(t *testi
 	}
 	if !containsAction(got, wantMove) {
 		t.Fatalf("expected move action %+v, got %+v", wantMove, got)
+	}
+}
+
+func TestValidAllianceRecruitActionsRecruitOneWarriorAtOneBase(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Alliance, Type: game.Base},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 5,
+		},
+	}
+
+	got := ValidAllianceRecruitActions(state)
+	wantOne := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Alliance,
+			ClearingIDs: []int{1},
+		},
+	}
+	wantTwo := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Alliance,
+			ClearingIDs: []int{2},
+		},
+	}
+	unwantedBoth := game.Action{
+		Type: game.ActionRecruit,
+		Recruit: &game.RecruitAction{
+			Faction:     game.Alliance,
+			ClearingIDs: []int{1, 2},
+		},
+	}
+
+	if !containsAction(got, wantOne) || !containsAction(got, wantTwo) {
+		t.Fatalf("expected one-warrior recruit choices at each base, got %+v", got)
+	}
+	if containsAction(got, unwantedBoth) {
+		t.Fatalf("did not expect one recruit action to place at multiple bases, got %+v", got)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected exactly two base recruit actions, got %+v", got)
 	}
 }
 

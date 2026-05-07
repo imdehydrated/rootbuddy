@@ -104,9 +104,13 @@ func applyRevolt(state *game.GameState, action game.Action) {
 		return
 	}
 
+	clearing := &state.Map.Clearings[index]
+	if !clearingHasOpenBuildSlotAfterRevolt(*clearing) {
+		return
+	}
+
 	spendAllianceSupporters(state, action.Revolt.SupporterCardIDs)
 	DiscardCards(state, action.Revolt.SupporterCardIDs)
-	clearing := &state.Map.Clearings[index]
 	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
 	clearing.Buildings = append(clearing.Buildings, game.Building{
 		Faction: game.Alliance,
