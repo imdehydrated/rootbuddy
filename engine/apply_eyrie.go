@@ -74,7 +74,7 @@ func applyEyrieNewRoost(state *game.GameState, action game.Action) {
 	}
 
 	index := findClearingIndex(state.Map, action.EyrieNewRoost.ClearingID)
-	if index == -1 || !clearingHasOpenBuildSlot(state.Map.Clearings[index]) {
+	if index == -1 || hasMarquiseKeepToken(state.Map.Clearings[index]) || !clearingHasOpenBuildSlot(state.Map.Clearings[index]) {
 		return
 	}
 

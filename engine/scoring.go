@@ -36,8 +36,8 @@ func scoreMarquiseBuilding(state *game.GameState, buildingType game.BuildingType
 
 func scoreBattleRemovals(state *game.GameState, faction game.Faction, removedBuildings int, removedTokens int) {
 	points := removedBuildings + removedTokens
-	if faction == game.Eyrie && state.Eyrie.Leader == game.LeaderDespot {
-		points += removedBuildings + removedTokens
+	if points > 0 && faction == game.Eyrie && state.Eyrie.Leader == game.LeaderDespot {
+		points++
 	}
 	addVictoryPoints(state, faction, points)
 }

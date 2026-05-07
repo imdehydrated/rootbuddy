@@ -535,6 +535,87 @@ func TestApplyActionBattleResolutionReturnsRemovedWoodToSupply(t *testing.T) {
 	}
 }
 
+func TestApplyActionBattleResolutionDespotScoresOneExtraPerBattle(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Wood: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			Leader: game.LeaderDespot,
+		},
+		Marquise: game.MarquiseState{
+			SawmillsPlaced: 1,
+			WoodSupply:     7,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Eyrie,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 2,
+		},
+	})
+
+	if len(next.Map.Clearings[0].Buildings) != 0 || next.Map.Clearings[0].Wood != 0 {
+		t.Fatalf("expected battle to remove Marquise building and wood, got %+v", next.Map.Clearings[0])
+	}
+	if next.VictoryPoints[game.Eyrie] != 3 {
+		t.Fatalf("expected Despot to score two removal VP plus one battle bonus, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionBattleResolutionDespotDoesNotScoreBonusForWarriorsOnly(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			Leader:        game.LeaderDespot,
+			WarriorSupply: 5,
+		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 5,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Eyrie,
+			ClearingID:     1,
+			TargetFaction:  game.Marquise,
+			DefenderLosses: 2,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected battle to remove Marquise warriors, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.VictoryPoints[game.Eyrie] != 0 {
+		t.Fatalf("did not expect Despot bonus without removed buildings or tokens, got %+v", next.VictoryPoints)
+	}
+}
+
 func TestApplyActionBattleResolutionUsesSelectedDefenderBuildingLoss(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

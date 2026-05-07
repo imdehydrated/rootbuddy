@@ -136,6 +136,9 @@ func ValidEyrieNewRoostActions(state game.GameState) []game.Action {
 	minWarriors := 0
 	candidates := []game.Clearing{}
 	for _, clearing := range state.Map.Clearings {
+		if hasKeepToken(clearing) {
+			continue
+		}
 		if !hasOpenBuildSlot(clearing) {
 			continue
 		}

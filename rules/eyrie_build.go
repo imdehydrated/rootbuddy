@@ -9,6 +9,9 @@ func ValidEyrieBuildActions(state game.GameState, cardID game.CardID) []game.Act
 	}
 
 	for _, clearing := range state.Map.Clearings {
+		if hasKeepToken(clearing) {
+			continue
+		}
 		if !decreeMatchesSuit(cardID, clearing.Suit) {
 			continue
 		}

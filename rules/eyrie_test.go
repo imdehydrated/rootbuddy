@@ -156,6 +156,61 @@ func TestValidEyrieBirdsongActionsOffersNewRoostAfterDecreeWhenNoRoosts(t *testi
 	}
 }
 
+func TestValidEyrieNewRoostActionsSkipsKeepClearing(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+				{
+					ID:         2,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Eyrie: game.EyrieState{
+			WarriorSupply: 3,
+		},
+		TurnProgress: game.TurnProgress{
+			CardsAddedToDecree: 1,
+		},
+	}
+
+	got := ValidEyrieNewRoostActions(state)
+	want := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 2,
+		},
+	}
+	unwanted := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 1,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected new roost outside the keep clearing %+v, got %+v", want, got)
+	}
+	if containsAction(got, unwanted) {
+		t.Fatalf("did not expect new roost in the keep clearing, got %+v", got)
+	}
+}
+
 func TestValidEyrieRecruitActionsCharismaticRecruitsTwoWarriors(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	state := game.GameState{
@@ -322,6 +377,65 @@ func TestValidEyrieRecruitActionsGeneratesSupplyLimitedChoices(t *testing.T) {
 	}
 	if len(got) != len(wants) {
 		t.Fatalf("expected only supply-limited recruit choices %+v, got %+v", wants, got)
+	}
+}
+
+func TestValidEyrieBuildActionsSkipsKeepClearing(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 2,
+					},
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+				{
+					ID:         2,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 1,
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 1,
+		},
+	}
+
+	got := ValidEyrieBuildActions(state, foxCard.ID)
+	want := game.Action{
+		Type: game.ActionBuild,
+		Build: &game.BuildAction{
+			Faction:      game.Eyrie,
+			ClearingID:   2,
+			BuildingType: game.Roost,
+			DecreeCardID: foxCard.ID,
+		},
+	}
+	unwanted := game.Action{
+		Type: game.ActionBuild,
+		Build: &game.BuildAction{
+			Faction:      game.Eyrie,
+			ClearingID:   1,
+			BuildingType: game.Roost,
+			DecreeCardID: foxCard.ID,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected Eyrie build outside the keep clearing %+v, got %+v", want, got)
+	}
+	if containsAction(got, unwanted) {
+		t.Fatalf("did not expect Eyrie build in the keep clearing, got %+v", got)
 	}
 }
 

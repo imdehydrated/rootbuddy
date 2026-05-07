@@ -193,6 +193,47 @@ func TestApplyEyrieNewRoostPlacesRoostWarriorsAndAdvances(t *testing.T) {
 	}
 }
 
+func TestApplyEyrieNewRoostRejectsKeepClearing(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Eyrie,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Eyrie: game.EyrieState{
+			WarriorSupply: 3,
+		},
+		TurnProgress: game.TurnProgress{
+			CardsAddedToDecree: 1,
+		},
+	}
+	action := game.Action{
+		Type: game.ActionEyrieNewRoost,
+		EyrieNewRoost: &game.EyrieNewRoostAction{
+			Faction:    game.Eyrie,
+			ClearingID: 1,
+		},
+	}
+
+	next := ApplyAction(state, action)
+
+	if len(next.Map.Clearings[0].Buildings) != 0 || next.Map.Clearings[0].Warriors[game.Eyrie] != 0 {
+		t.Fatalf("expected keep clearing to reject new roost placement, got %+v", next.Map.Clearings[0])
+	}
+	if next.Eyrie.WarriorSupply != 3 || next.Eyrie.RoostsPlaced != 0 {
+		t.Fatalf("expected Eyrie supply and roost count unchanged, got %+v", next.Eyrie)
+	}
+}
+
 func TestApplyEyrieRecruitPlacesAtEveryRequestedRoost(t *testing.T) {
 	foxCard := firstEyrieTestCard(t, game.Fox)
 	state := game.GameState{
@@ -228,6 +269,44 @@ func TestApplyEyrieRecruitPlacesAtEveryRequestedRoost(t *testing.T) {
 	}
 	if state.Map.Clearings[0].Warriors != nil || state.Map.Clearings[1].Warriors != nil {
 		t.Fatalf("expected ApplyAction to leave original state unchanged, got %+v", state.Map.Clearings)
+	}
+}
+
+func TestApplyEyrieBuildRejectsKeepClearing(t *testing.T) {
+	foxCard := firstEyrieTestCard(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Marquise, Type: game.TokenKeep},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 1,
+		},
+	}
+	action := game.Action{
+		Type: game.ActionBuild,
+		Build: &game.BuildAction{
+			Faction:      game.Eyrie,
+			ClearingID:   1,
+			BuildingType: game.Roost,
+			DecreeCardID: foxCard.ID,
+		},
+	}
+
+	next := ApplyAction(state, action)
+
+	if len(next.Map.Clearings[0].Buildings) != 0 {
+		t.Fatalf("expected keep clearing to reject Eyrie build, got %+v", next.Map.Clearings[0].Buildings)
+	}
+	if next.Eyrie.RoostsPlaced != 1 {
+		t.Fatalf("expected Eyrie roost count unchanged, got %d", next.Eyrie.RoostsPlaced)
 	}
 }
 

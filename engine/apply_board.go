@@ -450,6 +450,9 @@ func applyBuild(state *game.GameState, action game.Action) {
 	if index == -1 {
 		return
 	}
+	if action.Build.Faction == game.Eyrie && hasMarquiseKeepToken(state.Map.Clearings[index]) {
+		return
+	}
 
 	state.Map.Clearings[index].Buildings = append(
 		state.Map.Clearings[index].Buildings,
