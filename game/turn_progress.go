@@ -19,6 +19,7 @@ type TurnProgress struct {
 	HasSlipped              bool
 	VagabondRestResolved    bool
 	VagabondEveningDrawn    bool
+	VagabondAidCounts       map[Faction]int
 	VagabondDiscardResolved bool
 	VagabondCapacityChecked bool
 	EveningDrawn            bool

@@ -1,5 +1,6 @@
-import { factionLabels, itemStatusLabels, itemTypeLabels, itemZoneLabels, relationshipLabels, vagabondCharacterLabels } from "../../labels";
+import { itemStatusLabels, itemTypeLabels, itemZoneLabels, vagabondCharacterLabels } from "../../labels";
 import type { GameState } from "../../types";
+import { VagabondRelationshipTrack } from "../VagabondRelationshipTrack";
 
 type VagabondEditorProps = {
   state: GameState;
@@ -86,15 +87,16 @@ export function VagabondEditor({ state, onUpdateState }: VagabondEditorProps) {
           </div>
           <div className="summary-card">
             <span className="summary-label">Relationships</span>
-            {Object.entries(state.vagabond.relationships).length === 0 ? (
-              <span>None</span>
-            ) : (
-              Object.entries(state.vagabond.relationships).map(([faction, level]) => (
-                <span key={faction}>
-                  {factionLabels[Number(faction)]}: {relationshipLabels[level] ?? "Unknown"}
-                </span>
-              ))
-            )}
+            <VagabondRelationshipTrack
+              state={state}
+              editable
+              onSetRelationship={(faction, relationship) =>
+                onUpdateState((draft) => {
+                  draft.vagabond.relationships[String(faction)] = relationship;
+                  delete draft.turnProgress.vagabondAidCounts[String(faction)];
+                })
+              }
+            />
           </div>
         </div>
       </div>

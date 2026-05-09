@@ -15,10 +15,6 @@ func ValidAidActions(state game.GameState) []game.Action {
 
 	actions := []game.Action{}
 	for _, targetFaction := range vagabondFactionsInClearing(clearing) {
-		if game.VagabondHostileTo(state, targetFaction) {
-			continue
-		}
-
 		for _, card := range state.Vagabond.CardsInHand {
 			if !matchesSuitOrBird(card, clearing.Suit) {
 				continue

@@ -343,6 +343,121 @@ func TestApplyRevoltRejectsClearingWithNoOpenSlotAfterRemovingEnemies(t *testing
 	}
 }
 
+func TestApplyRevoltDamagesVagabondInRevoltingClearing(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	birdCard := firstAllianceTestCard(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			Supporters:    []game.Card{foxCard, birdCard},
+			WarriorSupply: 5,
+		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 5,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemTea, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	})
+
+	damaged := 0
+	for _, item := range next.Vagabond.Items {
+		if item.Status == game.ItemDamaged {
+			damaged++
+		}
+	}
+	if damaged != 3 {
+		t.Fatalf("expected revolt to damage three Vagabond items, got %+v", next.Vagabond.Items)
+	}
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected revolt to still remove enemy warriors, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if len(next.Map.Clearings[0].Buildings) != 1 || next.Map.Clearings[0].Buildings[0].Type != game.Base {
+		t.Fatalf("expected revolt to still place the Alliance base, got %+v", next.Map.Clearings[0].Buildings)
+	}
+}
+
+func TestApplyRevoltDoesNotDamageCoalitionPartnerVagabond(t *testing.T) {
+	foxCard := firstAllianceTestCard(t, game.Fox)
+	birdCard := firstAllianceTestCard(t, game.Bird)
+
+	state := game.GameState{
+		CoalitionActive:  true,
+		CoalitionPartner: game.Alliance,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			Supporters:    []game.Card{foxCard, birdCard},
+			WarriorSupply: 5,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:          game.Alliance,
+			ClearingID:       1,
+			BaseSuit:         game.Fox,
+			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+		},
+	})
+
+	for _, item := range next.Vagabond.Items {
+		if item.Status == game.ItemDamaged {
+			t.Fatalf("did not expect coalition partner Vagabond to be damaged, got %+v", next.Vagabond.Items)
+		}
+	}
+}
+
 func TestApplyBattleResolutionRemovingAllianceBaseAppliesFallout(t *testing.T) {
 	foxCard := firstAllianceTestCard(t, game.Fox)
 	birdCard := firstAllianceTestCard(t, game.Bird)

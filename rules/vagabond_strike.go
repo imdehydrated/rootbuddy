@@ -3,7 +3,7 @@ package rules
 import "github.com/imdehydrated/rootbuddy/game"
 
 func ValidStrikeActions(state game.GameState) []game.Action {
-	if len(vagabondItemIndexes(state, game.ItemSword, game.ItemReady)) == 0 {
+	if len(vagabondItemIndexes(state, game.ItemCrossbow, game.ItemReady)) == 0 {
 		return nil
 	}
 

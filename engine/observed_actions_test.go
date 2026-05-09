@@ -235,7 +235,13 @@ func TestApplyActionAidObservedHiddenVagabondCardInAssistMode(t *testing.T) {
 		},
 		Map: game.Map{
 			Clearings: []game.Clearing{
-				{ID: 1, Suit: game.Rabbit},
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
 			},
 		},
 		Marquise: game.MarquiseState{},
@@ -266,7 +272,7 @@ func TestApplyActionAidObservedHiddenVagabondCardInAssistMode(t *testing.T) {
 	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != 24 {
 		t.Fatalf("expected observed aid to transfer the public card, got %+v", next.Marquise.CardsInHand)
 	}
-	if next.Vagabond.Relationships[game.Marquise] != game.RelFriendly {
+	if next.Vagabond.Relationships[game.Marquise] != game.RelAmiable {
 		t.Fatalf("expected aid to improve relationship, got %+v", next.Vagabond.Relationships)
 	}
 }

@@ -36,7 +36,7 @@ func TestRuinItemsMatchBaseGameSet(t *testing.T) {
 		game.ItemSword,
 		game.ItemHammer,
 		game.ItemBag,
-		game.ItemCoin,
+		game.ItemBoots,
 	}
 
 	if len(got) != len(want) {

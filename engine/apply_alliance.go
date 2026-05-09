@@ -94,6 +94,17 @@ func sympathyCountBySuit(board game.Map, suit game.Suit) int {
 	return count
 }
 
+func damageVagabondInRevoltClearing(state *game.GameState, clearingID int) {
+	if state.Vagabond.InForest || state.Vagabond.ClearingID != clearingID {
+		return
+	}
+	if !game.AreEnemies(*state, game.Alliance, game.Vagabond) {
+		return
+	}
+
+	damageVagabondItems(state, 3)
+}
+
 func applyRevolt(state *game.GameState, action game.Action) {
 	if action.Revolt == nil {
 		return
@@ -112,6 +123,7 @@ func applyRevolt(state *game.GameState, action game.Action) {
 	spendAllianceSupporters(state, action.Revolt.SupporterCardIDs)
 	DiscardCards(state, action.Revolt.SupporterCardIDs)
 	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
+	damageVagabondInRevoltClearing(state, clearing.ID)
 	clearing.Buildings = append(clearing.Buildings, game.Building{
 		Faction: game.Alliance,
 		Type:    game.Base,

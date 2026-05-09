@@ -5,7 +5,6 @@ import {
   itemTypeLabels,
   itemStatusLabels,
   phaseLabels,
-  relationshipLabels,
   setupStageLabels,
   stepLabels,
   suitLabels,
@@ -13,6 +12,7 @@ import {
 } from "../labels";
 import type { GameState } from "../types";
 import { KnownCardPillList } from "./CardUi";
+import { VagabondRelationshipTrack } from "./VagabondRelationshipTrack";
 
 type TurnSummaryPanelProps = {
   state: GameState;
@@ -142,11 +142,6 @@ function renderCurrentFactionState(state: GameState) {
         key: `item-status-${status}`,
         label: `${itemStatusLabels[status]} ${state.vagabond.items.filter((item) => item.status === status).length}`
       }));
-      const relationshipSummary = Object.entries(state.vagabond.relationships).map(([faction, level]) => ({
-        key: `relationship-${faction}`,
-        label: `${factionLabels[Number(faction)]}: ${relationshipLabels[level] ?? "Unknown"}`
-      }));
-
       return (
         <div className="summary-stack">
           <div className="faction-state-grid">
@@ -162,7 +157,7 @@ function renderCurrentFactionState(state: GameState) {
             </div>
           </div>
           <KnownCardPillList items={itemSummary} />
-          <KnownCardPillList items={relationshipSummary} emptyLabel="Relationships unset" />
+          <VagabondRelationshipTrack state={state} />
         </div>
       );
     }

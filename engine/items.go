@@ -19,7 +19,7 @@ func RuinItems() []game.ItemType {
 		game.ItemSword,
 		game.ItemHammer,
 		game.ItemBag,
-		game.ItemCoin,
+		game.ItemBoots,
 	}
 }
 

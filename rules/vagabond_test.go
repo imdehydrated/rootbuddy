@@ -480,8 +480,35 @@ func TestValidVagabondBirdsongRefreshCountsOnlyTrackTea(t *testing.T) {
 		t.Fatalf("expected refresh choices")
 	}
 	for _, action := range got {
-		if action.Daybreak != nil && len(action.Daybreak.RefreshedItemIndexes) != 4 {
-			t.Fatalf("expected one track tea to allow four refreshed items, got %+v", action)
+		if action.Daybreak != nil && len(action.Daybreak.RefreshedItemIndexes) != 5 {
+			t.Fatalf("expected one track tea to allow five refreshed items, got %+v", action)
+		}
+	}
+}
+
+func TestValidVagabondBirdsongRefreshDoesNotCountTeaRefreshedThisStep(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemTea, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemSword, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTorch, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemHammer, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+			},
+		},
+	}
+
+	got := ValidVagabondBirdsongActions(state)
+	if len(got) == 0 {
+		t.Fatalf("expected refresh choices")
+	}
+	for _, action := range got {
+		if action.Daybreak != nil && len(action.Daybreak.RefreshedItemIndexes) != 3 {
+			t.Fatalf("expected exhausted tea not to increase current refresh limit, got %+v", action)
 		}
 	}
 }
@@ -663,7 +690,7 @@ func TestValidVagabondEveningCapacityCountsSatchelAndDamagedButNotTrack(t *testi
 	}
 }
 
-func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
+func TestValidAidActionsAllowsHostileFactions(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	state := game.GameState{
 		Map: game.Map{
@@ -704,7 +731,7 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 			ItemIndex:     0,
 		},
 	}
-	unwantMarquise := game.Action{
+	wantMarquise := game.Action{
 		Type: game.ActionAid,
 		Aid: &game.AidAction{
 			Faction:       game.Vagabond,
@@ -731,8 +758,8 @@ func TestValidAidActionsSkipsHostileFactions(t *testing.T) {
 	if !containsAction(got, wantAllianceBoots) {
 		t.Fatalf("expected selected-item aid action %+v, got %+v", wantAllianceBoots, got)
 	}
-	if containsAction(got, unwantMarquise) {
-		t.Fatalf("did not expect hostile marquise aid action %+v, got %+v", unwantMarquise, got)
+	if !containsAction(got, wantMarquise) {
+		t.Fatalf("expected hostile marquise aid action %+v, got %+v", wantMarquise, got)
 	}
 }
 
@@ -798,6 +825,66 @@ func TestValidAidActionsRequiresCardMatchingClearingSuit(t *testing.T) {
 	}
 	if containsAction(got, unwantRabbit) {
 		t.Fatalf("did not expect off-suit rabbit aid action %+v, got %+v", unwantRabbit, got)
+	}
+}
+
+func TestValidStrikeActionsRequiresReadyCrossbow(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemCrossbow, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidStrikeActions(state)
+	want := game.Action{
+		Type: game.ActionStrike,
+		Strike: &game.StrikeAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected crossbow strike action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidStrikeActionsDoesNotUseSword(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+		},
+	}
+
+	if got := ValidStrikeActions(state); len(got) != 0 {
+		t.Fatalf("did not expect sword-only strike actions, got %+v", got)
 	}
 }
 

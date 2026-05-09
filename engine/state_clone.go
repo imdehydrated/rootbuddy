@@ -203,6 +203,13 @@ func cloneState(state game.GameState) game.GameState {
 		copy(next.TurnProgress.UsedPersistentEffectIDs, state.TurnProgress.UsedPersistentEffectIDs)
 	}
 
+	if state.TurnProgress.VagabondAidCounts != nil {
+		next.TurnProgress.VagabondAidCounts = make(map[game.Faction]int, len(state.TurnProgress.VagabondAidCounts))
+		for faction, count := range state.TurnProgress.VagabondAidCounts {
+			next.TurnProgress.VagabondAidCounts[faction] = count
+		}
+	}
+
 	return next
 }
 

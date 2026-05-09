@@ -166,6 +166,112 @@
   font-weight: 700;
 }
 
+.relationship-track-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.relationship-track-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.34fr) minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.relationship-hostile,
+.relationship-track-main {
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background: rgba(255, 249, 240, 0.74);
+}
+
+.relationship-hostile {
+  display: grid;
+  place-items: center;
+  min-height: 4rem;
+  border-color: rgba(138, 53, 53, 0.18);
+}
+
+.relationship-hostile.active {
+  background: rgba(138, 53, 53, 0.12);
+  border-color: rgba(138, 53, 53, 0.34);
+}
+
+.relationship-hostile button,
+.relationship-node {
+  color: inherit;
+  font: inherit;
+}
+
+.relationship-hostile button {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.relationship-hostile span {
+  font-weight: 800;
+}
+
+.relationship-track-main {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.58rem;
+}
+
+.relationship-track-heading {
+  display: flex;
+  gap: 0.45rem;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.relationship-track-heading span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.relationship-nodes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.relationship-node {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  padding: 0.42rem 0.35rem;
+  border: 1px solid rgba(39, 72, 60, 0.14);
+  background: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+button.relationship-node {
+  cursor: pointer;
+}
+
+.relationship-node.active {
+  border-color: rgba(39, 72, 60, 0.4);
+  background: rgba(39, 72, 60, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(39, 72, 60, 0.12);
+}
+
+.relationship-node span {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.relationship-node small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .endgame-hero {
   display: grid;
   gap: 0.3rem;

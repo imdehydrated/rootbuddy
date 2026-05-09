@@ -20,6 +20,23 @@ func firstVagabondTestCard(t *testing.T, suit game.Suit) game.Card {
 	return game.Card{}
 }
 
+func vagabondTestCardsOfSuit(t *testing.T, suit game.Suit, count int) []game.Card {
+	t.Helper()
+
+	cards := []game.Card{}
+	for _, card := range carddata.BaseDeck() {
+		if card.Suit == suit {
+			cards = append(cards, card)
+			if len(cards) == count {
+				return cards
+			}
+		}
+	}
+
+	t.Fatalf("only found %d cards for suit %v, needed %d", len(cards), suit, count)
+	return nil
+}
+
 func TestResolveBattleVagabondCapsHitsByExhaustedSwords(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -160,8 +177,48 @@ func TestApplyDaybreakMovesTrackItemsBetweenSatchelAndTrack(t *testing.T) {
 	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[0].Zone != game.ItemZoneTrack {
 		t.Fatalf("expected refreshed coin to return to track, got %+v", next.Vagabond.Items[0])
 	}
-	if next.Vagabond.Items[1].Status != game.ItemExhausted || next.Vagabond.Items[1].Zone != game.ItemZoneSatchel {
-		t.Fatalf("expected spent tea to move to satchel exhausted, got %+v", next.Vagabond.Items[1])
+	if next.Vagabond.Items[1].Status != game.ItemReady || next.Vagabond.Items[1].Zone != game.ItemZoneTrack {
+		t.Fatalf("expected refresh tea to stay ready on track, got %+v", next.Vagabond.Items[1])
+	}
+}
+
+func TestApplyDaybreakUsesTwoRefreshesPerReadyTrackTea(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemTea, Status: game.ItemReady, Zone: game.ItemZoneTrack},
+				{Type: game.ItemBoots, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemSword, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTorch, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemHammer, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemCrossbow, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionDaybreak,
+		Daybreak: &game.DaybreakAction{
+			Faction:              game.Vagabond,
+			RefreshedItemIndexes: []int{1, 2, 3, 4, 5, 6},
+		},
+	})
+
+	ready := 0
+	for _, item := range next.Vagabond.Items {
+		if item.Status == game.ItemReady {
+			ready++
+		}
+	}
+	if ready != 6 {
+		t.Fatalf("expected ready tea plus five refreshed items, got %+v", next.Vagabond.Items)
+	}
+	if next.Vagabond.Items[6].Status != game.ItemExhausted {
+		t.Fatalf("expected direct refresh application to stop at legal limit, got %+v", next.Vagabond.Items[6])
 	}
 }
 
@@ -276,7 +333,13 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
-				{ID: 1, Suit: game.Fox},
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
 			},
 		},
 		Vagabond: game.VagabondState{
@@ -309,12 +372,253 @@ func TestApplyActionAidTransfersCardAndImprovesRelationship(t *testing.T) {
 	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[1].Status != game.ItemExhausted {
 		t.Fatalf("expected aid to exhaust selected item only, got %+v", next.Vagabond.Items)
 	}
-	if vagabondRelationshipLevel(next, game.Marquise) != game.RelFriendly {
-		t.Fatalf("expected relationship to improve to friendly, got %v", vagabondRelationshipLevel(next, game.Marquise))
+	if vagabondRelationshipLevel(next, game.Marquise) != game.RelAmiable {
+		t.Fatalf("expected relationship to improve to amiable, got %v", vagabondRelationshipLevel(next, game.Marquise))
+	}
+	if next.VictoryPoints[game.Vagabond] != 1 {
+		t.Fatalf("expected first relationship improvement to score 1 VP, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionAidRequiresThresholdsForLaterRelationshipSpaces(t *testing.T) {
+	cards := vagabondTestCardsOfSuit(t, game.Fox, 2)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: cards,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelAmiable,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	afterFirst := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        cards[0].ID,
+			ItemIndex:     0,
+		},
+	})
+
+	if afterFirst.Vagabond.Relationships[game.Marquise] != game.RelAmiable {
+		t.Fatalf("expected first amiable aid not to improve yet, got %+v", afterFirst.Vagabond.Relationships)
+	}
+	if afterFirst.TurnProgress.VagabondAidCounts[game.Marquise] != 1 {
+		t.Fatalf("expected one aid progress toward friendly, got %+v", afterFirst.TurnProgress.VagabondAidCounts)
+	}
+	if afterFirst.VictoryPoints[game.Vagabond] != 0 {
+		t.Fatalf("expected no VP before relationship threshold, got %+v", afterFirst.VictoryPoints)
+	}
+
+	afterSecond := ApplyAction(afterFirst, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        cards[1].ID,
+			ItemIndex:     1,
+		},
+	})
+
+	if afterSecond.Vagabond.Relationships[game.Marquise] != game.RelFriendly {
+		t.Fatalf("expected second amiable aid to improve to friendly, got %+v", afterSecond.Vagabond.Relationships)
+	}
+	if afterSecond.TurnProgress.VagabondAidCounts[game.Marquise] != 0 {
+		t.Fatalf("expected aid progress to reset after improvement, got %+v", afterSecond.TurnProgress.VagabondAidCounts)
+	}
+	if afterSecond.VictoryPoints[game.Vagabond] != 2 {
+		t.Fatalf("expected friendly improvement to score 2 VP, got %+v", afterSecond.VictoryPoints)
+	}
+}
+
+func TestApplyActionAidAlliedFactionScoresTwoVP(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelAllied,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Marquise] != game.RelAllied {
+		t.Fatalf("expected allied relationship to remain allied, got %+v", next.Vagabond.Relationships)
+	}
+	if next.VictoryPoints[game.Vagabond] != 2 {
+		t.Fatalf("expected allied aid to score 2 VP, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionAidHostileFactionDoesNotImproveRelationship(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Marquise] != game.RelHostile {
+		t.Fatalf("expected hostile aid not to improve relationship, got %+v", next.Vagabond.Relationships)
+	}
+	if next.VictoryPoints[game.Vagabond] != 0 {
+		t.Fatalf("expected hostile aid not to score relationship VP, got %+v", next.VictoryPoints)
+	}
+	if len(next.Marquise.CardsInHand) != 1 || next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected hostile aid to still transfer card and exhaust item, cards=%+v items=%+v", next.Marquise.CardsInHand, next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionAidRequiresTargetPiecesInClearing(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{ID: 1, Suit: game.Fox},
+			},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	})
+
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.Items[0].Status != game.ItemReady {
+		t.Fatalf("expected invalid aid to leave hand and item unchanged, hand=%+v items=%+v", next.Vagabond.CardsInHand, next.Vagabond.Items)
 	}
 }
 
 func TestApplyActionStrikeReturnsRemovedWarriorToSupply(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 3,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemCrossbow, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionStrike,
+		Strike: &game.StrikeAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
+		t.Fatalf("expected strike to remove marquise warrior, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if next.Marquise.WarriorSupply != 4 {
+		t.Fatalf("expected struck marquise warrior to return to supply, got %d", next.Marquise.WarriorSupply)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected strike to exhaust crossbow, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionStrikeRequiresCrossbow(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
 			Clearings: []game.Clearing{
@@ -346,11 +650,14 @@ func TestApplyActionStrikeReturnsRemovedWarriorToSupply(t *testing.T) {
 		},
 	})
 
-	if next.Map.Clearings[0].Warriors[game.Marquise] != 0 {
-		t.Fatalf("expected strike to remove marquise warrior, got %+v", next.Map.Clearings[0].Warriors)
+	if next.Map.Clearings[0].Warriors[game.Marquise] != 1 {
+		t.Fatalf("expected sword-only strike to leave marquise warrior, got %+v", next.Map.Clearings[0].Warriors)
 	}
-	if next.Marquise.WarriorSupply != 4 {
-		t.Fatalf("expected struck marquise warrior to return to supply, got %d", next.Marquise.WarriorSupply)
+	if next.Marquise.WarriorSupply != 3 {
+		t.Fatalf("expected sword-only strike not to return warrior to supply, got %d", next.Marquise.WarriorSupply)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemReady {
+		t.Fatalf("expected sword-only strike not to exhaust sword, got %+v", next.Vagabond.Items)
 	}
 }
 
@@ -378,7 +685,7 @@ func TestApplyActionStrikeRemovingAllianceBaseAppliesFallout(t *testing.T) {
 		Vagabond: game.VagabondState{
 			ClearingID: 1,
 			Items: []game.Item{
-				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemCrossbow, Status: game.ItemReady},
 			},
 		},
 		VictoryPoints: map[game.Faction]int{},
@@ -410,6 +717,9 @@ func TestApplyActionStrikeRemovingAllianceBaseAppliesFallout(t *testing.T) {
 	}
 	if next.VictoryPoints[game.Vagabond] != 1 {
 		t.Fatalf("expected Vagabond to score removed base, got %+v", next.VictoryPoints)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected strike to exhaust crossbow, got %+v", next.Vagabond.Items)
 	}
 }
 

@@ -77,6 +77,7 @@ type RelationshipLevel int
 const (
 	RelHostile RelationshipLevel = iota
 	RelIndifferent
+	RelAmiable
 	RelFriendly
 	RelAllied
 )

@@ -147,6 +147,7 @@ export const sampleState: GameState = {
     eyrieNewRoostResolved: false,
     vagabondRestResolved: false,
     vagabondEveningDrawn: false,
+    vagabondAidCounts: {},
     vagabondDiscardResolved: false,
     vagabondCapacityChecked: false,
     eveningDrawn: false,

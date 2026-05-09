@@ -331,3 +331,38 @@ func TestSetupGameWithSameSeedProducesDeterministicRuinsAndDeck(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupGamePlacesBaseLawRuinItems(t *testing.T) {
+	state, err := SetupGame(SetupRequest{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
+		RandomSeed:    456,
+	})
+	if err != nil {
+		t.Fatalf("expected setup to succeed, got %v", err)
+	}
+
+	counts := map[game.ItemType]int{}
+	for _, clearing := range state.Map.Clearings {
+		for _, itemType := range clearing.RuinItems {
+			counts[itemType]++
+		}
+	}
+
+	want := map[game.ItemType]int{
+		game.ItemBag:    1,
+		game.ItemBoots:  1,
+		game.ItemHammer: 1,
+		game.ItemSword:  1,
+	}
+	for itemType, count := range want {
+		if counts[itemType] != count {
+			t.Fatalf("expected one %v in ruins, got counts %+v", itemType, counts)
+		}
+	}
+	if counts[game.ItemCoin] != 0 {
+		t.Fatalf("did not expect coins in ruins, got counts %+v", counts)
+	}
+}

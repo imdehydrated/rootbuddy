@@ -206,6 +206,7 @@ export interface GameState {
     eyrieNewRoostResolved: boolean;
     vagabondRestResolved: boolean;
     vagabondEveningDrawn: boolean;
+    vagabondAidCounts: Record<string, number>;
     vagabondDiscardResolved: boolean;
     vagabondCapacityChecked: boolean;
     eveningDrawn: boolean;

@@ -29,6 +29,11 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 		HiddenCards: []game.HiddenCard{
 			{ID: 1, OwnerFaction: game.Eyrie, Zone: game.HiddenCardZoneHand},
 		},
+		TurnProgress: game.TurnProgress{
+			VagabondAidCounts: map[game.Faction]int{
+				game.Marquise: 1,
+			},
+		},
 	}
 
 	cloned := cloneState(state)
@@ -43,6 +48,7 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 	cloned.QuestDiscard[0] = 95
 	cloned.OtherHandCounts[game.Eyrie] = 1
 	cloned.HiddenCards[0].Zone = game.HiddenCardZoneSupporters
+	cloned.TurnProgress.VagabondAidCounts[game.Marquise] = 2
 
 	if state.Deck[0] != 1 {
 		t.Fatalf("expected deck to be deep-copied, got %+v", state.Deck)
@@ -76,5 +82,8 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 	}
 	if state.HiddenCards[0].Zone != game.HiddenCardZoneHand {
 		t.Fatalf("expected hidden cards to be deep-copied, got %+v", state.HiddenCards)
+	}
+	if state.TurnProgress.VagabondAidCounts[game.Marquise] != 1 {
+		t.Fatalf("expected Vagabond aid counts to be deep-copied, got %+v", state.TurnProgress.VagabondAidCounts)
 	}
 }

@@ -27,13 +27,77 @@ func setVagabondRelationship(state *game.GameState, faction game.Faction, relati
 	state.Vagabond.Relationships[faction] = relationship
 }
 
-func improveVagabondRelationship(state *game.GameState, faction game.Faction) {
-	current := vagabondRelationshipLevel(*state, faction)
-	if current >= game.RelAllied {
+func vagabondAidProgress(state game.GameState, faction game.Faction) int {
+	if state.TurnProgress.VagabondAidCounts == nil {
+		return 0
+	}
+
+	return state.TurnProgress.VagabondAidCounts[faction]
+}
+
+func setVagabondAidProgress(state *game.GameState, faction game.Faction, count int) {
+	if count <= 0 {
+		if state.TurnProgress.VagabondAidCounts != nil {
+			delete(state.TurnProgress.VagabondAidCounts, faction)
+		}
+		return
+	}
+	if state.TurnProgress.VagabondAidCounts == nil {
+		state.TurnProgress.VagabondAidCounts = map[game.Faction]int{}
+	}
+
+	state.TurnProgress.VagabondAidCounts[faction] = count
+}
+
+func vagabondAidCostToImprove(relationship game.RelationshipLevel) int {
+	switch relationship {
+	case game.RelIndifferent:
+		return 1
+	case game.RelAmiable:
+		return 2
+	case game.RelFriendly:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func vagabondRelationshipReward(relationship game.RelationshipLevel) int {
+	switch relationship {
+	case game.RelAmiable:
+		return 1
+	case game.RelFriendly, game.RelAllied:
+		return 2
+	default:
+		return 0
+	}
+}
+
+func resolveVagabondAidRelationship(state *game.GameState, faction game.Faction) {
+	relationship := vagabondRelationshipLevel(*state, faction)
+	switch relationship {
+	case game.RelHostile:
+		return
+	case game.RelAllied:
+		addVictoryPoints(state, game.Vagabond, 2)
 		return
 	}
 
-	setVagabondRelationship(state, faction, current+1)
+	cost := vagabondAidCostToImprove(relationship)
+	if cost == 0 {
+		return
+	}
+
+	progress := vagabondAidProgress(*state, faction) + 1
+	if progress < cost {
+		setVagabondAidProgress(state, faction, progress)
+		return
+	}
+
+	nextRelationship := relationship + 1
+	setVagabondRelationship(state, faction, nextRelationship)
+	setVagabondAidProgress(state, faction, 0)
+	addVictoryPoints(state, game.Vagabond, vagabondRelationshipReward(nextRelationship))
 }
 
 func vagabondItemIndex(state game.GameState, itemType game.ItemType, status game.ItemStatus) (int, bool) {
@@ -334,17 +398,24 @@ func applyDaybreak(state *game.GameState, action game.Action) {
 		return
 	}
 
-	readyTeaCount := vagabondTrackItemCount(*state, game.ItemTea)
+	refreshLimit := 3 + 2*vagabondTrackItemCount(*state, game.ItemTea)
+	refreshed := 0
+	seen := map[int]bool{}
 	for _, index := range action.Daybreak.RefreshedItemIndexes {
+		if refreshed >= refreshLimit {
+			return
+		}
 		if index < 0 || index >= len(state.Vagabond.Items) {
 			continue
 		}
-		if state.Vagabond.Items[index].Status == game.ItemExhausted {
-			setVagabondItemStatus(state, index, game.ItemReady)
+		if seen[index] || state.Vagabond.Items[index].Status != game.ItemExhausted {
+			continue
 		}
-	}
 
-	exhaustReadyItemsByType(state, game.ItemTea, readyTeaCount)
+		setVagabondItemStatus(state, index, game.ItemReady)
+		seen[index] = true
+		refreshed++
+	}
 }
 
 func applySlip(state *game.GameState, action game.Action) {
@@ -390,12 +461,15 @@ func applyExplore(state *game.GameState, action game.Action) {
 }
 
 func applyAid(state *game.GameState, action game.Action) {
-	if action.Aid == nil {
+	if action.Aid == nil || action.Aid.Faction != game.Vagabond {
 		return
 	}
 
 	clearing := findClearing(state, action.Aid.ClearingID)
 	if clearing == nil {
+		return
+	}
+	if !clearingHasFactionPiecesForAid(*clearing, action.Aid.TargetFaction) {
 		return
 	}
 
@@ -426,10 +500,28 @@ func applyAid(state *game.GameState, action game.Action) {
 	setVagabondItemStatus(state, action.Aid.ItemIndex, game.ItemExhausted)
 
 	appendCardToFactionHand(state, action.Aid.TargetFaction, card)
-	improveVagabondRelationship(state, action.Aid.TargetFaction)
-	if vagabondRelationshipLevel(*state, action.Aid.TargetFaction) == game.RelAllied {
-		addVictoryPoints(state, game.Vagabond, 1)
+	resolveVagabondAidRelationship(state, action.Aid.TargetFaction)
+}
+
+func clearingHasFactionPiecesForAid(clearing game.Clearing, faction game.Faction) bool {
+	if clearing.Warriors != nil && clearing.Warriors[faction] > 0 {
+		return true
 	}
+	for _, building := range clearing.Buildings {
+		if building.Faction == faction {
+			return true
+		}
+	}
+	for _, token := range clearing.Tokens {
+		if token.Faction == faction {
+			return true
+		}
+	}
+	if faction == game.Marquise && clearing.Wood > 0 {
+		return true
+	}
+
+	return false
 }
 
 func applyQuest(state *game.GameState, action game.Action) {
@@ -470,7 +562,7 @@ func applyStrike(state *game.GameState, action game.Action) {
 	if index == -1 {
 		return
 	}
-	if exhaustReadyItemsByType(state, game.ItemSword, 1) == 0 {
+	if exhaustReadyItemsByType(state, game.ItemCrossbow, 1) == 0 {
 		return
 	}
 
