@@ -41,7 +41,25 @@ function aidItemTakeLabel(action: Action, state?: GameState): string {
 
 	const faction = action.aid?.targetFaction ?? -1;
 	const itemType = state?.craftedItems[String(faction)]?.[takeIndex];
-	return `take ${itemTypeLabels[itemType ?? -1] ?? `crafted item ${takeIndex + 1}`}`;
+  return `take ${itemTypeLabels[itemType ?? -1] ?? `crafted item ${takeIndex + 1}`}`;
+}
+
+function alliedMoveLabel(action: Action): string {
+  const alliedWarriors = action.movement?.alliedWarriors ?? 0;
+  if (alliedWarriors <= 0) {
+    return "";
+  }
+
+  const alliedFaction = action.movement?.alliedFaction ?? -1;
+  return ` with ${alliedWarriors} ${factionLabels[alliedFaction] ?? "Allied"} warrior(s)`;
+}
+
+function alliedBattleLabel(action: Action): string {
+  if (!action.battle?.useAlliedFaction) {
+    return "";
+  }
+
+  return ` using ${factionLabels[action.battle.alliedFaction ?? -1] ?? "Allied"} warriors`;
 }
 
 export function createVisibleCardLookup(state: GameState): Map<number, VisibleCardRef> {
@@ -247,11 +265,11 @@ function describeBoardLocation(clearingID: number | undefined, forestID: number 
 }
 
 export function describeAction(action: Action, state?: GameState): string {
-  switch (action.type) {
-    case ACTION_TYPE.MOVEMENT:
-      return `Move up to ${action.movement?.maxCount ?? 0} from ${describeBoardLocation(action.movement?.from, action.movement?.fromForestID)} to ${describeBoardLocation(action.movement?.to, action.movement?.toForestID)}`;
-    case ACTION_TYPE.BATTLE:
-      return `Battle ${factionLabels[action.battle?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.battle?.clearingID ?? "?"}`;
+	switch (action.type) {
+	case ACTION_TYPE.MOVEMENT:
+		return `Move up to ${action.movement?.maxCount ?? 0} from ${describeBoardLocation(action.movement?.from, action.movement?.fromForestID)} to ${describeBoardLocation(action.movement?.to, action.movement?.toForestID)}${alliedMoveLabel(action)}`;
+	case ACTION_TYPE.BATTLE:
+		return `Battle ${factionLabels[action.battle?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.battle?.clearingID ?? "?"}${alliedBattleLabel(action)}`;
     case ACTION_TYPE.BATTLE_RESOLUTION:
       return `Resolved battle in clearing ${action.battleResolution?.clearingID ?? "?"}`;
     case ACTION_TYPE.BUILD:

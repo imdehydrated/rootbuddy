@@ -105,16 +105,20 @@ type MovementAction struct {
 	To             int
 	FromForestID   int
 	ToForestID     int
+	AlliedFaction  Faction
+	AlliedWarriors int
 	DecreeCardID   CardID
 	SourceEffectID string
 }
 
 type BattleAction struct {
-	Faction        Faction
-	ClearingID     int
-	TargetFaction  Faction
-	DecreeCardID   CardID
-	SourceEffectID string
+	Faction          Faction
+	ClearingID       int
+	TargetFaction    Faction
+	UseAlliedFaction bool
+	AlliedFaction    Faction
+	DecreeCardID     CardID
+	SourceEffectID   string
 }
 
 type BattleModifiers struct {
@@ -164,6 +168,9 @@ type BattleResolutionAction struct {
 	AmbushHitsToAttacker      int
 	AttackerLosses            int
 	DefenderLosses            int
+	UseAlliedFaction          bool
+	AlliedFaction             Faction
+	AlliedWarriorLosses       int
 	AttackerPieceLosses       []BattlePieceLoss
 	DefenderPieceLosses       []BattlePieceLoss
 	SourceEffectID            string

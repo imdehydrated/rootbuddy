@@ -64,6 +64,8 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 						AttackerCounterAmbush: false,
 						AttackerLosses:        ambushHitsToAttacker,
 						DefenderLosses:        0,
+						UseAlliedFaction:      action.Battle.UseAlliedFaction,
+						AlliedFaction:         action.Battle.AlliedFaction,
 						SourceEffectID:        action.Battle.SourceEffectID,
 					},
 				}
@@ -148,6 +150,8 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 			AmbushHitsToAttacker:      ambushHitsToAttacker,
 			AttackerLosses:            ambushHitsToAttacker + defenderHits,
 			DefenderLosses:            attackerHits,
+			UseAlliedFaction:          action.Battle.UseAlliedFaction,
+			AlliedFaction:             action.Battle.AlliedFaction,
 			SourceEffectID:            action.Battle.SourceEffectID,
 		},
 	}

@@ -323,6 +323,65 @@ func TestValidVagabondMoveActionsChargesOneBootForMultipleHostileFactions(t *tes
 	}
 }
 
+func TestValidVagabondMoveActionsCanMoveAlliedWarriors(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:  1,
+					Adj: []int{2},
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 2,
+					},
+				},
+				{
+					ID:  2,
+					Adj: []int{1},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	got := ValidVagabondMoveActions(state)
+	wantOne := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:        game.Vagabond,
+			Count:          1,
+			MaxCount:       1,
+			From:           1,
+			To:             2,
+			AlliedFaction:  game.Eyrie,
+			AlliedWarriors: 1,
+		},
+	}
+	wantTwo := game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:        game.Vagabond,
+			Count:          1,
+			MaxCount:       1,
+			From:           1,
+			To:             2,
+			AlliedFaction:  game.Eyrie,
+			AlliedWarriors: 2,
+		},
+	}
+
+	if !containsAction(got, wantOne) || !containsAction(got, wantTwo) {
+		t.Fatalf("expected allied warrior move choices, got %+v", got)
+	}
+}
+
 func TestValidVagabondMoveActionsCanExitForestButCannotEnterForest(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -985,6 +1044,47 @@ func TestValidVagabondBattleActionsTargetsMarquiseWood(t *testing.T) {
 
 	if !containsAction(got, want) {
 		t.Fatalf("expected battle against marquise wood %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondBattleActionsCanUseAlliedWarriors(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    2,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	got := ValidVagabondBattleActions(state)
+	want := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:          game.Vagabond,
+			ClearingID:       1,
+			TargetFaction:    game.Marquise,
+			UseAlliedFaction: true,
+			AlliedFaction:    game.Eyrie,
+		},
+	}
+
+	if !containsAction(got, want) {
+		t.Fatalf("expected allied-warrior battle option %+v, got %+v", want, got)
 	}
 }
 

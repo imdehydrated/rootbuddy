@@ -240,6 +240,43 @@
   gap: 0.35rem;
 }
 
+.relationship-ally-command {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.05rem 0.45rem;
+  align-items: center;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(77, 54, 30, 0.16);
+  background: rgba(77, 54, 30, 0.06);
+}
+
+.relationship-ally-command.ready {
+  border-color: rgba(39, 72, 60, 0.28);
+  background: rgba(39, 72, 60, 0.1);
+}
+
+.relationship-ally-command strong {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  background: rgba(39, 72, 60, 0.14);
+  border: 1px solid rgba(39, 72, 60, 0.18);
+  font-size: 1rem;
+}
+
+.relationship-ally-command span {
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.relationship-ally-command small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .relationship-node {
   display: grid;
   gap: 0.12rem;

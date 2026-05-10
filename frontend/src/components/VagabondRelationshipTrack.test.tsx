@@ -17,6 +17,12 @@ describe("VagabondRelationshipTrack", () => {
     const state = relationshipState();
     state.vagabond.relationships = { "0": 2, "1": 0, "2": 4 };
     state.turnProgress.vagabondAidCounts = { "0": 1 };
+    state.vagabond.clearingID = 6;
+    state.vagabond.inForest = false;
+    const clearing = state.map.clearings.find((candidate) => candidate.id === 6);
+    if (clearing) {
+      clearing.warriors = { ...clearing.warriors, "2": 2 };
+    }
 
     render(<VagabondRelationshipTrack state={state} />);
 
@@ -24,6 +30,8 @@ describe("VagabondRelationshipTrack", () => {
     expect(screen.getByText("1/2 Aid this turn toward Friendly.")).toBeInTheDocument();
     expect(screen.getByText("Hostile Aid allowed; relationship stays Hostile.")).toBeInTheDocument();
     expect(screen.getByText("Allied Aid scores 2 VP.")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Move or battle with this ally")).toBeInTheDocument();
   });
 
   it("allows relationship editing when enabled", () => {

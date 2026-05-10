@@ -294,6 +294,95 @@ func TestApplyActionVagabondMovementExhaustsBootsAndMoves(t *testing.T) {
 	}
 }
 
+func TestApplyActionVagabondMovementMovesAlliedWarriors(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 2,
+					},
+				},
+				{
+					ID: 2,
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:        game.Vagabond,
+			Count:          1,
+			MaxCount:       1,
+			From:           1,
+			To:             2,
+			AlliedFaction:  game.Eyrie,
+			AlliedWarriors: 2,
+		},
+	})
+
+	if next.Vagabond.ClearingID != 2 {
+		t.Fatalf("expected Vagabond to move to clearing 2, got %+v", next.Vagabond)
+	}
+	if next.Map.Clearings[0].Warriors[game.Eyrie] != 0 || next.Map.Clearings[1].Warriors[game.Eyrie] != 2 {
+		t.Fatalf("expected allied warriors to move with Vagabond, got %+v", next.Map.Clearings)
+	}
+}
+
+func TestApplyActionVagabondMovementRejectsNonAlliedWarriors(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Eyrie: 1,
+					},
+				},
+				{ID: 2},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelFriendly,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:        game.Vagabond,
+			Count:          1,
+			MaxCount:       1,
+			From:           1,
+			To:             2,
+			AlliedFaction:  game.Eyrie,
+			AlliedWarriors: 1,
+		},
+	})
+
+	if next.Vagabond.ClearingID != 1 || next.Map.Clearings[0].Warriors[game.Eyrie] != 1 {
+		t.Fatalf("expected non-allied warrior movement to be rejected, got pawn=%+v clearings=%+v", next.Vagabond, next.Map.Clearings)
+	}
+}
+
 func TestApplyActionExploreTakesRuinItemAndScores(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -1052,6 +1141,150 @@ func TestApplyActionBattleResolutionDamagesVagabondItems(t *testing.T) {
 	}
 	if damaged != 2 {
 		t.Fatalf("expected 2 damaged vagabond items, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestResolveBattlePreservesVagabondAlliedBattleChoice(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	resolved := ResolveBattle(state, game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:          game.Vagabond,
+			ClearingID:       1,
+			TargetFaction:    game.Marquise,
+			UseAlliedFaction: true,
+			AlliedFaction:    game.Eyrie,
+		},
+	}, 2, 1)
+
+	if resolved.BattleResolution == nil ||
+		!resolved.BattleResolution.UseAlliedFaction ||
+		resolved.BattleResolution.AlliedFaction != game.Eyrie {
+		t.Fatalf("expected resolved battle to preserve allied battle choice, got %+v", resolved)
+	}
+}
+
+func TestApplyActionBattleResolutionCanAssignVagabondHitsToAlliedWarriors(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    2,
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			WarriorSupply: 18,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:             game.Vagabond,
+			ClearingID:          1,
+			TargetFaction:       game.Marquise,
+			AttackerLosses:      2,
+			DefenderLosses:      0,
+			UseAlliedFaction:    true,
+			AlliedFaction:       game.Eyrie,
+			AlliedWarriorLosses: 1,
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Eyrie] != 1 || next.Eyrie.WarriorSupply != 19 {
+		t.Fatalf("expected one allied Eyrie warrior removed to supply, clearings=%+v supply=%d", next.Map.Clearings, next.Eyrie.WarriorSupply)
+	}
+	damaged := 0
+	for _, item := range next.Vagabond.Items {
+		if item.Status == game.ItemDamaged {
+			damaged++
+		}
+	}
+	if damaged != 1 {
+		t.Fatalf("expected remaining hit to damage one Vagabond item, got %+v", next.Vagabond.Items)
+	}
+	if next.Vagabond.Relationships[game.Eyrie] != game.RelAllied {
+		t.Fatalf("expected relationship to remain Allied when allied losses do not exceed item damage, got %+v", next.Vagabond.Relationships)
+	}
+}
+
+func TestApplyActionBattleResolutionTurnsAllyHostileWhenWarriorLossesExceedItemDamage(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    2,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Eyrie: game.RelAllied,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:             game.Vagabond,
+			ClearingID:          1,
+			TargetFaction:       game.Marquise,
+			AttackerLosses:      2,
+			DefenderLosses:      0,
+			UseAlliedFaction:    true,
+			AlliedFaction:       game.Eyrie,
+			AlliedWarriorLosses: 2,
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Eyrie] != game.RelHostile {
+		t.Fatalf("expected ally to become hostile when allied losses exceed item damage, got %+v", next.Vagabond.Relationships)
 	}
 }
 

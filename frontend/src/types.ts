@@ -238,6 +238,8 @@ export interface Action {
     to: number;
     fromForestID: number;
     toForestID: number;
+    alliedFaction?: number;
+    alliedWarriors?: number;
     decreeCardID: number;
     sourceEffectID: string;
   } | null;
@@ -245,6 +247,8 @@ export interface Action {
     faction: number;
     clearingID: number;
     targetFaction: number;
+    useAlliedFaction?: boolean;
+    alliedFaction?: number;
     decreeCardID: number;
     sourceEffectID: string;
   } | null;
@@ -268,6 +272,9 @@ export interface Action {
     ambushHitsToAttacker: number;
     attackerLosses: number;
     defenderLosses: number;
+    useAlliedFaction?: boolean;
+    alliedFaction?: number;
+    alliedWarriorLosses?: number;
     attackerPieceLosses?: Array<{
       kind: number;
       buildingType: number;

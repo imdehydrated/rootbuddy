@@ -37,12 +37,21 @@ function aidProgressLabel(relationship: number, progress: number): string {
   return `${progress}/${cost} Aid this turn toward ${relationshipLabels[nextRelationship]}.`;
 }
 
+function alliedWarriorsHere(state: GameState, faction: number): number {
+  if (state.vagabond.inForest) {
+    return 0;
+  }
+  const clearing = state.map.clearings.find((candidate) => candidate.id === state.vagabond.clearingID);
+  return clearing?.warriors?.[String(faction)] ?? 0;
+}
+
 export function VagabondRelationshipTrack({ state, editable = false, onSetRelationship }: VagabondRelationshipTrackProps) {
   return (
     <div className="relationship-track-list">
       {nonVagabondFactions.map((faction) => {
         const relationship = state.vagabond.relationships[String(faction)] ?? 1;
         const progress = state.turnProgress.vagabondAidCounts?.[String(faction)] ?? 0;
+        const alliedWarriors = relationship === 4 ? alliedWarriorsHere(state, faction) : 0;
 
         return (
           <div className="relationship-track-row" key={faction}>
@@ -60,6 +69,13 @@ export function VagabondRelationshipTrack({ state, editable = false, onSetRelati
                 <strong>{factionLabels[faction] ?? `Faction ${faction}`}</strong>
                 <span>{aidProgressLabel(relationship, progress)}</span>
               </div>
+              {relationship === 4 ? (
+                <div className={`relationship-ally-command ${alliedWarriors > 0 ? "ready" : ""}`}>
+                  <strong>{alliedWarriors}</strong>
+                  <span>{alliedWarriors === 1 ? "warrior" : "warriors"} with the Vagabond</span>
+                  <small>{alliedWarriors > 0 ? "Move or battle with this ally" : "No allied warriors in this clearing"}</small>
+                </div>
+              ) : null}
               <div className="relationship-nodes" aria-label={`${factionLabels[faction]} relationship`}>
                 {alliedTrack.map((level) => {
                   const active = relationship === level;

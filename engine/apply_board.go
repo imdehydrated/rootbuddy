@@ -51,15 +51,26 @@ func applyMovement(state *game.GameState, action game.Action) {
 	}
 
 	if action.Movement.Faction == game.Vagabond {
+		if !canApplyVagabondAlliedMove(*state, *action.Movement) {
+			return
+		}
 		if action.Movement.ToForestID != 0 {
 			return
+		}
+		fromIndex := findClearingIndex(state.Map, action.Movement.From)
+		toIndex := findClearingIndex(state.Map, action.Movement.To)
+		if action.Movement.AlliedWarriors > 0 && (fromIndex == -1 || toIndex == -1) {
+			return
+		}
+		if action.Movement.AlliedWarriors > 0 {
+			moveVagabondAlliedWarriors(state, fromIndex, toIndex, action.Movement.AlliedFaction, action.Movement.AlliedWarriors)
 		}
 		state.Vagabond.ClearingID = action.Movement.To
 		state.Vagabond.ForestID = 0
 		state.Vagabond.InForest = false
 		exhaustReadyItemsByType(state, game.ItemBoots, max(1, action.Movement.Count))
 
-		toIndex := findClearingIndex(state.Map, action.Movement.To)
+		toIndex = findClearingIndex(state.Map, action.Movement.To)
 		if !state.Vagabond.InForest && toIndex != -1 && hasAllianceSympathy(state.Map.Clearings[toIndex]) {
 			transferOutrageCard(state, action.Movement.Faction, state.Map.Clearings[toIndex].Suit)
 		}
@@ -90,6 +101,37 @@ func applyMovement(state *game.GameState, action game.Action) {
 	if action.Movement.Faction != game.Alliance && hasAllianceSympathy(state.Map.Clearings[toIndex]) {
 		transferOutrageCard(state, action.Movement.Faction, state.Map.Clearings[toIndex].Suit)
 	}
+}
+
+func canApplyVagabondAlliedMove(state game.GameState, movement game.MovementAction) bool {
+	if movement.AlliedWarriors == 0 && movement.AlliedFaction == 0 {
+		return true
+	}
+	if movement.AlliedWarriors <= 0 || movement.From == 0 || movement.To == 0 || movement.FromForestID != 0 || movement.ToForestID != 0 {
+		return false
+	}
+	if vagabondRelationshipLevel(state, movement.AlliedFaction) != game.RelAllied {
+		return false
+	}
+
+	fromIndex := findClearingIndex(state.Map, movement.From)
+	if fromIndex == -1 || state.Map.Clearings[fromIndex].Warriors == nil {
+		return false
+	}
+
+	return state.Map.Clearings[fromIndex].Warriors[movement.AlliedFaction] >= movement.AlliedWarriors
+}
+
+func moveVagabondAlliedWarriors(state *game.GameState, fromIndex int, toIndex int, faction game.Faction, count int) {
+	if count <= 0 {
+		return
+	}
+
+	state.Map.Clearings[fromIndex].Warriors[faction] -= count
+	if state.Map.Clearings[toIndex].Warriors == nil {
+		state.Map.Clearings[toIndex].Warriors = map[game.Faction]int{}
+	}
+	state.Map.Clearings[toIndex].Warriors[faction] += count
 }
 
 func returnWarriorsToSupply(state *game.GameState, faction game.Faction, count int) {
@@ -400,8 +442,15 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	clearing := &state.Map.Clearings[index]
 	attackerSummary := battleRemovalSummary{}
 	if action.BattleResolution.Faction == game.Vagabond {
+		if !canApplyVagabondAlliedBattleLosses(*state, clearing, *action.BattleResolution) {
+			return
+		}
 		exhaustReadyItemsByType(state, game.ItemSword, 1)
-		damageVagabondItems(state, action.BattleResolution.AttackerLosses)
+		alliedLosses := removeVagabondAlliedBattleLosses(state, clearing, *action.BattleResolution)
+		damagedItems := damageVagabondItems(state, action.BattleResolution.AttackerLosses-alliedLosses)
+		if action.BattleResolution.UseAlliedFaction && alliedLosses > damagedItems {
+			setVagabondRelationship(state, action.BattleResolution.AlliedFaction, game.RelHostile)
+		}
 	} else {
 		attackerSummary = applyNonVagabondBattleLosses(
 			state,
@@ -451,6 +500,32 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	if action.BattleResolution.Faction == game.Vagabond && !defenderWasHostileToVagabond && defenderSummary.warriors > 0 {
 		setVagabondRelationship(state, action.BattleResolution.TargetFaction, game.RelHostile)
 	}
+}
+
+func canApplyVagabondAlliedBattleLosses(state game.GameState, clearing *game.Clearing, resolution game.BattleResolutionAction) bool {
+	if resolution.AlliedWarriorLosses == 0 && !resolution.UseAlliedFaction {
+		return true
+	}
+	if !resolution.UseAlliedFaction || resolution.AlliedWarriorLosses < 0 || resolution.AlliedWarriorLosses > resolution.AttackerLosses {
+		return false
+	}
+	if resolution.AlliedFaction == resolution.TargetFaction || vagabondRelationshipLevel(state, resolution.AlliedFaction) != game.RelAllied {
+		return false
+	}
+	if clearing.Warriors == nil {
+		return false
+	}
+
+	return clearing.Warriors[resolution.AlliedFaction] >= resolution.AlliedWarriorLosses
+}
+
+func removeVagabondAlliedBattleLosses(state *game.GameState, clearing *game.Clearing, resolution game.BattleResolutionAction) int {
+	if !resolution.UseAlliedFaction || resolution.AlliedWarriorLosses <= 0 {
+		return 0
+	}
+
+	remaining := removeWarriorLosses(state, clearing, resolution.AlliedFaction, resolution.AlliedWarriorLosses)
+	return resolution.AlliedWarriorLosses - remaining
 }
 
 func applyBuild(state *game.GameState, action game.Action) {

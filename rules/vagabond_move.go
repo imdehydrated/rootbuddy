@@ -16,16 +16,8 @@ func ValidVagabondMoveActions(state game.GameState) []game.Action {
 				continue
 			}
 
-			actions = append(actions, game.Action{
-				Type: game.ActionMovement,
-				Movement: &game.MovementAction{
-					Faction:  game.Vagabond,
-					Count:    bootCost,
-					MaxCount: bootCost,
-					From:     clearing.ID,
-					To:       destination.ID,
-				},
-			})
+			actions = append(actions, vagabondMoveAction(clearing.ID, destination.ID, bootCost, 0, 0))
+			actions = append(actions, vagabondAlliedMoveActions(state, clearing, destination.ID, bootCost)...)
 		}
 
 	}
@@ -52,6 +44,39 @@ func ValidVagabondMoveActions(state game.GameState) []game.Action {
 					FromForestID: forest.ID,
 				},
 			})
+		}
+	}
+
+	return actions
+}
+
+func vagabondMoveAction(from int, to int, bootCost int, alliedFaction game.Faction, alliedWarriors int) game.Action {
+	return game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:        game.Vagabond,
+			Count:          bootCost,
+			MaxCount:       bootCost,
+			From:           from,
+			To:             to,
+			AlliedFaction:  alliedFaction,
+			AlliedWarriors: alliedWarriors,
+		},
+	}
+}
+
+func vagabondAlliedMoveActions(state game.GameState, clearing game.Clearing, to int, bootCost int) []game.Action {
+	actions := []game.Action{}
+	for _, faction := range []game.Faction{game.Marquise, game.Alliance, game.Eyrie} {
+		if vagabondRelationshipLevel(state, faction) != game.RelAllied {
+			continue
+		}
+		available := 0
+		if clearing.Warriors != nil {
+			available = clearing.Warriors[faction]
+		}
+		for count := 1; count <= available; count++ {
+			actions = append(actions, vagabondMoveAction(clearing.ID, to, bootCost, faction, count))
 		}
 	}
 
