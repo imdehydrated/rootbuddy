@@ -828,6 +828,73 @@ func TestValidAidActionsRequiresCardMatchingClearingSuit(t *testing.T) {
 	}
 }
 
+func TestValidAidActionsIncludesCraftedItemChoices(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	firstTakeIndex := 0
+	secondTakeIndex := 1
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		CraftedItems: map[game.Faction][]game.ItemType{
+			game.Marquise: {game.ItemBoots, game.ItemCoin},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID:  1,
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidAidActions(state)
+	wantNoTake := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+		},
+	}
+	wantBoots := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+			TakeItemIndex: &firstTakeIndex,
+		},
+	}
+	wantCoin := game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+			TakeItemIndex: &secondTakeIndex,
+		},
+	}
+
+	if !containsAction(got, wantNoTake) || !containsAction(got, wantBoots) || !containsAction(got, wantCoin) {
+		t.Fatalf("expected aid choices with optional crafted item takes, got %+v", got)
+	}
+}
+
 func TestValidStrikeActionsRequiresReadyCrossbow(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

@@ -3,8 +3,22 @@ package engine
 import (
 	"testing"
 
+	"github.com/imdehydrated/rootbuddy/carddata"
 	"github.com/imdehydrated/rootbuddy/game"
 )
+
+func firstItemSupplyTestCard(t *testing.T, itemType game.ItemType) game.Card {
+	t.Helper()
+
+	for _, card := range carddata.BaseDeck() {
+		if card.CraftedItem != nil && *card.CraftedItem == itemType {
+			return card
+		}
+	}
+
+	t.Fatalf("no item card found for item %v", itemType)
+	return game.Card{}
+}
 
 func TestInitialItemSupplyMatchesBaseGameCounts(t *testing.T) {
 	supply := InitialItemSupply()
@@ -130,5 +144,37 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 	}
 	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 33 {
 		t.Fatalf("expected crafted card to be discarded, got %+v", next.DiscardPile)
+	}
+}
+
+func TestApplyCraftDeductsItemSupplyAndAddsNonVagabondCraftedItem(t *testing.T) {
+	card := firstItemSupplyTestCard(t, game.ItemBoots)
+	state := game.GameState{
+		ItemSupply: map[game.ItemType]int{
+			game.ItemBoots: 1,
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{card},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:               game.Marquise,
+			CardID:                card.ID,
+			UsedWorkshopClearings: []int{1},
+		},
+	})
+
+	if next.ItemSupply[game.ItemBoots] != 0 {
+		t.Fatalf("expected boots supply to be deducted to 0, got %+v", next.ItemSupply)
+	}
+	if len(next.CraftedItems[game.Marquise]) != 1 || next.CraftedItems[game.Marquise][0] != game.ItemBoots {
+		t.Fatalf("expected crafted boots in Marquise crafted item box, got %+v", next.CraftedItems)
+	}
+	if len(next.Vagabond.Items) != 0 {
+		t.Fatalf("expected non-Vagabond craft not to add Vagabond items, got %+v", next.Vagabond.Items)
 	}
 }

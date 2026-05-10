@@ -63,6 +63,7 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 		CurrentStep:       game.StepUnspecified,
 		VictoryPoints:     make(map[game.Faction]int, len(req.Factions)),
 		ItemSupply:        InitialItemSupply(),
+		CraftedItems:      map[game.Faction][]game.ItemType{},
 		PersistentEffects: map[game.Faction][]game.CardID{},
 		OtherHandCounts:   map[game.Faction]int{},
 		HiddenCards:       []game.HiddenCard{},

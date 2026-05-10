@@ -18,6 +18,9 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 		ItemSupply: map[game.ItemType]int{
 			game.ItemBag: 2,
 		},
+		CraftedItems: map[game.Faction][]game.ItemType{
+			game.Marquise: {game.ItemBoots},
+		},
 		PersistentEffects: map[game.Faction][]game.CardID{
 			game.Marquise: {15, 17},
 		},
@@ -43,6 +46,7 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 	cloned.ActiveDominance[game.Marquise] = 96
 	cloned.WinningCoalition[0] = game.Eyrie
 	cloned.ItemSupply[game.ItemBag] = 0
+	cloned.CraftedItems[game.Marquise][0] = game.ItemCoin
 	cloned.PersistentEffects[game.Marquise][0] = 97
 	cloned.QuestDeck[0] = 96
 	cloned.QuestDiscard[0] = 95
@@ -67,6 +71,9 @@ func TestCloneStateCopiesExpandedCollections(t *testing.T) {
 	}
 	if state.ItemSupply[game.ItemBag] != 2 {
 		t.Fatalf("expected item supply to be deep-copied, got %+v", state.ItemSupply)
+	}
+	if state.CraftedItems[game.Marquise][0] != game.ItemBoots {
+		t.Fatalf("expected crafted items to be deep-copied, got %+v", state.CraftedItems)
 	}
 	if state.PersistentEffects[game.Marquise][0] != 15 {
 		t.Fatalf("expected persistent effects to be deep-copied, got %+v", state.PersistentEffects)

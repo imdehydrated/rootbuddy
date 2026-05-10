@@ -37,6 +37,19 @@ func vagabondTestCardsOfSuit(t *testing.T, suit game.Suit, count int) []game.Car
 	return nil
 }
 
+func firstVagabondTestItemCard(t *testing.T, itemType game.ItemType) game.Card {
+	t.Helper()
+
+	for _, card := range carddata.BaseDeck() {
+		if card.CraftedItem != nil && *card.CraftedItem == itemType {
+			return card
+		}
+	}
+
+	t.Fatalf("no item card found for item %v", itemType)
+	return game.Card{}
+}
+
 func TestResolveBattleVagabondCapsHitsByExhaustedSwords(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -540,6 +553,102 @@ func TestApplyActionAidHostileFactionDoesNotImproveRelationship(t *testing.T) {
 	}
 	if len(next.Marquise.CardsInHand) != 1 || next.Vagabond.Items[0].Status != game.ItemExhausted {
 		t.Fatalf("expected hostile aid to still transfer card and exhaust item, cards=%+v items=%+v", next.Marquise.CardsInHand, next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionAidTakesCraftedItemFromTargetBox(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	takeIndex := 1
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		CraftedItems: map[game.Faction][]game.ItemType{
+			game.Marquise: {game.ItemBoots, game.ItemCoin},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+			TakeItemIndex: &takeIndex,
+		},
+	})
+
+	if len(next.CraftedItems[game.Marquise]) != 1 || next.CraftedItems[game.Marquise][0] != game.ItemBoots {
+		t.Fatalf("expected aided coin to leave Marquise crafted items, got %+v", next.CraftedItems)
+	}
+	if len(next.Vagabond.Items) != 2 ||
+		next.Vagabond.Items[1].Type != game.ItemCoin ||
+		next.Vagabond.Items[1].Status != game.ItemReady ||
+		next.Vagabond.Items[1].Zone != game.ItemZoneTrack {
+		t.Fatalf("expected aided coin to enter Vagabond track ready, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionAidInvalidCraftedItemChoiceRejectsAid(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	takeIndex := 2
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		CraftedItems: map[game.Faction][]game.ItemType{
+			game.Marquise: {game.ItemBoots},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{foxCard},
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionAid,
+		Aid: &game.AidAction{
+			Faction:       game.Vagabond,
+			TargetFaction: game.Marquise,
+			ClearingID:    1,
+			CardID:        foxCard.ID,
+			ItemIndex:     0,
+			TakeItemIndex: &takeIndex,
+		},
+	})
+
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.Items[0].Status != game.ItemReady {
+		t.Fatalf("expected invalid crafted-item take to reject Aid, hand=%+v items=%+v", next.Vagabond.CardsInHand, next.Vagabond.Items)
+	}
+	if len(next.CraftedItems[game.Marquise]) != 1 {
+		t.Fatalf("expected crafted item box unchanged, got %+v", next.CraftedItems)
 	}
 }
 

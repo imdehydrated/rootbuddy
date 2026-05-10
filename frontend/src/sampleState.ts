@@ -56,6 +56,10 @@ export const sampleState: GameState = {
     "6": 0,
     "7": 1
   },
+  craftedItems: {
+    "0": [6, 1],
+    "2": [4]
+  },
   persistentEffects: {
     "0": [15],
     "2": [28]

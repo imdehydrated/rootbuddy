@@ -141,6 +141,7 @@ export interface GameState {
   coalitionActive: boolean;
   coalitionPartner: number;
   itemSupply: Record<string, number>;
+  craftedItems: Record<string, number[]>;
   persistentEffects: Record<string, number[]>;
   questDeck: number[];
   questDiscard: number[];
@@ -349,6 +350,7 @@ export interface Action {
     clearingID: number;
     cardID: number;
     itemIndex: number;
+    takeItemIndex?: number | null;
   } | null;
   strike?: {
     faction: number;

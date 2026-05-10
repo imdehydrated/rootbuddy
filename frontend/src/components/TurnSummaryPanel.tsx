@@ -12,6 +12,7 @@ import {
 } from "../labels";
 import type { GameState } from "../types";
 import { KnownCardPillList } from "./CardUi";
+import { CraftedItemsDisplay } from "./CraftedItemsDisplay";
 import { VagabondRelationshipTrack } from "./VagabondRelationshipTrack";
 
 type TurnSummaryPanelProps = {
@@ -208,6 +209,11 @@ export function TurnSummaryPanel({ state }: TurnSummaryPanelProps) {
       <div className="summary-stack">
         <span className="summary-label">Current Faction State</span>
         {renderCurrentFactionState(state)}
+      </div>
+
+      <div className="summary-stack">
+        <span className="summary-label">Crafted Items</span>
+        <CraftedItemsDisplay state={state} />
       </div>
 
       {activeDominanceEntries.length > 0 || state.availableDominance.length > 0 || state.coalitionActive ? (

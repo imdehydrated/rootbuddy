@@ -39,6 +39,7 @@ type GameState struct {
 	CoalitionActive       bool
 	CoalitionPartner      Faction
 	ItemSupply            map[ItemType]int
+	CraftedItems          map[Faction][]ItemType
 	PersistentEffects     map[Faction][]CardID
 	QuestDeck             []QuestID
 	QuestDiscard          []QuestID

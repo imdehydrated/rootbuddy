@@ -53,6 +53,7 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.coalitionActive ??= false;
   normalized.coalitionPartner ??= 0;
   normalized.itemSupply ??= {};
+  normalized.craftedItems ??= {};
   normalized.persistentEffects ??= {};
   normalized.questDeck ??= [];
   normalized.questDiscard ??= [];

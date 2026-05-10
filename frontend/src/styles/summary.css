@@ -272,6 +272,81 @@ button.relationship-node {
   font-weight: 700;
 }
 
+.crafted-items-board {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.crafted-items-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.32fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(77, 54, 30, 0.18);
+  background: linear-gradient(180deg, rgba(131, 94, 48, 0.12), rgba(71, 48, 27, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.crafted-items-faction {
+  display: grid;
+  gap: 0.12rem;
+  align-content: center;
+  padding: 0.58rem 0.65rem;
+  background: rgba(71, 48, 27, 0.12);
+  border-right: 1px solid rgba(77, 54, 30, 0.16);
+}
+
+.crafted-items-faction span {
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.crafted-items-faction small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.crafted-items-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+  min-width: 0;
+  padding: 0.55rem;
+}
+
+.crafted-item-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-height: 2.1rem;
+  padding: 0.28rem 0.48rem 0.28rem 0.32rem;
+  border: 1px solid rgba(77, 54, 30, 0.2);
+  background: #f6ead6;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 850;
+  box-shadow: 0 1px 0 rgba(77, 54, 30, 0.12);
+}
+
+.crafted-item-icon {
+  display: grid;
+  place-items: center;
+  width: 1.42rem;
+  height: 1.42rem;
+  background: rgba(77, 54, 30, 0.14);
+  border: 1px solid rgba(77, 54, 30, 0.18);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.crafted-items-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  align-self: center;
+}
+
 .endgame-hero {
   display: grid;
   gap: 0.3rem;

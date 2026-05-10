@@ -97,6 +97,13 @@ func cloneState(state game.GameState) game.GameState {
 		}
 	}
 
+	if state.CraftedItems != nil {
+		next.CraftedItems = make(map[game.Faction][]game.ItemType, len(state.CraftedItems))
+		for faction, items := range state.CraftedItems {
+			next.CraftedItems[faction] = append([]game.ItemType(nil), items...)
+		}
+	}
+
 	if state.PersistentEffects != nil {
 		next.PersistentEffects = make(map[game.Faction][]game.CardID, len(state.PersistentEffects))
 		for faction, cardIDs := range state.PersistentEffects {

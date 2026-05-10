@@ -1,5 +1,5 @@
 import { describeKnownCardID } from "./cardCatalog";
-import { ACTION_TYPE, factionLabels, buildingLabels, suitLabels, eyrieLeaderLabels, vagabondCharacterLabels } from "./labels";
+import { ACTION_TYPE, factionLabels, buildingLabels, suitLabels, eyrieLeaderLabels, itemTypeLabels, vagabondCharacterLabels } from "./labels";
 import type { Action, Card, GameState } from "./types";
 
 export type ActionCardReference = {
@@ -31,6 +31,17 @@ function describeQuestLabel(questID: number | undefined, state?: GameState): str
   }
 
   return `${quest.name} (${suitLabels[quest.suit] ?? "Unknown"})`;
+}
+
+function aidItemTakeLabel(action: Action, state?: GameState): string {
+	const takeIndex = action.aid?.takeItemIndex;
+	if (takeIndex === null || takeIndex === undefined) {
+		return "take no crafted item";
+	}
+
+	const faction = action.aid?.targetFaction ?? -1;
+	const itemType = state?.craftedItems[String(faction)]?.[takeIndex];
+	return `take ${itemTypeLabels[itemType ?? -1] ?? `crafted item ${takeIndex + 1}`}`;
 }
 
 export function createVisibleCardLookup(state: GameState): Map<number, VisibleCardRef> {
@@ -279,7 +290,7 @@ export function describeAction(action: Action, state?: GameState): string {
     case ACTION_TYPE.QUEST:
       return `Complete quest ${describeQuestLabel(action.quest?.questID, state)}`;
     case ACTION_TYPE.AID:
-      return `Aid ${factionLabels[action.aid?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.aid?.clearingID ?? "?"} with item slot ${action.aid?.itemIndex ?? "?"}`;
+      return `Aid ${factionLabels[action.aid?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.aid?.clearingID ?? "?"} with item slot ${action.aid?.itemIndex ?? "?"}; ${aidItemTakeLabel(action, state)}`;
     case ACTION_TYPE.STRIKE:
       return `Strike ${factionLabels[action.strike?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.strike?.clearingID ?? "?"}`;
     case ACTION_TYPE.REPAIR:

@@ -100,6 +100,31 @@ func resolveVagabondAidRelationship(state *game.GameState, faction game.Faction)
 	addVictoryPoints(state, game.Vagabond, vagabondRelationshipReward(nextRelationship))
 }
 
+func addCraftedItem(state *game.GameState, faction game.Faction, itemType game.ItemType) {
+	if state.CraftedItems == nil {
+		state.CraftedItems = map[game.Faction][]game.ItemType{}
+	}
+
+	state.CraftedItems[faction] = append(state.CraftedItems[faction], itemType)
+}
+
+func takeCraftedItem(state *game.GameState, faction game.Faction, index int) (game.ItemType, bool) {
+	if index < 0 || state.CraftedItems == nil || index >= len(state.CraftedItems[faction]) {
+		return 0, false
+	}
+
+	itemType := state.CraftedItems[faction][index]
+	state.CraftedItems[faction] = append(state.CraftedItems[faction][:index], state.CraftedItems[faction][index+1:]...)
+	return itemType, true
+}
+
+func gainVagabondItem(state *game.GameState, itemType game.ItemType) {
+	state.Vagabond.Items = append(state.Vagabond.Items, game.NormalizeItemZone(game.Item{
+		Type:   itemType,
+		Status: game.ItemReady,
+	}))
+}
+
 func vagabondItemIndex(state game.GameState, itemType game.ItemType, status game.ItemStatus) (int, bool) {
 	for index, item := range state.Vagabond.Items {
 		if item.Type == itemType && item.Status == status {
@@ -483,6 +508,12 @@ func applyAid(state *game.GameState, action game.Action) {
 		state.Vagabond.Items[action.Aid.ItemIndex].Status != game.ItemReady {
 		return
 	}
+	if action.Aid.TakeItemIndex != nil {
+		takeIndex := *action.Aid.TakeItemIndex
+		if takeIndex < 0 || state.CraftedItems == nil || takeIndex >= len(state.CraftedItems[action.Aid.TargetFaction]) {
+			return
+		}
+	}
 
 	card, ok := game.Card{}, false
 	if tracksHandForFaction(*state, game.Vagabond) {
@@ -500,6 +531,11 @@ func applyAid(state *game.GameState, action game.Action) {
 	setVagabondItemStatus(state, action.Aid.ItemIndex, game.ItemExhausted)
 
 	appendCardToFactionHand(state, action.Aid.TargetFaction, card)
+	if action.Aid.TakeItemIndex != nil {
+		if itemType, ok := takeCraftedItem(state, action.Aid.TargetFaction, *action.Aid.TakeItemIndex); ok {
+			gainVagabondItem(state, itemType)
+		}
+	}
 	resolveVagabondAidRelationship(state, action.Aid.TargetFaction)
 }
 

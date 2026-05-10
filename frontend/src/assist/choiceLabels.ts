@@ -40,6 +40,16 @@ function itemIndexLabel(state: GameState, itemIndex: number | undefined): string
   return `${itemTypeLabels[item?.type ?? -1] ?? "Item"} #${itemIndex + 1}`;
 }
 
+function craftedItemTakeLabel(action: Action, state?: GameState): string {
+	const takeIndex = action.aid?.takeItemIndex;
+	if (takeIndex === null || takeIndex === undefined) {
+		return "Take no crafted item";
+	}
+	const faction = action.aid?.targetFaction ?? -1;
+	const itemType = state?.craftedItems[String(faction)]?.[takeIndex];
+	return `Take ${itemTypeLabels[itemType ?? -1] ?? `crafted item ${takeIndex + 1}`}`;
+}
+
 export function factionChoiceLabel(action: Action, state: GameState): string | null {
   switch (action.type) {
     case ACTION_TYPE.MOBILIZE:
@@ -120,8 +130,8 @@ export function factionSpatialChoiceDetail(action: Action): string {
       return `Base: ${suitLabels[action.revolt?.baseSuit ?? -1] ?? "Unknown"}; supporters: ${knownCardListLabel(action.revolt?.supporterCardIDs ?? [])}`;
     case ACTION_TYPE.EXPLORE:
       return `Item: ${itemTypeLabels[action.explore?.itemType ?? -1] ?? "Unknown"}`;
-    case ACTION_TYPE.AID:
-      return `Card: ${knownCardLabel(action.aid?.cardID)}; item slot: ${action.aid?.itemIndex ?? "?"}`;
+	case ACTION_TYPE.AID:
+		return `Card: ${knownCardLabel(action.aid?.cardID)}; item slot: ${action.aid?.itemIndex ?? "?"}; ${craftedItemTakeLabel(action)}`;
     case ACTION_TYPE.STRIKE:
       return `Target: ${factionLabels[action.strike?.targetFaction ?? -1] ?? "Unknown faction"}`;
     case ACTION_TYPE.ORGANIZE:

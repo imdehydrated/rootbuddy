@@ -269,6 +269,7 @@ type AidAction struct {
 	ClearingID    int
 	CardID        CardID
 	ItemIndex     int
+	TakeItemIndex *int
 }
 
 type StrikeAction struct {

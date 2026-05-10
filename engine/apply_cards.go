@@ -8,11 +8,18 @@ func applyCraft(state *game.GameState, action game.Action) {
 	}
 
 	card, found := CardByID(action.Craft.CardID)
-	if found && card.CraftedItem != nil && !DeductItem(state, *card.CraftedItem) {
-		return
+	if found && card.CraftedItem != nil {
+		ensureItemSupply(state)
+		if state.ItemSupply[*card.CraftedItem] <= 0 {
+			return
+		}
 	}
 
 	if _, ok := spendFactionHandCard(state, action.Craft.Faction, action.Craft.CardID); !ok {
+		return
+	}
+
+	if found && card.CraftedItem != nil && !DeductItem(state, *card.CraftedItem) {
 		return
 	}
 
@@ -25,6 +32,8 @@ func applyCraft(state *game.GameState, action game.Action) {
 			})
 			state.Vagabond.Items[len(state.Vagabond.Items)-1] = game.NormalizeItemZone(state.Vagabond.Items[len(state.Vagabond.Items)-1])
 		}
+	} else if found && card.CraftedItem != nil {
+		addCraftedItem(state, action.Craft.Faction, *card.CraftedItem)
 	}
 	if found {
 		resolveCraftedCard(state, action.Craft.Faction, card)

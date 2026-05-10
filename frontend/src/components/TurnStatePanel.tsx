@@ -7,6 +7,7 @@ import {
 } from "../labels";
 import type { GameState } from "../types";
 import { AllianceEditor } from "./turnState/AllianceEditor";
+import { CraftedItemsDisplay } from "./CraftedItemsDisplay";
 import { EyrieEditor } from "./turnState/EyrieEditor";
 import { MarquiseEditor } from "./turnState/MarquiseEditor";
 import { VagabondEditor } from "./turnState/VagabondEditor";
@@ -213,6 +214,11 @@ export function TurnStatePanel({
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="summary-section">
+        <h3>Crafted Items</h3>
+        <CraftedItemsDisplay state={state} />
       </div>
 
       <div className="summary-section">
