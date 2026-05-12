@@ -624,6 +624,86 @@ func applyRepair(state *game.GameState, action game.Action) {
 	repairDamagedItem(state, action.Repair.ItemIndex)
 }
 
+func applyVagabondSteal(state *game.GameState, action game.Action) {
+	if action.VagabondSteal == nil || action.VagabondSteal.Faction != game.Vagabond {
+		return
+	}
+	if state.Vagabond.Character != game.CharThief {
+		return
+	}
+	clearing := findClearing(state, action.VagabondSteal.ClearingID)
+	if clearing == nil ||
+		state.Vagabond.InForest ||
+		state.Vagabond.ClearingID != action.VagabondSteal.ClearingID ||
+		!clearingHasFactionPiecesForAid(*clearing, action.VagabondSteal.TargetFaction) ||
+		factionHandSize(*state, action.VagabondSteal.TargetFaction) == 0 {
+		return
+	}
+	if _, ok := vagabondItemIndex(*state, game.ItemTorch, game.ItemReady); !ok {
+		return
+	}
+
+	card, knownCard, ok := stealVagabondCard(state, action.VagabondSteal.TargetFaction, action.VagabondSteal.ObservedCardID)
+	if !ok {
+		return
+	}
+	if exhaustReadyItemsByType(state, game.ItemTorch, 1) == 0 {
+		return
+	}
+	if knownCard {
+		appendCardToFactionHand(state, game.Vagabond, card)
+	} else if !tracksHandForFaction(*state, game.Vagabond) {
+		incrementOtherHandCount(state, game.Vagabond, 1)
+	}
+}
+
+func applyVagabondDayLabor(state *game.GameState, action game.Action) {
+	if action.VagabondDayLabor == nil || action.VagabondDayLabor.Faction != game.Vagabond {
+		return
+	}
+	if state.Vagabond.Character != game.CharTinker {
+		return
+	}
+	clearing := findClearing(state, action.VagabondDayLabor.ClearingID)
+	if clearing == nil ||
+		state.Vagabond.InForest ||
+		state.Vagabond.ClearingID != action.VagabondDayLabor.ClearingID {
+		return
+	}
+
+	card, ok := CardByID(action.VagabondDayLabor.CardID)
+	if !ok || !cardMatchesSuitOrBird(card, clearing.Suit) {
+		return
+	}
+	if exhaustReadyItemsByType(state, game.ItemTorch, 1) == 0 {
+		return
+	}
+	if !removeCardIDFromDiscard(state, action.VagabondDayLabor.CardID) {
+		return
+	}
+
+	appendCardToFactionHand(state, game.Vagabond, card)
+}
+
+func applyVagabondHideout(state *game.GameState, action game.Action) {
+	if action.VagabondHideout == nil || action.VagabondHideout.Faction != game.Vagabond {
+		return
+	}
+	if state.Vagabond.Character != game.CharRanger {
+		return
+	}
+	if !hideoutRepairIndexesValid(*state, action.VagabondHideout.ItemIndexes) {
+		return
+	}
+	if exhaustReadyItemsByType(state, game.ItemTorch, 1) == 0 {
+		return
+	}
+
+	for _, itemIndex := range action.VagabondHideout.ItemIndexes {
+		repairDamagedItem(state, itemIndex)
+	}
+}
+
 func applyVagabondRest(state *game.GameState, action game.Action) {
 	if action.VagabondRest == nil || action.VagabondRest.Faction != game.Vagabond {
 		return
@@ -679,6 +759,61 @@ func vagabondTrackItemCount(state game.GameState, itemType game.ItemType) int {
 		}
 	}
 	return count
+}
+
+func stealVagabondCard(state *game.GameState, targetFaction game.Faction, observedCardID game.CardID) (game.Card, bool, bool) {
+	if state.GameMode == game.GameModeAssist && !tracksHandForFaction(*state, targetFaction) {
+		if observedCardID > 0 {
+			card, ok := CardByID(observedCardID)
+			if !ok {
+				return game.Card{}, false, false
+			}
+			decrementOtherHandCount(state, targetFaction, 1)
+			return card, true, true
+		}
+		decrementOtherHandCount(state, targetFaction, 1)
+		return game.Card{}, false, true
+	}
+
+	card, ok := removeRandomCardFromFactionHand(state, targetFaction)
+	return card, ok, ok
+}
+
+func removeCardIDFromDiscard(state *game.GameState, cardID game.CardID) bool {
+	for index, discardID := range state.DiscardPile {
+		if discardID != cardID {
+			continue
+		}
+		state.DiscardPile = append(state.DiscardPile[:index], state.DiscardPile[index+1:]...)
+		return true
+	}
+
+	return false
+}
+
+func hideoutRepairIndexesValid(state game.GameState, itemIndexes []int) bool {
+	damagedCount := 0
+	for _, item := range state.Vagabond.Items {
+		if item.Status == game.ItemDamaged {
+			damagedCount++
+		}
+	}
+	if damagedCount < 3 || len(itemIndexes) != 3 {
+		return false
+	}
+
+	seen := map[int]bool{}
+	for _, itemIndex := range itemIndexes {
+		if itemIndex < 0 || itemIndex >= len(state.Vagabond.Items) || seen[itemIndex] {
+			return false
+		}
+		if state.Vagabond.Items[itemIndex].Status != game.ItemDamaged {
+			return false
+		}
+		seen[itemIndex] = true
+	}
+
+	return true
 }
 
 func vagabondReadyItemCount(state game.GameState) int {

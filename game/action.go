@@ -20,6 +20,9 @@ type Action struct {
 	Aid                 *AidAction
 	Strike              *StrikeAction
 	Repair              *RepairAction
+	VagabondSteal       *VagabondStealAction
+	VagabondDayLabor    *VagabondDayLaborAction
+	VagabondHideout     *VagabondHideoutAction
 	Turmoil             *TurmoilAction
 	Daybreak            *DaybreakAction
 	Slip                *SlipAction
@@ -95,6 +98,9 @@ const (
 	ActionEveningDiscard
 	ActionFieldHospitals
 	ActionMarquiseExtraAction
+	ActionVagabondSteal
+	ActionVagabondDayLabor
+	ActionVagabondHideout
 )
 
 type MovementAction struct {
@@ -288,6 +294,24 @@ type StrikeAction struct {
 type RepairAction struct {
 	Faction   Faction
 	ItemIndex int
+}
+
+type VagabondStealAction struct {
+	Faction        Faction
+	ClearingID     int
+	TargetFaction  Faction
+	ObservedCardID CardID
+}
+
+type VagabondDayLaborAction struct {
+	Faction    Faction
+	ClearingID int
+	CardID     CardID
+}
+
+type VagabondHideoutAction struct {
+	Faction     Faction
+	ItemIndexes []int
 }
 
 type TurmoilAction struct {

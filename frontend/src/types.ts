@@ -368,6 +368,21 @@ export interface Action {
     faction: number;
     itemIndex: number;
   } | null;
+  vagabondSteal?: {
+    faction: number;
+    clearingID: number;
+    targetFaction: number;
+    observedCardID: number;
+  } | null;
+  vagabondDayLabor?: {
+    faction: number;
+    clearingID: number;
+    cardID: number;
+  } | null;
+  vagabondHideout?: {
+    faction: number;
+    itemIndexes: number[];
+  } | null;
   turmoil?: {
     faction: number;
     newLeader: number;

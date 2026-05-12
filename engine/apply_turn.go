@@ -156,10 +156,14 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			state.CurrentStep = game.StepDaylightActions
 		}
 		state.TurnProgress.HasCrafted = true
-	case game.ActionExplore, game.ActionAid, game.ActionQuest, game.ActionStrike, game.ActionRepair:
+	case game.ActionExplore, game.ActionAid, game.ActionQuest, game.ActionStrike, game.ActionRepair, game.ActionVagabondSteal, game.ActionVagabondDayLabor:
 		state.TurnProgress.DaylightMainActionTaken = true
 		state.CurrentPhase = game.Daylight
 		state.CurrentStep = game.StepDaylightActions
+	case game.ActionVagabondHideout:
+		state.TurnProgress.DaylightMainActionTaken = true
+		state.CurrentPhase = game.Evening
+		state.CurrentStep = game.StepEvening
 	case game.ActionSpreadSympathy:
 		state.TurnProgress.BirdsongMainActionTaken = true
 		state.TurnProgress.SpreadSympathyStarted = true

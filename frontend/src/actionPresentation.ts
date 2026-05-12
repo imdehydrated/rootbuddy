@@ -119,6 +119,12 @@ export function actionHeadline(action: Action): string {
       return "Aid";
     case ACTION_TYPE.STRIKE:
       return "Strike";
+    case ACTION_TYPE.VAGABOND_STEAL:
+      return "Steal";
+    case ACTION_TYPE.VAGABOND_DAY_LABOR:
+      return "Day Labor";
+    case ACTION_TYPE.VAGABOND_HIDEOUT:
+      return "Hideout";
     case ACTION_TYPE.ADD_TO_DECREE:
       return "Add To Decree";
     case ACTION_TYPE.EYRIE_EMERGENCY_ORDERS:
@@ -201,6 +207,8 @@ export function actionCardReferences(action: Action): ActionCardReference[] {
       return action.fieldHospitals?.cardID ? [{ cardID: action.fieldHospitals.cardID, zoneLabel: "Hand" }] : [];
     case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
       return action.marquiseExtraAction?.cardID ? [{ cardID: action.marquiseExtraAction.cardID, zoneLabel: "Hand" }] : [];
+    case ACTION_TYPE.VAGABOND_DAY_LABOR:
+      return action.vagabondDayLabor?.cardID ? [{ cardID: action.vagabondDayLabor.cardID, zoneLabel: "Discard" }] : [];
     default:
       return [];
   }
@@ -228,6 +236,10 @@ export function actionContextTags(action: Action): string[] {
       return [`Clearing ${action.eyrieNewRoost?.clearingID ?? "?"}`];
     case ACTION_TYPE.AID:
       return [`Clearing ${action.aid?.clearingID ?? "?"}`, `Target ${factionLabels[action.aid?.targetFaction ?? -1] ?? "?"}`];
+    case ACTION_TYPE.VAGABOND_STEAL:
+      return [`Clearing ${action.vagabondSteal?.clearingID ?? "?"}`, `Target ${factionLabels[action.vagabondSteal?.targetFaction ?? -1] ?? "?"}`];
+    case ACTION_TYPE.VAGABOND_DAY_LABOR:
+      return [`Clearing ${action.vagabondDayLabor?.clearingID ?? "?"}`];
     case ACTION_TYPE.OTHER_PLAYER_DRAW:
       return [`Count ${action.otherPlayerDraw?.count ?? 0}`];
     case ACTION_TYPE.FIELD_HOSPITALS:
@@ -313,6 +325,12 @@ export function describeAction(action: Action, state?: GameState): string {
       return `Strike ${factionLabels[action.strike?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.strike?.clearingID ?? "?"}`;
     case ACTION_TYPE.REPAIR:
       return `Repair item slot ${action.repair?.itemIndex ?? "?"}`;
+    case ACTION_TYPE.VAGABOND_STEAL:
+      return `Steal a random card from ${factionLabels[action.vagabondSteal?.targetFaction ?? 0] ?? "Unknown"} in clearing ${action.vagabondSteal?.clearingID ?? "?"}`;
+    case ACTION_TYPE.VAGABOND_DAY_LABOR:
+      return `Take ${describeKnownCardID(action.vagabondDayLabor?.cardID ?? 0)} from the discard pile`;
+    case ACTION_TYPE.VAGABOND_HIDEOUT:
+      return `Repair ${(action.vagabondHideout?.itemIndexes ?? []).length} item(s), then begin Evening`;
     case ACTION_TYPE.TURMOIL:
       return "Go into turmoil";
     case ACTION_TYPE.DAYBREAK:

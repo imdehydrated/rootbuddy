@@ -134,6 +134,12 @@ func summarizeAction(action game.Action) string {
 		return fmt.Sprintf("Strike %s in clearing %d", factionLabel(action.Strike.TargetFaction), action.Strike.ClearingID)
 	case game.ActionRepair:
 		return fmt.Sprintf("Repair item %d", action.Repair.ItemIndex)
+	case game.ActionVagabondSteal:
+		return fmt.Sprintf("Steal from %s in clearing %d", factionLabel(action.VagabondSteal.TargetFaction), action.VagabondSteal.ClearingID)
+	case game.ActionVagabondDayLabor:
+		return fmt.Sprintf("Day Labor card %d in clearing %d", action.VagabondDayLabor.CardID, action.VagabondDayLabor.ClearingID)
+	case game.ActionVagabondHideout:
+		return fmt.Sprintf("Hideout repairs %d item(s)", len(action.VagabondHideout.ItemIndexes))
 	case game.ActionTurmoil:
 		return "Go into turmoil"
 	case game.ActionDaybreak:
@@ -280,6 +286,12 @@ func actionTypeLabel(actionType game.ActionType) string {
 		return "Strike"
 	case game.ActionRepair:
 		return "Repair"
+	case game.ActionVagabondSteal:
+		return "Vagabond Steal"
+	case game.ActionVagabondDayLabor:
+		return "Vagabond Day Labor"
+	case game.ActionVagabondHideout:
+		return "Vagabond Hideout"
 	case game.ActionTurmoil:
 		return "Turmoil"
 	case game.ActionDaybreak:

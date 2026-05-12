@@ -1267,3 +1267,147 @@ func TestValidQuestActionsUsesQuestRequirements(t *testing.T) {
 		t.Fatalf("did not expect mismatched quest item choice %+v, got %+v", unwant, got)
 	}
 }
+
+func TestValidVagabondCharacterActionsThiefSteal(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{foxCard},
+		},
+		Vagabond: game.VagabondState{
+			Character:  game.CharThief,
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidVagabondCharacterActions(state)
+	want := game.Action{
+		Type: game.ActionVagabondSteal,
+		VagabondSteal: &game.VagabondStealAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected Thief Steal action %+v, got %+v", want, got)
+	}
+}
+
+func TestValidVagabondCharacterActionsTinkerDayLabor(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	rabbitCard := firstCardOfSuit(t, game.Rabbit)
+	birdCard := firstCardOfSuit(t, game.Bird)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{{ID: 1, Suit: game.Fox}},
+		},
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		DiscardPile:  []game.CardID{foxCard.ID, rabbitCard.ID, birdCard.ID},
+		Vagabond: game.VagabondState{
+			Character:  game.CharTinker,
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidVagabondCharacterActions(state)
+	wantFox := game.Action{
+		Type: game.ActionVagabondDayLabor,
+		VagabondDayLabor: &game.VagabondDayLaborAction{
+			Faction:    game.Vagabond,
+			ClearingID: 1,
+			CardID:     foxCard.ID,
+		},
+	}
+	wantBird := game.Action{
+		Type: game.ActionVagabondDayLabor,
+		VagabondDayLabor: &game.VagabondDayLaborAction{
+			Faction:    game.Vagabond,
+			ClearingID: 1,
+			CardID:     birdCard.ID,
+		},
+	}
+	unwantRabbit := game.Action{
+		Type: game.ActionVagabondDayLabor,
+		VagabondDayLabor: &game.VagabondDayLaborAction{
+			Faction:    game.Vagabond,
+			ClearingID: 1,
+			CardID:     rabbitCard.ID,
+		},
+	}
+	if !containsAction(got, wantFox) || !containsAction(got, wantBird) {
+		t.Fatalf("expected matching and bird Day Labor actions, got %+v", got)
+	}
+	if containsAction(got, unwantRabbit) {
+		t.Fatalf("did not expect off-suit Day Labor action %+v, got %+v", unwantRabbit, got)
+	}
+}
+
+func TestValidVagabondCharacterActionsRangerHideoutRepairsThreeAndEndsDaylight(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Character: game.CharRanger,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemDamaged},
+				{Type: game.ItemSword, Status: game.ItemDamaged},
+				{Type: game.ItemHammer, Status: game.ItemDamaged},
+				{Type: game.ItemBag, Status: game.ItemDamaged},
+			},
+		},
+	}
+
+	got := ValidVagabondCharacterActions(state)
+	if len(got) != 4 {
+		t.Fatalf("expected four three-item Hideout choices for four damaged items, got %+v", got)
+	}
+	for _, action := range got {
+		if action.Type == game.ActionVagabondHideout && len(action.VagabondHideout.ItemIndexes) != 3 {
+			t.Fatalf("expected Hideout to repair exactly three when at least three are damaged, got %+v", action)
+		}
+	}
+}
+
+func TestValidVagabondCharacterActionsRangerHideoutRequiresThreeDamagedItems(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Character: game.CharRanger,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemDamaged},
+				{Type: game.ItemSword, Status: game.ItemDamaged},
+			},
+		},
+	}
+
+	if got := ValidVagabondCharacterActions(state); len(got) != 0 {
+		t.Fatalf("did not expect Hideout with fewer than three damaged items, got %+v", got)
+	}
+}

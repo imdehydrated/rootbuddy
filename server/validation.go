@@ -110,6 +110,27 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.Repair == nil {
 			return "repair payload is required"
 		}
+	case game.ActionVagabondSteal:
+		if req.Action.VagabondSteal == nil {
+			return "vagabond steal payload is required"
+		}
+		if req.Action.VagabondSteal.ClearingID <= 0 || req.Action.VagabondSteal.TargetFaction == game.Vagabond {
+			return "vagabond steal action must have a valid clearing and target faction"
+		}
+	case game.ActionVagabondDayLabor:
+		if req.Action.VagabondDayLabor == nil {
+			return "vagabond day labor payload is required"
+		}
+		if req.Action.VagabondDayLabor.ClearingID <= 0 || req.Action.VagabondDayLabor.CardID <= 0 {
+			return "vagabond day labor action must have a valid clearing and card ID"
+		}
+	case game.ActionVagabondHideout:
+		if req.Action.VagabondHideout == nil {
+			return "vagabond hideout payload is required"
+		}
+		if len(req.Action.VagabondHideout.ItemIndexes) == 0 {
+			return "vagabond hideout action must include repaired item indexes"
+		}
 	case game.ActionTurmoil:
 		if req.Action.Turmoil == nil {
 			return "turmoil payload is required"

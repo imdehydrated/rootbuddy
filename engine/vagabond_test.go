@@ -1436,3 +1436,136 @@ func TestApplyActionQuestExhaustsRequiredItemsAndScores(t *testing.T) {
 		t.Fatalf("expected first completed fox quest to score 1 VP, got %d", next.VictoryPoints[game.Vagabond])
 	}
 }
+
+func TestApplyActionVagabondStealTransfersRandomCard(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	state := game.GameState{
+		GameMode:      game.GameModeOnline,
+		TrackAllHands: true,
+		RandomSeed:    17,
+		FactionTurn:   game.Vagabond,
+		CurrentPhase:  game.Daylight,
+		CurrentStep:   game.StepDaylightActions,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{foxCard},
+		},
+		Vagabond: game.VagabondState{
+			Character:  game.CharThief,
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondSteal,
+		VagabondSteal: &game.VagabondStealAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Marquise,
+		},
+	})
+
+	if len(next.Marquise.CardsInHand) != 0 {
+		t.Fatalf("expected stolen card to leave target hand, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.CardsInHand[0].ID != foxCard.ID {
+		t.Fatalf("expected stolen card in Vagabond hand, got %+v", next.Vagabond.CardsInHand)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected Steal to exhaust torch, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionVagabondDayLaborTakesMatchingDiscard(t *testing.T) {
+	foxCard := firstVagabondTestCard(t, game.Fox)
+	rabbitCard := firstVagabondTestCard(t, game.Rabbit)
+	state := game.GameState{
+		TrackAllHands: true,
+		FactionTurn:   game.Vagabond,
+		CurrentPhase:  game.Daylight,
+		CurrentStep:   game.StepDaylightActions,
+		DiscardPile:   []game.CardID{foxCard.ID, rabbitCard.ID},
+		Map: game.Map{
+			Clearings: []game.Clearing{{ID: 1, Suit: game.Fox}},
+		},
+		Vagabond: game.VagabondState{
+			Character:  game.CharTinker,
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondDayLabor,
+		VagabondDayLabor: &game.VagabondDayLaborAction{
+			Faction:    game.Vagabond,
+			ClearingID: 1,
+			CardID:     foxCard.ID,
+		},
+	})
+
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != rabbitCard.ID {
+		t.Fatalf("expected Day Labor to remove chosen matching discard, got %+v", next.DiscardPile)
+	}
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.CardsInHand[0].ID != foxCard.ID {
+		t.Fatalf("expected Day Labor card in Vagabond hand, got %+v", next.Vagabond.CardsInHand)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected Day Labor to exhaust torch, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionVagabondHideoutRepairsAndBeginsEvening(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Character: game.CharRanger,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemDamaged},
+				{Type: game.ItemSword, Status: game.ItemDamaged},
+				{Type: game.ItemHammer, Status: game.ItemDamaged},
+				{Type: game.ItemBag, Status: game.ItemDamaged},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionVagabondHideout,
+		VagabondHideout: &game.VagabondHideoutAction{
+			Faction:     game.Vagabond,
+			ItemIndexes: []int{1, 2, 3},
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected Hideout to exhaust torch, got %+v", next.Vagabond.Items)
+	}
+	for _, itemIndex := range []int{1, 2, 3} {
+		if next.Vagabond.Items[itemIndex].Status != game.ItemReady {
+			t.Fatalf("expected Hideout to repair item %d, got %+v", itemIndex, next.Vagabond.Items)
+		}
+	}
+	if next.Vagabond.Items[4].Status != game.ItemDamaged {
+		t.Fatalf("expected fourth damaged item to remain damaged, got %+v", next.Vagabond.Items)
+	}
+	if next.CurrentPhase != game.Evening || next.CurrentStep != game.StepEvening {
+		t.Fatalf("expected Hideout to begin Evening, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
+	}
+}

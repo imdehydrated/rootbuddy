@@ -149,6 +149,7 @@ func validVagabondActions(state game.GameState) []game.Action {
 		actions = append(actions, rules.ValidQuestActions(state)...)
 		actions = append(actions, rules.ValidStrikeActions(state)...)
 		actions = append(actions, rules.ValidRepairActions(state)...)
+		actions = append(actions, rules.ValidVagabondCharacterActions(state)...)
 		actions = append(actions, rules.ValidVagabondCraftActions(state)...)
 		actions = append(actions, game.Action{
 			Type: game.ActionPassPhase,
