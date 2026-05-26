@@ -578,6 +578,7 @@ func applyQuest(state *game.GameState, action game.Action) {
 
 	state.Vagabond.QuestsAvailable = remaining
 	state.Vagabond.QuestsCompleted = append(state.Vagabond.QuestsCompleted, quest)
+	drawAvailableQuest(state)
 	if action.Quest.Reward == game.QuestRewardVictoryPoints {
 		addVictoryPoints(state, game.Vagabond, questCountBySuit(state.Vagabond.QuestsCompleted, quest.Suit))
 		return

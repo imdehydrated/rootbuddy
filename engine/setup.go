@@ -285,7 +285,15 @@ func shuffleQuestIDs(state *game.GameState, quests []game.Quest) []game.QuestID 
 }
 
 func drawSetupQuests(state *game.GameState, count int) {
-	for i := 0; i < count && len(state.QuestDeck) > 0; i++ {
+	for i := 0; i < count; i++ {
+		if !drawAvailableQuest(state) {
+			return
+		}
+	}
+}
+
+func drawAvailableQuest(state *game.GameState) bool {
+	for len(state.QuestDeck) > 0 {
 		questID := state.QuestDeck[0]
 		state.QuestDeck = state.QuestDeck[1:]
 		quest, ok := questByID(questID)
@@ -293,7 +301,10 @@ func drawSetupQuests(state *game.GameState, count int) {
 			continue
 		}
 		state.Vagabond.QuestsAvailable = append(state.Vagabond.QuestsAvailable, quest)
+		return true
 	}
+
+	return false
 }
 
 func setupDeckAndHands(state *game.GameState, present map[game.Faction]bool) {

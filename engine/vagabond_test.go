@@ -1437,6 +1437,49 @@ func TestApplyActionQuestExhaustsRequiredItemsAndScores(t *testing.T) {
 	}
 }
 
+func TestApplyActionQuestDrawsReplacementQuest(t *testing.T) {
+	state := game.GameState{
+		VictoryPoints: map[game.Faction]int{
+			game.Vagabond: 0,
+		},
+		QuestDeck: []game.QuestID{2},
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemHammer, Status: game.ItemReady},
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+			QuestsAvailable: []game.Quest{
+				{
+					ID:            4,
+					Name:          "Repair a Shed",
+					Suit:          game.Fox,
+					RequiredItems: []game.ItemType{game.ItemHammer, game.ItemTorch},
+				},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionQuest,
+		Quest: &game.QuestAction{
+			Faction:     game.Vagabond,
+			QuestID:     4,
+			ItemIndexes: []int{0, 1},
+			Reward:      game.QuestRewardVictoryPoints,
+		},
+	})
+
+	if len(next.Vagabond.QuestsCompleted) != 1 || next.Vagabond.QuestsCompleted[0].ID != 4 {
+		t.Fatalf("expected completed quest to move to completed, got %+v", next.Vagabond.QuestsCompleted)
+	}
+	if len(next.Vagabond.QuestsAvailable) != 1 || next.Vagabond.QuestsAvailable[0].ID != 2 {
+		t.Fatalf("expected replacement quest 2 to be available, got %+v", next.Vagabond.QuestsAvailable)
+	}
+	if len(next.QuestDeck) != 0 {
+		t.Fatalf("expected replacement quest to be consumed from deck, got %+v", next.QuestDeck)
+	}
+}
+
 func TestApplyActionVagabondStealTransfersRandomCard(t *testing.T) {
 	foxCard := firstVagabondTestCard(t, game.Fox)
 	state := game.GameState{
