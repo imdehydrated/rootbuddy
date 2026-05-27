@@ -14,6 +14,9 @@ func applyCraft(state *game.GameState, action game.Action) {
 			return
 		}
 	}
+	if found && !canApplyCraftVagabondDamageChoice(*state, action.Craft.Faction, card, action.Craft.DamagedVagabondItemIndexes) {
+		return
+	}
 
 	if _, ok := spendFactionHandCard(state, action.Craft.Faction, action.Craft.CardID); !ok {
 		return
@@ -36,7 +39,7 @@ func applyCraft(state *game.GameState, action game.Action) {
 		addCraftedItem(state, action.Craft.Faction, *card.CraftedItem)
 	}
 	if found {
-		resolveCraftedCard(state, action.Craft.Faction, card)
+		resolveCraftedCard(state, action.Craft.Faction, card, action.Craft.DamagedVagabondItemIndexes)
 	} else {
 		DiscardCard(state, action.Craft.CardID)
 	}

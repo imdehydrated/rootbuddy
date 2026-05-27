@@ -132,6 +132,24 @@ func vagabondUndamagedItemIndexes(state game.GameState) []int {
 	return indexes
 }
 
+func vagabondDamageIndexChoices(state game.GameState, hits int) [][]int {
+	if hits <= 0 {
+		return [][]int{nil}
+	}
+
+	undamaged := vagabondUndamagedItemIndexes(state)
+	if len(undamaged) == 0 {
+		return [][]int{nil}
+	}
+
+	damageCount := hits
+	if damageCount > len(undamaged) {
+		damageCount = len(undamaged)
+	}
+
+	return chooseItemIndexSubsets(undamaged, damageCount)
+}
+
 func chooseItemIndexSubsets(indexes []int, choose int) [][]int {
 	if choose <= 0 || choose > len(indexes) {
 		return nil

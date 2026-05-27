@@ -69,7 +69,7 @@ func applyHypotheticalAmbushHits(state *game.GameState, faction game.Faction, cl
 	}
 
 	if faction == game.Vagabond {
-		return damageVagabondItems(state, hits)
+		return requiredVagabondDamageCount(*state, hits)
 	}
 
 	index := findClearingIndex(state.Map, clearingID)

@@ -1124,11 +1124,12 @@ func TestApplyActionBattleResolutionDamagesVagabondItems(t *testing.T) {
 	action := game.Action{
 		Type: game.ActionBattleResolution,
 		BattleResolution: &game.BattleResolutionAction{
-			Faction:        game.Marquise,
-			ClearingID:     1,
-			TargetFaction:  game.Vagabond,
-			AttackerLosses: 0,
-			DefenderLosses: 2,
+			Faction:                    game.Marquise,
+			ClearingID:                 1,
+			TargetFaction:              game.Vagabond,
+			AttackerLosses:             0,
+			DefenderLosses:             2,
+			DefenderDamagedItemIndexes: []int{1, 2},
 		},
 	}
 
@@ -1141,6 +1142,89 @@ func TestApplyActionBattleResolutionDamagesVagabondItems(t *testing.T) {
 	}
 	if damaged != 2 {
 		t.Fatalf("expected 2 damaged vagabond items, got %+v", next.Vagabond.Items)
+	}
+	if next.Vagabond.Items[0].Status == game.ItemDamaged {
+		t.Fatalf("expected unselected sword not to be damaged, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionBattleResolutionRejectsMissingVagabondDamageChoice(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemTorch, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Vagabond,
+			AttackerLosses: 0,
+			DefenderLosses: 2,
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemReady ||
+		next.Vagabond.Items[1].Status != game.ItemReady ||
+		next.Vagabond.Items[2].Status != game.ItemReady {
+		t.Fatalf("expected missing damage choice to reject battle damage, got %+v", next.Vagabond.Items)
+	}
+}
+
+func TestApplyActionBattleResolutionRejectsMissingVagabondDamageChoiceBeforeSideEffects(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:                   game.Marquise,
+			ClearingID:                1,
+			TargetFaction:             game.Vagabond,
+			DefenderLosses:            1,
+			AttackerUsedBrutalTactics: true,
+		},
+	})
+
+	if next.VictoryPoints[game.Vagabond] != 0 {
+		t.Fatalf("expected invalid damage choice to reject before Brutal Tactics VP, got %+v", next.VictoryPoints)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[1].Status != game.ItemReady {
+		t.Fatalf("expected invalid damage choice to leave items unchanged, got %+v", next.Vagabond.Items)
 	}
 }
 
@@ -1217,14 +1301,15 @@ func TestApplyActionBattleResolutionCanAssignVagabondHitsToAlliedWarriors(t *tes
 	next := ApplyAction(state, game.Action{
 		Type: game.ActionBattleResolution,
 		BattleResolution: &game.BattleResolutionAction{
-			Faction:             game.Vagabond,
-			ClearingID:          1,
-			TargetFaction:       game.Marquise,
-			AttackerLosses:      2,
-			DefenderLosses:      0,
-			UseAlliedFaction:    true,
-			AlliedFaction:       game.Eyrie,
-			AlliedWarriorLosses: 1,
+			Faction:                    game.Vagabond,
+			ClearingID:                 1,
+			TargetFaction:              game.Marquise,
+			AttackerLosses:             2,
+			DefenderLosses:             0,
+			UseAlliedFaction:           true,
+			AlliedFaction:              game.Eyrie,
+			AlliedWarriorLosses:        1,
+			AttackerDamagedItemIndexes: []int{1},
 		},
 	})
 

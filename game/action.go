@@ -155,31 +155,33 @@ type BattlePieceLoss struct {
 }
 
 type BattleResolutionAction struct {
-	Faction                   Faction
-	ClearingID                int
-	TargetFaction             Faction
-	DecreeCardID              CardID
-	AttackerRoll              int
-	DefenderRoll              int
-	AttackerHitModifier       int
-	DefenderHitModifier       int
-	IgnoreHitsToAttacker      bool
-	IgnoreHitsToDefender      bool
-	DefenderAmbushed          bool
-	AttackerCounterAmbush     bool
-	AttackerUsedArmorers      bool
-	DefenderUsedArmorers      bool
-	AttackerUsedBrutalTactics bool
-	DefenderUsedSappers       bool
-	AmbushHitsToAttacker      int
-	AttackerLosses            int
-	DefenderLosses            int
-	UseAlliedFaction          bool
-	AlliedFaction             Faction
-	AlliedWarriorLosses       int
-	AttackerPieceLosses       []BattlePieceLoss
-	DefenderPieceLosses       []BattlePieceLoss
-	SourceEffectID            string
+	Faction                    Faction
+	ClearingID                 int
+	TargetFaction              Faction
+	DecreeCardID               CardID
+	AttackerRoll               int
+	DefenderRoll               int
+	AttackerHitModifier        int
+	DefenderHitModifier        int
+	IgnoreHitsToAttacker       bool
+	IgnoreHitsToDefender       bool
+	DefenderAmbushed           bool
+	AttackerCounterAmbush      bool
+	AttackerUsedArmorers       bool
+	DefenderUsedArmorers       bool
+	AttackerUsedBrutalTactics  bool
+	DefenderUsedSappers        bool
+	AmbushHitsToAttacker       int
+	AttackerLosses             int
+	DefenderLosses             int
+	UseAlliedFaction           bool
+	AlliedFaction              Faction
+	AlliedWarriorLosses        int
+	AttackerDamagedItemIndexes []int
+	DefenderDamagedItemIndexes []int
+	AttackerPieceLosses        []BattlePieceLoss
+	DefenderPieceLosses        []BattlePieceLoss
+	SourceEffectID             string
 }
 
 type BuildAction struct {
@@ -208,9 +210,10 @@ type OverworkAction struct {
 }
 
 type CraftAction struct {
-	Faction               Faction
-	CardID                CardID
-	UsedWorkshopClearings []int
+	Faction                    Faction
+	CardID                     CardID
+	UsedWorkshopClearings      []int
+	DamagedVagabondItemIndexes []int
 }
 
 type DecreeColumn int
@@ -235,10 +238,11 @@ type SpreadSympathyAction struct {
 }
 
 type RevoltAction struct {
-	Faction          Faction
-	ClearingID       int
-	BaseSuit         Suit
-	SupporterCardIDs []CardID
+	Faction                    Faction
+	ClearingID                 int
+	BaseSuit                   Suit
+	SupporterCardIDs           []CardID
+	DamagedVagabondItemIndexes []int
 }
 
 type MobilizeAction struct {

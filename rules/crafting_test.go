@@ -427,3 +427,57 @@ func TestValidCraftActions(t *testing.T) {
 		})
 	}
 }
+
+func TestValidCraftActionsIncludesFavorVagabondDamageChoices(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   4,
+					Suit: game.Mouse,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+						{Faction: game.Marquise, Type: game.Workshop},
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{
+					ID:           36,
+					Name:         "Favor of the Mice",
+					Kind:         game.OneTimeEffectCard,
+					EffectID:     "favor_mice",
+					CraftingCost: game.CraftingCost{Mouse: 3},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 4,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemTea, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidCraftActions(state)
+	want := game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:                    game.Marquise,
+			CardID:                     36,
+			UsedWorkshopClearings:      []int{4, 4, 4},
+			DamagedVagabondItemIndexes: []int{0, 1, 2},
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected favor craft damage choice %+v, got %+v", want, got)
+	}
+}

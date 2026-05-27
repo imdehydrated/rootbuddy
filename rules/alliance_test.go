@@ -259,6 +259,56 @@ func TestValidRevoltActionsRequiresOpenSlotAfterRemovingEnemies(t *testing.T) {
 	}
 }
 
+func TestValidRevoltActionsIncludesVagabondDamageChoices(t *testing.T) {
+	foxCard := firstCardOfSuit(t, game.Fox)
+	birdCard := firstCardOfSuit(t, game.Bird)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Birdsong,
+		CurrentStep:  game.StepBirdsong,
+		Alliance: game.AllianceState{
+			Supporters: []game.Card{foxCard, birdCard},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemTorch, Status: game.ItemReady},
+				{Type: game.ItemBoots, Status: game.ItemReady},
+				{Type: game.ItemSword, Status: game.ItemReady},
+				{Type: game.ItemTea, Status: game.ItemReady},
+			},
+		},
+	}
+
+	got := ValidRevoltActions(state)
+	want := game.Action{
+		Type: game.ActionRevolt,
+		Revolt: &game.RevoltAction{
+			Faction:                    game.Alliance,
+			ClearingID:                 1,
+			BaseSuit:                   game.Fox,
+			SupporterCardIDs:           []game.CardID{foxCard.ID, birdCard.ID},
+			DamagedVagabondItemIndexes: []int{0, 1, 2},
+		},
+	}
+	if !containsAction(got, want) {
+		t.Fatalf("expected revolt damage choice %+v, got %+v", want, got)
+	}
+}
+
 func TestValidRevoltActionsStopsAfterSpreadSympathyStarts(t *testing.T) {
 	foxCard := firstCardOfSuit(t, game.Fox)
 	birdCard := firstCardOfSuit(t, game.Bird)

@@ -149,7 +149,7 @@ func removeAllFactionPiecesFromClearing(state *game.GameState, clearing *game.Cl
 	return removedWarriors, removedBuildings, removedTokens, removedSympathy
 }
 
-func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Card) {
+func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Card, vagabondDamagedItemIndexes []int) {
 	suit, ok := favorSuit(card.EffectID)
 	if !ok {
 		return
@@ -183,12 +183,12 @@ func resolveFavorCard(state *game.GameState, faction game.Faction, card game.Car
 			game.AreEnemies(*state, faction, game.Vagabond) &&
 			!state.Vagabond.InForest &&
 			state.Vagabond.ClearingID == clearing.ID {
-			damageVagabondItems(state, 3)
+			damageSelectedVagabondItems(state, 3, vagabondDamagedItemIndexes)
 		}
 	}
 }
 
-func resolveCraftedCard(state *game.GameState, faction game.Faction, card game.Card) {
+func resolveCraftedCard(state *game.GameState, faction game.Faction, card game.Card, vagabondDamagedItemIndexes []int) {
 	points := card.VP
 	if faction == game.Eyrie && card.CraftedItem != nil && state.Eyrie.Leader != game.LeaderBuilder {
 		points = 1
@@ -200,10 +200,29 @@ func resolveCraftedCard(state *game.GameState, faction game.Faction, card game.C
 		addPersistentEffect(state, faction, card.ID)
 	case game.OneTimeEffectCard:
 		if _, ok := favorSuit(card.EffectID); ok {
-			resolveFavorCard(state, faction, card)
+			resolveFavorCard(state, faction, card, vagabondDamagedItemIndexes)
 		}
 		DiscardCard(state, card.ID)
 	default:
 		DiscardCard(state, card.ID)
 	}
+}
+
+func canApplyCraftVagabondDamageChoice(state game.GameState, faction game.Faction, card game.Card, itemIndexes []int) bool {
+	hits := craftVagabondDamageHits(state, faction, card)
+	return canDamageSelectedVagabondItems(state, hits, itemIndexes)
+}
+
+func craftVagabondDamageHits(state game.GameState, faction game.Faction, card game.Card) int {
+	suit, ok := favorSuit(card.EffectID)
+	if !ok || faction == game.Vagabond || state.Vagabond.InForest || state.Vagabond.ClearingID == 0 || !game.AreEnemies(state, faction, game.Vagabond) {
+		return 0
+	}
+
+	index := findClearingIndex(state.Map, state.Vagabond.ClearingID)
+	if index == -1 || state.Map.Clearings[index].Suit != suit {
+		return 0
+	}
+
+	return 3
 }

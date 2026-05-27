@@ -50,14 +50,14 @@ func ValidEyrieCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		actions = append(actions, game.Action{
+		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
 			Type: game.ActionCraft,
 			Craft: &game.CraftAction{
 				Faction:               game.Eyrie,
 				CardID:                card.ID,
 				UsedWorkshopClearings: usedRoostIDs,
 			},
-		})
+		}, card)...)
 	}
 
 	return actions

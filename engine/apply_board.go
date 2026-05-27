@@ -437,17 +437,36 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 		return
 	}
 
-	applyBattleCardSideEffects(state, action)
-
 	clearing := &state.Map.Clearings[index]
-	attackerSummary := battleRemovalSummary{}
 	if action.BattleResolution.Faction == game.Vagabond {
+		damageHits := action.BattleResolution.AttackerLosses - action.BattleResolution.AlliedWarriorLosses
 		if !canApplyVagabondAlliedBattleLosses(*state, clearing, *action.BattleResolution) {
 			return
 		}
+		if !canDamageSelectedVagabondItems(*state, damageHits, action.BattleResolution.AttackerDamagedItemIndexes) {
+			return
+		}
+	}
+	if action.BattleResolution.TargetFaction == game.Vagabond &&
+		!canDamageSelectedVagabondItems(*state, action.BattleResolution.DefenderLosses, action.BattleResolution.DefenderDamagedItemIndexes) {
+		return
+	}
+
+	applyBattleCardSideEffects(state, action)
+
+	attackerSummary := battleRemovalSummary{}
+	if action.BattleResolution.Faction == game.Vagabond {
+		damageHits := action.BattleResolution.AttackerLosses - action.BattleResolution.AlliedWarriorLosses
 		exhaustReadyItemsByType(state, game.ItemSword, 1)
 		alliedLosses := removeVagabondAlliedBattleLosses(state, clearing, *action.BattleResolution)
-		damagedItems := damageVagabondItems(state, action.BattleResolution.AttackerLosses-alliedLosses)
+		damagedItems, ok := damageSelectedVagabondItems(
+			state,
+			damageHits,
+			action.BattleResolution.AttackerDamagedItemIndexes,
+		)
+		if !ok {
+			return
+		}
 		if action.BattleResolution.UseAlliedFaction && alliedLosses > damagedItems {
 			setVagabondRelationship(state, action.BattleResolution.AlliedFaction, game.RelHostile)
 		}
@@ -467,7 +486,7 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 
 	if action.BattleResolution.TargetFaction == game.Vagabond {
 		exhaustReadyItemsByType(state, game.ItemSword, 1)
-		damageVagabondItems(state, action.BattleResolution.DefenderLosses)
+		damageSelectedVagabondItems(state, action.BattleResolution.DefenderLosses, action.BattleResolution.DefenderDamagedItemIndexes)
 		if attackerSummary.warriors+attackerSummary.buildings+attackerSummary.tokens > 0 {
 			setVagabondRelationship(state, action.BattleResolution.Faction, game.RelHostile)
 		}

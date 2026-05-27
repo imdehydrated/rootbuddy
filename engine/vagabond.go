@@ -216,26 +216,59 @@ func repairAllDamagedItems(state *game.GameState) {
 	}
 }
 
-func damageVagabondItems(state *game.GameState, count int) int {
-	damaged := 0
-	for damaged < count {
-		found := false
-		for index, item := range state.Vagabond.Items {
-			if item.Status == game.ItemDamaged {
-				continue
-			}
-
-			setVagabondItemStatus(state, index, game.ItemDamaged)
-			damaged++
-			found = true
-			break
-		}
-		if !found {
-			return damaged
+func vagabondUndamagedItemIndexes(state game.GameState) []int {
+	indexes := []int{}
+	for index, item := range state.Vagabond.Items {
+		if item.Status != game.ItemDamaged {
+			indexes = append(indexes, index)
 		}
 	}
+	return indexes
+}
 
-	return damaged
+func requiredVagabondDamageCount(state game.GameState, hits int) int {
+	if hits <= 0 {
+		return 0
+	}
+
+	undamaged := len(vagabondUndamagedItemIndexes(state))
+	if hits > undamaged {
+		return undamaged
+	}
+	return hits
+}
+
+func damageSelectedVagabondItems(state *game.GameState, hits int, itemIndexes []int) (int, bool) {
+	if !canDamageSelectedVagabondItems(*state, hits, itemIndexes) {
+		return 0, false
+	}
+
+	requiredCount := requiredVagabondDamageCount(*state, hits)
+	for _, index := range itemIndexes {
+		setVagabondItemStatus(state, index, game.ItemDamaged)
+	}
+
+	return requiredCount, true
+}
+
+func canDamageSelectedVagabondItems(state game.GameState, hits int, itemIndexes []int) bool {
+	requiredCount := requiredVagabondDamageCount(state, hits)
+	if len(itemIndexes) != requiredCount {
+		return false
+	}
+
+	seen := map[int]bool{}
+	for _, index := range itemIndexes {
+		if index < 0 || index >= len(state.Vagabond.Items) || seen[index] {
+			return false
+		}
+		if state.Vagabond.Items[index].Status == game.ItemDamaged {
+			return false
+		}
+		seen[index] = true
+	}
+
+	return true
 }
 
 func vagabondReadySwordCount(state game.GameState) int {

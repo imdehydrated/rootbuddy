@@ -38,14 +38,14 @@ func ValidAllianceCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		actions = append(actions, game.Action{
+		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
 			Type: game.ActionCraft,
 			Craft: &game.CraftAction{
 				Faction:               game.Alliance,
 				CardID:                card.ID,
 				UsedWorkshopClearings: usedBaseIDs,
 			},
-		})
+		}, card)...)
 	}
 
 	return actions

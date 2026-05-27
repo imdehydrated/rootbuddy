@@ -33,6 +33,10 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.BattleResolution.AttackerLosses < 0 || req.Action.BattleResolution.DefenderLosses < 0 {
 			return "battle resolution losses cannot be negative"
 		}
+		if hasNegativeIndex(req.Action.BattleResolution.AttackerDamagedItemIndexes) ||
+			hasNegativeIndex(req.Action.BattleResolution.DefenderDamagedItemIndexes) {
+			return "battle resolution damaged item indexes must be nonnegative"
+		}
 	case game.ActionBuild:
 		if req.Action.Build == nil {
 			return "build payload is required"
@@ -61,6 +65,9 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if req.Action.Craft.CardID <= 0 {
 			return "craft action must have a valid card ID"
 		}
+		if hasNegativeIndex(req.Action.Craft.DamagedVagabondItemIndexes) {
+			return "craft damaged item indexes must be nonnegative"
+		}
 	case game.ActionBattle:
 		return "battle initiation cannot be applied directly; resolve it first"
 	case game.ActionAddToDecree:
@@ -74,6 +81,9 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 	case game.ActionRevolt:
 		if req.Action.Revolt == nil {
 			return "revolt payload is required"
+		}
+		if hasNegativeIndex(req.Action.Revolt.DamagedVagabondItemIndexes) {
+			return "revolt damaged item indexes must be nonnegative"
 		}
 	case game.ActionMobilize:
 		if req.Action.Mobilize == nil {
@@ -334,4 +344,13 @@ func validateBattleContextRequest(req BattleContextRequest) string {
 	}
 
 	return ""
+}
+
+func hasNegativeIndex(indexes []int) bool {
+	for _, index := range indexes {
+		if index < 0 {
+			return true
+		}
+	}
+	return false
 }

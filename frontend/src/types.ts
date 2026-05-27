@@ -275,6 +275,8 @@ export interface Action {
     useAlliedFaction?: boolean;
     alliedFaction?: number;
     alliedWarriorLosses?: number;
+    attackerDamagedItemIndexes?: number[] | null;
+    defenderDamagedItemIndexes?: number[] | null;
     attackerPieceLosses?: Array<{
       kind: number;
       buildingType: number;
@@ -311,6 +313,7 @@ export interface Action {
     faction: number;
     cardID: number;
     usedWorkshopClearings: number[];
+    damagedVagabondItemIndexes?: number[] | null;
   } | null;
   addToDecree?: {
     faction: number;
@@ -327,6 +330,7 @@ export interface Action {
     clearingID: number;
     baseSuit: number;
     supporterCardIDs: number[];
+    damagedVagabondItemIndexes?: number[] | null;
   } | null;
   mobilize?: {
     faction: number;

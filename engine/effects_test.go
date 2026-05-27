@@ -113,8 +113,9 @@ func TestApplyActionCraftFavorDamagesVagabondInAffectedClearing(t *testing.T) {
 	next := ApplyAction(state, game.Action{
 		Type: game.ActionCraft,
 		Craft: &game.CraftAction{
-			Faction: game.Eyrie,
-			CardID:  36,
+			Faction:                    game.Eyrie,
+			CardID:                     36,
+			DamagedVagabondItemIndexes: []int{0, 2, 3},
 		},
 	})
 

@@ -182,15 +182,63 @@ func ValidCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		actions = append(actions, game.Action{
+		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
 			Type: game.ActionCraft,
 			Craft: &game.CraftAction{
 				Faction:               game.Marquise,
 				CardID:                card.ID,
 				UsedWorkshopClearings: usedWorkshopIDs,
 			},
-		})
+		}, card)...)
 	}
 
 	return actions
+}
+
+func craftActionsWithVagabondDamageChoices(state game.GameState, action game.Action, card game.Card) []game.Action {
+	if action.Craft == nil {
+		return []game.Action{action}
+	}
+
+	hits := craftVagabondDamageHits(state, action.Craft.Faction, card)
+	choices := vagabondDamageIndexChoices(state, hits)
+	actions := make([]game.Action, 0, len(choices))
+	for _, damagedItemIndexes := range choices {
+		next := action
+		next.Craft = &game.CraftAction{
+			Faction:                    action.Craft.Faction,
+			CardID:                     action.Craft.CardID,
+			UsedWorkshopClearings:      append([]int(nil), action.Craft.UsedWorkshopClearings...),
+			DamagedVagabondItemIndexes: damagedItemIndexes,
+		}
+		actions = append(actions, next)
+	}
+	return actions
+}
+
+func craftVagabondDamageHits(state game.GameState, faction game.Faction, card game.Card) int {
+	suit, ok := craftFavorSuit(card.EffectID)
+	if !ok || faction == game.Vagabond || state.Vagabond.InForest || state.Vagabond.ClearingID == 0 || !game.AreEnemies(state, faction, game.Vagabond) {
+		return 0
+	}
+
+	clearing, ok := findClearingByID(state.Map, state.Vagabond.ClearingID)
+	if !ok || clearing.Suit != suit {
+		return 0
+	}
+
+	return 3
+}
+
+func craftFavorSuit(effectID string) (game.Suit, bool) {
+	switch effectID {
+	case "favor_foxes":
+		return game.Fox, true
+	case "favor_rabbits":
+		return game.Rabbit, true
+	case "favor_mice":
+		return game.Mouse, true
+	default:
+		return 0, false
+	}
 }

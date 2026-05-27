@@ -384,10 +384,11 @@ func TestApplyRevoltDamagesVagabondInRevoltingClearing(t *testing.T) {
 	next := ApplyAction(state, game.Action{
 		Type: game.ActionRevolt,
 		Revolt: &game.RevoltAction{
-			Faction:          game.Alliance,
-			ClearingID:       1,
-			BaseSuit:         game.Fox,
-			SupporterCardIDs: []game.CardID{foxCard.ID, birdCard.ID},
+			Faction:                    game.Alliance,
+			ClearingID:                 1,
+			BaseSuit:                   game.Fox,
+			SupporterCardIDs:           []game.CardID{foxCard.ID, birdCard.ID},
+			DamagedVagabondItemIndexes: []int{1, 2, 3},
 		},
 	})
 

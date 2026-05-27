@@ -94,15 +94,27 @@ func sympathyCountBySuit(board game.Map, suit game.Suit) int {
 	return count
 }
 
-func damageVagabondInRevoltClearing(state *game.GameState, clearingID int) {
+func canDamageVagabondInRevoltClearing(state game.GameState, clearingID int, itemIndexes []int) bool {
 	if state.Vagabond.InForest || state.Vagabond.ClearingID != clearingID {
-		return
+		return len(itemIndexes) == 0
 	}
-	if !game.AreEnemies(*state, game.Alliance, game.Vagabond) {
-		return
+	if !game.AreEnemies(state, game.Alliance, game.Vagabond) {
+		return len(itemIndexes) == 0
 	}
 
-	damageVagabondItems(state, 3)
+	return canDamageSelectedVagabondItems(state, 3, itemIndexes)
+}
+
+func damageVagabondInRevoltClearing(state *game.GameState, clearingID int, itemIndexes []int) bool {
+	if state.Vagabond.InForest || state.Vagabond.ClearingID != clearingID {
+		return len(itemIndexes) == 0
+	}
+	if !game.AreEnemies(*state, game.Alliance, game.Vagabond) {
+		return len(itemIndexes) == 0
+	}
+
+	_, ok := damageSelectedVagabondItems(state, 3, itemIndexes)
+	return ok
 }
 
 func applyRevolt(state *game.GameState, action game.Action) {
@@ -119,11 +131,14 @@ func applyRevolt(state *game.GameState, action game.Action) {
 	if !clearingHasOpenBuildSlotAfterRevolt(*clearing) {
 		return
 	}
+	if !canDamageVagabondInRevoltClearing(*state, clearing.ID, action.Revolt.DamagedVagabondItemIndexes) {
+		return
+	}
 
 	spendAllianceSupporters(state, action.Revolt.SupporterCardIDs)
 	DiscardCards(state, action.Revolt.SupporterCardIDs)
 	removedPieces := removeEnemyPiecesForRevolt(state, clearing)
-	damageVagabondInRevoltClearing(state, clearing.ID)
+	damageVagabondInRevoltClearing(state, clearing.ID, action.Revolt.DamagedVagabondItemIndexes)
 	clearing.Buildings = append(clearing.Buildings, game.Building{
 		Faction: game.Alliance,
 		Type:    game.Base,
