@@ -136,8 +136,16 @@ func vagabondItemIndex(state game.GameState, itemType game.ItemType, status game
 }
 
 func setVagabondItemStatus(state *game.GameState, index int, status game.ItemStatus) {
-	state.Vagabond.Items[index].Status = status
-	state.Vagabond.Items[index].Zone = game.ItemZoneForStatus(state.Vagabond.Items[index].Type, status)
+	item := &state.Vagabond.Items[index]
+	if status == game.ItemDamaged {
+		if item.Status != game.ItemDamaged {
+			item.DamagedSide = game.ItemCurrentSide(*item)
+		}
+	} else {
+		item.DamagedSide = game.ItemReady
+	}
+	item.Status = status
+	item.Zone = game.ItemZoneForStatus(item.Type, status)
 }
 
 func exhaustReadyItemsByType(state *game.GameState, itemType game.ItemType, count int) int {
@@ -197,15 +205,18 @@ func exhaustReadyItemsByIndexes(state *game.GameState, indexes []int) bool {
 }
 
 func repairDamagedItem(state *game.GameState, index int) bool {
-	if index < 0 || index >= len(state.Vagabond.Items) {
-		return false
-	}
-	if state.Vagabond.Items[index].Status != game.ItemDamaged {
+	if !canRepairDamagedItem(*state, index) {
 		return false
 	}
 
-	setVagabondItemStatus(state, index, game.ItemReady)
+	setVagabondItemStatus(state, index, game.ItemCurrentSide(state.Vagabond.Items[index]))
 	return true
+}
+
+func canRepairDamagedItem(state game.GameState, index int) bool {
+	return index >= 0 &&
+		index < len(state.Vagabond.Items) &&
+		state.Vagabond.Items[index].Status == game.ItemDamaged
 }
 
 func repairAllDamagedItems(state *game.GameState) {
@@ -649,6 +660,9 @@ func applyStrike(state *game.GameState, action game.Action) {
 
 func applyRepair(state *game.GameState, action game.Action) {
 	if action.Repair == nil {
+		return
+	}
+	if !canRepairDamagedItem(*state, action.Repair.ItemIndex) {
 		return
 	}
 	if exhaustReadyItemsByType(state, game.ItemHammer, 1) == 0 {

@@ -39,9 +39,10 @@ const (
 )
 
 type Item struct {
-	Type   ItemType
-	Status ItemStatus
-	Zone   ItemZone
+	Type        ItemType
+	Status      ItemStatus
+	Zone        ItemZone
+	DamagedSide ItemStatus
 }
 
 func IsTrackItemType(itemType ItemType) bool {
@@ -65,11 +66,29 @@ func ItemZoneForStatus(itemType ItemType, status ItemStatus) ItemZone {
 
 func NormalizeItemZone(item Item) Item {
 	item.Zone = ItemZoneForStatus(item.Type, item.Status)
+	if item.Status == ItemDamaged {
+		if item.DamagedSide != ItemExhausted {
+			item.DamagedSide = ItemReady
+		}
+		return item
+	}
+
+	item.DamagedSide = ItemReady
 	return item
 }
 
 func ItemCurrentZone(item Item) ItemZone {
 	return NormalizeItemZone(item).Zone
+}
+
+func ItemCurrentSide(item Item) ItemStatus {
+	if item.Status != ItemDamaged {
+		return item.Status
+	}
+	if item.DamagedSide == ItemExhausted {
+		return ItemExhausted
+	}
+	return ItemReady
 }
 
 type RelationshipLevel int

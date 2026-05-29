@@ -74,6 +74,7 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.vagabond.items ??= [];
   normalized.vagabond.items = normalized.vagabond.items.map((item) => ({
     ...item,
+    damagedSide: item.status === 2 ? item.damagedSide ?? 0 : 0,
     zone: itemZoneForStatus(item.type, item.status)
   }));
   normalized.vagabond.relationships ??= {};

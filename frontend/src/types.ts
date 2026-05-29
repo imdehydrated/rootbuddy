@@ -24,6 +24,7 @@ export interface Item {
   type: number;
   status: number;
   zone: number;
+  damagedSide?: number;
 }
 
 export interface Quest {

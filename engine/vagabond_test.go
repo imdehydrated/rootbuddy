@@ -1373,6 +1373,128 @@ func TestApplyActionBattleResolutionTurnsAllyHostileWhenWarriorLossesExceedItemD
 	}
 }
 
+func TestApplyActionBattleResolutionRecordsDamagedItemCurrentSide(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+					},
+				},
+			},
+		},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemExhausted, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTorch, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:                    game.Marquise,
+			ClearingID:                 1,
+			TargetFaction:              game.Vagabond,
+			DefenderLosses:             1,
+			DefenderDamagedItemIndexes: []int{0},
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemDamaged ||
+		next.Vagabond.Items[0].DamagedSide != game.ItemExhausted ||
+		next.Vagabond.Items[0].Zone != game.ItemZoneDamaged {
+		t.Fatalf("expected damaged exhausted item to remember face-down side, got %+v", next.Vagabond.Items[0])
+	}
+}
+
+func TestApplyActionRepairKeepsDamagedItemCurrentSide(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemHammer, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemDamaged, Zone: game.ItemZoneDamaged, DamagedSide: game.ItemExhausted},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRepair,
+		Repair: &game.RepairAction{
+			Faction:   game.Vagabond,
+			ItemIndex: 1,
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected repair to exhaust hammer, got %+v", next.Vagabond.Items[0])
+	}
+	if next.Vagabond.Items[1].Status != game.ItemExhausted ||
+		next.Vagabond.Items[1].Zone != game.ItemZoneSatchel ||
+		next.Vagabond.Items[1].DamagedSide != game.ItemReady {
+		t.Fatalf("expected repair to keep damaged item's exhausted side, got %+v", next.Vagabond.Items[1])
+	}
+}
+
+func TestApplyActionRepairMovesFaceUpTrackItemBackToTrack(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemHammer, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemTea, Status: game.ItemDamaged, Zone: game.ItemZoneDamaged, DamagedSide: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRepair,
+		Repair: &game.RepairAction{
+			Faction:   game.Vagabond,
+			ItemIndex: 1,
+		},
+	})
+
+	if next.Vagabond.Items[1].Status != game.ItemReady || next.Vagabond.Items[1].Zone != game.ItemZoneTrack {
+		t.Fatalf("expected face-up repaired tea to return to track, got %+v", next.Vagabond.Items[1])
+	}
+}
+
+func TestApplyActionRepairRejectsInvalidTargetBeforeExhaustingHammer(t *testing.T) {
+	state := game.GameState{
+		FactionTurn:  game.Vagabond,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Vagabond: game.VagabondState{
+			Items: []game.Item{
+				{Type: game.ItemHammer, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+				{Type: game.ItemBoots, Status: game.ItemReady, Zone: game.ItemZoneSatchel},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionRepair,
+		Repair: &game.RepairAction{
+			Faction:   game.Vagabond,
+			ItemIndex: 1,
+		},
+	})
+
+	if next.Vagabond.Items[0].Status != game.ItemReady || next.Vagabond.Items[1].Status != game.ItemReady {
+		t.Fatalf("expected invalid repair to leave items unchanged, got %+v", next.Vagabond.Items)
+	}
+}
+
 func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 	state := game.GameState{
 		FactionTurn:  game.Vagabond,
@@ -1381,8 +1503,8 @@ func TestApplyActionVagabondEveningInForestRepairsDamagedItems(t *testing.T) {
 		Vagabond: game.VagabondState{
 			InForest: true,
 			Items: []game.Item{
-				{Type: game.ItemSword, Status: game.ItemDamaged},
-				{Type: game.ItemTea, Status: game.ItemDamaged},
+				{Type: game.ItemSword, Status: game.ItemDamaged, DamagedSide: game.ItemExhausted},
+				{Type: game.ItemTea, Status: game.ItemDamaged, DamagedSide: game.ItemExhausted},
 			},
 		},
 	}

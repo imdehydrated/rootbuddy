@@ -275,6 +275,67 @@ func TestValidActionsIncludesVagabondCoalitionTarget(t *testing.T) {
 	}
 }
 
+func TestApplyVagabondCoalitionWithHostileFactionResetsRelationship(t *testing.T) {
+	state := game.GameState{
+		GamePhase: game.LifecyclePlaying,
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{
+				{ID: 40, Name: "Dominance", Suit: game.Mouse, Kind: game.DominanceCard},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelHostile,
+				game.Eyrie:    game.RelFriendly,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionActivateDominance,
+		ActivateDominance: &game.ActivateDominanceAction{
+			Faction:       game.Vagabond,
+			CardID:        40,
+			TargetFaction: game.Marquise,
+		},
+	})
+
+	if !next.CoalitionActive || next.CoalitionPartner != game.Marquise {
+		t.Fatalf("expected Vagabond coalition with Marquise, got active=%v partner=%v", next.CoalitionActive, next.CoalitionPartner)
+	}
+	if next.Vagabond.Relationships[game.Marquise] != game.RelIndifferent {
+		t.Fatalf("expected hostile coalition partner to reset to indifferent, got %+v", next.Vagabond.Relationships)
+	}
+	if next.Vagabond.Relationships[game.Eyrie] != game.RelFriendly {
+		t.Fatalf("expected unrelated relationships to remain unchanged, got %+v", next.Vagabond.Relationships)
+	}
+}
+
+func TestApplyVagabondCoalitionPreservesNonHostileRelationship(t *testing.T) {
+	state := game.GameState{
+		GamePhase: game.LifecyclePlaying,
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{
+				{ID: 40, Name: "Dominance", Suit: game.Mouse, Kind: game.DominanceCard},
+			},
+			Relationships: map[game.Faction]game.RelationshipLevel{
+				game.Marquise: game.RelFriendly,
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionActivateDominance,
+		ActivateDominance: &game.ActivateDominanceAction{
+			Faction:       game.Vagabond,
+			CardID:        40,
+			TargetFaction: game.Marquise,
+		},
+	})
+
+	if next.Vagabond.Relationships[game.Marquise] != game.RelFriendly {
+		t.Fatalf("expected non-hostile coalition partner relationship to remain friendly, got %+v", next.Vagabond.Relationships)
+	}
+}
+
 func TestCoalitionSharesPartnerVictory(t *testing.T) {
 	state := game.GameState{
 		GamePhase:        game.LifecyclePlaying,

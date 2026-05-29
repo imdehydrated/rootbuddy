@@ -203,6 +203,9 @@ func applyActivateDominance(state *game.GameState, action game.Action) {
 	if action.ActivateDominance.Faction == game.Vagabond {
 		state.CoalitionActive = true
 		state.CoalitionPartner = action.ActivateDominance.TargetFaction
+		if vagabondRelationshipLevel(*state, action.ActivateDominance.TargetFaction) == game.RelHostile {
+			setVagabondRelationship(state, action.ActivateDominance.TargetFaction, game.RelIndifferent)
+		}
 	}
 }
 
