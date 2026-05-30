@@ -921,6 +921,62 @@ func TestApplyActionStrikeRemovingAllianceBaseAppliesFallout(t *testing.T) {
 	}
 }
 
+func TestApplyActionStrikeRemovingSympathyTriggersOutrage(t *testing.T) {
+	rabbitCard := firstVagabondTestCard(t, game.Rabbit)
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Alliance: game.AllianceState{
+			SympathyPlaced: 1,
+		},
+		Vagabond: game.VagabondState{
+			ClearingID:  1,
+			CardsInHand: []game.Card{rabbitCard},
+			Items: []game.Item{
+				{Type: game.ItemCrossbow, Status: game.ItemReady},
+			},
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionStrike,
+		Strike: &game.StrikeAction{
+			Faction:       game.Vagabond,
+			ClearingID:    1,
+			TargetFaction: game.Alliance,
+		},
+	})
+
+	if len(next.Map.Clearings[0].Tokens) != 0 {
+		t.Fatalf("expected strike to remove sympathy, got %+v", next.Map.Clearings[0].Tokens)
+	}
+	if next.Alliance.SympathyPlaced != 0 {
+		t.Fatalf("expected sympathy placed count to decrement, got %d", next.Alliance.SympathyPlaced)
+	}
+	if next.VictoryPoints[game.Vagabond] != 1 {
+		t.Fatalf("expected Vagabond to score removed sympathy, got %+v", next.VictoryPoints)
+	}
+	if len(next.Vagabond.CardsInHand) != 0 {
+		t.Fatalf("expected Outrage to remove matching Vagabond card, got %+v", next.Vagabond.CardsInHand)
+	}
+	if len(next.Alliance.Supporters) != 1 || next.Alliance.Supporters[0].ID != rabbitCard.ID {
+		t.Fatalf("expected matching card to become Alliance supporter, got %+v", next.Alliance.Supporters)
+	}
+	if next.Vagabond.Items[0].Status != game.ItemExhausted {
+		t.Fatalf("expected strike to exhaust crossbow, got %+v", next.Vagabond.Items)
+	}
+}
+
 func TestVagabondBattleScoresInfamyForHostilePieces(t *testing.T) {
 	state := game.GameState{
 		GamePhase:   game.LifecyclePlaying,

@@ -685,6 +685,65 @@ func TestApplyMovementIntoSympathyTransfersOutrageCard(t *testing.T) {
 	}
 }
 
+func TestApplyVagabondMovementIntoSympathyDoesNotTriggerOutrage(t *testing.T) {
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+	foxCard := firstAllianceTestCard(t, game.Fox)
+
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Adj:  []int{2},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Adj:  []int{1},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Deck: []game.CardID{foxCard.ID},
+		Vagabond: game.VagabondState{
+			ClearingID: 1,
+			CardsInHand: []game.Card{
+				rabbitCard,
+			},
+			Items: []game.Item{
+				{Type: game.ItemBoots, Status: game.ItemReady},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Vagabond,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	})
+
+	if next.Vagabond.ClearingID != 2 {
+		t.Fatalf("expected Vagabond to move into sympathetic clearing, got %+v", next.Vagabond)
+	}
+	if len(next.Vagabond.CardsInHand) != 1 || next.Vagabond.CardsInHand[0].ID != rabbitCard.ID {
+		t.Fatalf("did not expect Vagabond movement to pay Outrage, got hand %+v", next.Vagabond.CardsInHand)
+	}
+	if len(next.Alliance.Supporters) != 0 {
+		t.Fatalf("did not expect Vagabond pawn movement to add supporters, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.Deck) != 1 || next.Deck[0] != foxCard.ID {
+		t.Fatalf("did not expect Vagabond movement to draw fallback supporter, got deck %+v", next.Deck)
+	}
+}
+
 func TestApplyMovementIntoSympathyDrawsSupporterWhenNoMatchingCard(t *testing.T) {
 	foxCard := firstAllianceTestCard(t, game.Fox)
 	rabbitCard := firstAllianceTestCard(t, game.Rabbit)

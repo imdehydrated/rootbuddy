@@ -74,13 +74,27 @@ func validDominanceActions(state game.GameState) []game.Action {
 }
 
 func cardCanTakeDominance(spendCard game.Card, dominanceCard game.Card) bool {
-	if spendCard.Suit != dominanceCard.Suit {
+	if dominanceCard.Kind != game.DominanceCard {
 		return false
 	}
-	if dominanceCard.Suit == game.Bird {
-		return spendCard.Suit == game.Bird
+	if spendCard.Suit == game.Bird {
+		return true
 	}
-	return true
+	return spendCard.Suit == dominanceCard.Suit
+}
+
+func cardAvailableToSpendForDominance(state game.GameState, faction game.Faction, cardID game.CardID) (game.Card, bool) {
+	for _, card := range factionHand(state, faction) {
+		if card.ID == cardID {
+			return card, true
+		}
+	}
+
+	if !canUseObservedHiddenCards(state, faction) || hiddenCardCount(state, faction, game.HiddenCardZoneHand) == 0 {
+		return game.Card{}, false
+	}
+
+	return CardByID(cardID)
 }
 
 func coalitionTargets(state game.GameState) []game.Faction {

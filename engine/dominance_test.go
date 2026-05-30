@@ -135,6 +135,94 @@ func TestApplyTakeDominanceSpendsMatchingCard(t *testing.T) {
 	}
 }
 
+func TestValidActionsTakeDominanceAllowsBirdCardAsWild(t *testing.T) {
+	state := game.GameState{
+		GamePhase:          game.LifecyclePlaying,
+		FactionTurn:        game.Marquise,
+		CurrentPhase:       game.Daylight,
+		CurrentStep:        game.StepDaylightActions,
+		AvailableDominance: []game.CardID{27},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 1, Name: "Armorers", Suit: game.Bird},
+			},
+		},
+	}
+
+	actions := ValidActions(state)
+	for _, action := range actions {
+		if action.Type == game.ActionTakeDominance &&
+			action.TakeDominance != nil &&
+			action.TakeDominance.DominanceCardID == 27 &&
+			action.TakeDominance.SpentCardID == 1 {
+			return
+		}
+	}
+	t.Fatalf("expected bird card to take rabbit dominance, got %+v", actions)
+}
+
+func TestApplyTakeDominanceAllowsBirdCardAsWild(t *testing.T) {
+	state := game.GameState{
+		GamePhase:          game.LifecyclePlaying,
+		AvailableDominance: []game.CardID{27},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 1, Name: "Armorers", Suit: game.Bird},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionTakeDominance,
+		TakeDominance: &game.TakeDominanceAction{
+			Faction:         game.Marquise,
+			DominanceCardID: 27,
+			SpentCardID:     1,
+		},
+	})
+
+	if len(next.AvailableDominance) != 0 {
+		t.Fatalf("expected available dominance to be taken, got %+v", next.AvailableDominance)
+	}
+	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != 27 {
+		t.Fatalf("expected rabbit dominance card to enter hand, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 1 {
+		t.Fatalf("expected spent bird card to be discarded, got %+v", next.DiscardPile)
+	}
+}
+
+func TestApplyTakeDominanceRejectsOffSuitNonBirdCard(t *testing.T) {
+	state := game.GameState{
+		GamePhase:          game.LifecyclePlaying,
+		AvailableDominance: []game.CardID{27},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 28, Name: "Codebreakers", Suit: game.Mouse},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionTakeDominance,
+		TakeDominance: &game.TakeDominanceAction{
+			Faction:         game.Marquise,
+			DominanceCardID: 27,
+			SpentCardID:     28,
+		},
+	})
+
+	if len(next.AvailableDominance) != 1 || next.AvailableDominance[0] != 27 {
+		t.Fatalf("expected rabbit dominance to remain available, got %+v", next.AvailableDominance)
+	}
+	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != 28 {
+		t.Fatalf("expected off-suit card to remain in hand, got %+v", next.Marquise.CardsInHand)
+	}
+	if len(next.DiscardPile) != 0 {
+		t.Fatalf("expected no discard for invalid dominance take, got %+v", next.DiscardPile)
+	}
+}
+
 func TestBeginNextFactionTurnChecksDominanceVictory(t *testing.T) {
 	state := game.GameState{
 		GamePhase:   game.LifecyclePlaying,

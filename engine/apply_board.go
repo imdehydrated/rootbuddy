@@ -69,11 +69,6 @@ func applyMovement(state *game.GameState, action game.Action) {
 		state.Vagabond.ForestID = 0
 		state.Vagabond.InForest = false
 		exhaustReadyItemsByType(state, game.ItemBoots, max(1, action.Movement.Count))
-
-		toIndex = findClearingIndex(state.Map, action.Movement.To)
-		if !state.Vagabond.InForest && toIndex != -1 && hasAllianceSympathy(state.Map.Clearings[toIndex]) {
-			transferOutrageCard(state, action.Movement.Faction, state.Map.Clearings[toIndex].Suit)
-		}
 		return
 	}
 

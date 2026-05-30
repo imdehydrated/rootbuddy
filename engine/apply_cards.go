@@ -214,6 +214,15 @@ func applyTakeDominance(state *game.GameState, action game.Action) {
 		return
 	}
 
+	dominanceCard, ok := CardByID(action.TakeDominance.DominanceCardID)
+	if !ok || dominanceCard.Kind != game.DominanceCard {
+		return
+	}
+	spendCard, ok := cardAvailableToSpendForDominance(*state, action.TakeDominance.Faction, action.TakeDominance.SpentCardID)
+	if !ok || !cardCanTakeDominance(spendCard, dominanceCard) {
+		return
+	}
+
 	if !removeAvailableDominance(state, action.TakeDominance.DominanceCardID) {
 		return
 	}
@@ -223,10 +232,5 @@ func applyTakeDominance(state *game.GameState, action game.Action) {
 	}
 
 	DiscardCard(state, action.TakeDominance.SpentCardID)
-	card, ok := CardByID(action.TakeDominance.DominanceCardID)
-	if !ok {
-		addAvailableDominance(state, action.TakeDominance.DominanceCardID)
-		return
-	}
-	appendCardToFactionHand(state, action.TakeDominance.Faction, card)
+	appendCardToFactionHand(state, action.TakeDominance.Faction, dominanceCard)
 }
