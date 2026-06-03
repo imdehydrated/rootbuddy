@@ -316,9 +316,11 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			modifiers.DefenderAmbush = session.DefenderAmbush
+			modifiers.DefenderAmbushCardID = session.DefenderAmbushCardID
 			modifiers.DefenderUsesArmorers = session.DefenderUsedArmorers
 			modifiers.DefenderUsesSappers = session.DefenderUsedSappers
 			modifiers.AttackerCounterAmbush = session.AttackerCounterAmbush
+			modifiers.AttackerCounterAmbushCardID = session.AttackerCounterAmbushCardID
 			modifiers.AttackerUsesArmorers = session.AttackerUsedArmorers
 			modifiers.AttackerUsesBrutalTactics = session.AttackerUsedBrutalTactics
 			if session.RollsResolved {
@@ -479,21 +481,21 @@ func HandleOpenBattle(w http.ResponseWriter, r *http.Request) {
 	battleContext := engine.BattleContext(context.state, req.Action)
 	if !requiresBattleSession(battleContext) {
 		writeJSON(w, http.StatusOK, BattlePromptResponse{
-			Prompt: battlePromptView(battleSession{
+			Prompt: battlePromptView(enrichBattleSessionChoices(battleSession{
 				GameID:          req.GameID,
 				Revision:        context.record.Revision,
 				Action:          req.Action,
 				BattleContext:   battleContext,
 				AttackerFaction: req.Action.Battle.Faction,
 				DefenderFaction: req.Action.Battle.TargetFaction,
-			}, context.perspective),
+			}, context.state), context.perspective),
 			GameID:   req.GameID,
 			Revision: context.record.Revision,
 		})
 		return
 	}
 
-	session, _ := battleSessions.open(req.GameID, context.record.Revision, req.Action, battleContext)
+	session, _ := battleSessions.open(req.GameID, context.record.Revision, req.Action, battleContext, context.state)
 	session, err := advanceBattleSessionAfterResponses(req.GameID, context.record.Revision, context.state, session)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, &ErrorResponse{

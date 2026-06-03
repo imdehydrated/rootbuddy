@@ -39,15 +39,26 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 	battleSuit := clearingSuit(state, action.Battle.ClearingID)
 	attackerHasScoutingParty := hasPersistentEffect(state, action.Battle.Faction, "scouting_party")
 	defenderAmbushed := false
+	defenderAmbushCardID := game.CardID(0)
 	attackerCounterAmbush := false
+	attackerCounterAmbushCardID := game.CardID(0)
 	ambushHitsToAttacker := 0
 	simulatedState := cloneState(state)
 
-	if modifiers.DefenderAmbush && !attackerHasScoutingParty && canFactionPlayAmbush(state, action.Battle.TargetFaction, battleSuit) {
-		defenderAmbushed = true
-		if modifiers.AttackerCounterAmbush && canFactionPlayAmbush(state, action.Battle.Faction, battleSuit) {
-			attackerCounterAmbush = true
-		} else {
+	if modifiers.DefenderAmbush && !attackerHasScoutingParty {
+		if cardID, ok := resolveAmbushCardID(state, action.Battle.TargetFaction, battleSuit, modifiers.DefenderAmbushCardID); ok {
+			defenderAmbushCardID = cardID
+			defenderAmbushed = true
+		}
+	}
+	if defenderAmbushed {
+		if modifiers.AttackerCounterAmbush {
+			if cardID, ok := resolveAmbushCardID(state, action.Battle.Faction, battleSuit, modifiers.AttackerCounterAmbushCardID); ok {
+				attackerCounterAmbushCardID = cardID
+				attackerCounterAmbush = true
+			}
+		}
+		if !attackerCounterAmbush {
 			ambushHitsToAttacker = applyHypotheticalAmbushHits(&simulatedState, action.Battle.Faction, action.Battle.ClearingID, 2)
 			if !attackersRemainAfterAmbush(simulatedState, action.Battle.Faction, action.Battle.ClearingID) {
 				return game.Action{
@@ -60,6 +71,7 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 						AttackerRoll:          attackerRoll,
 						DefenderRoll:          defenderRoll,
 						DefenderAmbushed:      true,
+						DefenderAmbushCardID:  defenderAmbushCardID,
 						AmbushHitsToAttacker:  ambushHitsToAttacker,
 						AttackerCounterAmbush: false,
 						AttackerLosses:        ambushHitsToAttacker,
@@ -131,28 +143,30 @@ func ResolveBattleWithModifiers(state game.GameState, action game.Action, attack
 	return game.Action{
 		Type: game.ActionBattleResolution,
 		BattleResolution: &game.BattleResolutionAction{
-			Faction:                   action.Battle.Faction,
-			ClearingID:                action.Battle.ClearingID,
-			TargetFaction:             action.Battle.TargetFaction,
-			DecreeCardID:              action.Battle.DecreeCardID,
-			AttackerRoll:              attackerRoll,
-			DefenderRoll:              defenderRoll,
-			AttackerHitModifier:       modifiers.AttackerHitModifier,
-			DefenderHitModifier:       modifiers.DefenderHitModifier,
-			IgnoreHitsToAttacker:      modifiers.IgnoreHitsToAttacker,
-			IgnoreHitsToDefender:      modifiers.IgnoreHitsToDefender,
-			DefenderAmbushed:          defenderAmbushed,
-			AttackerCounterAmbush:     attackerCounterAmbush,
-			AttackerUsedArmorers:      attackerUsedArmorers,
-			DefenderUsedArmorers:      defenderUsedArmorers,
-			AttackerUsedBrutalTactics: attackerUsedBrutalTactics,
-			DefenderUsedSappers:       defenderUsedSappers,
-			AmbushHitsToAttacker:      ambushHitsToAttacker,
-			AttackerLosses:            ambushHitsToAttacker + defenderHits,
-			DefenderLosses:            attackerHits,
-			UseAlliedFaction:          action.Battle.UseAlliedFaction,
-			AlliedFaction:             action.Battle.AlliedFaction,
-			SourceEffectID:            action.Battle.SourceEffectID,
+			Faction:                     action.Battle.Faction,
+			ClearingID:                  action.Battle.ClearingID,
+			TargetFaction:               action.Battle.TargetFaction,
+			DecreeCardID:                action.Battle.DecreeCardID,
+			AttackerRoll:                attackerRoll,
+			DefenderRoll:                defenderRoll,
+			AttackerHitModifier:         modifiers.AttackerHitModifier,
+			DefenderHitModifier:         modifiers.DefenderHitModifier,
+			IgnoreHitsToAttacker:        modifiers.IgnoreHitsToAttacker,
+			IgnoreHitsToDefender:        modifiers.IgnoreHitsToDefender,
+			DefenderAmbushed:            defenderAmbushed,
+			DefenderAmbushCardID:        defenderAmbushCardID,
+			AttackerCounterAmbush:       attackerCounterAmbush,
+			AttackerCounterAmbushCardID: attackerCounterAmbushCardID,
+			AttackerUsedArmorers:        attackerUsedArmorers,
+			DefenderUsedArmorers:        defenderUsedArmorers,
+			AttackerUsedBrutalTactics:   attackerUsedBrutalTactics,
+			DefenderUsedSappers:         defenderUsedSappers,
+			AmbushHitsToAttacker:        ambushHitsToAttacker,
+			AttackerLosses:              ambushHitsToAttacker + defenderHits,
+			DefenderLosses:              attackerHits,
+			UseAlliedFaction:            action.Battle.UseAlliedFaction,
+			AlliedFaction:               action.Battle.AlliedFaction,
+			SourceEffectID:              action.Battle.SourceEffectID,
 		},
 	}
 }

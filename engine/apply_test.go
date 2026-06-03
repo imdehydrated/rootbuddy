@@ -565,6 +565,10 @@ func TestApplyActionBattleResolutionDespotScoresOneExtraPerBattle(t *testing.T) 
 			ClearingID:     1,
 			TargetFaction:  game.Marquise,
 			DefenderLosses: 2,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceBuilding, BuildingType: game.Sawmill},
+				{Kind: game.BattlePieceWood},
+			},
 		},
 	})
 
@@ -663,6 +667,54 @@ func TestApplyActionBattleResolutionUsesSelectedDefenderBuildingLoss(t *testing.
 	}
 	if next.VictoryPoints[game.Eyrie] != 1 {
 		t.Fatalf("expected attacker to score selected building removal, got %+v", next.VictoryPoints)
+	}
+}
+
+func TestApplyActionBattleResolutionRejectsAmbiguousDefenderPieceLossBeforeSideEffects(t *testing.T) {
+	state := game.GameState{
+		PlayerFaction: game.Marquise,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Sawmill},
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		Marquise: game.MarquiseState{
+			CardsInHand:     []game.Card{{ID: 12, Kind: game.AmbushCard, Suit: game.Bird}},
+			SawmillsPlaced:  1,
+			WorkshopsPlaced: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:              game.Eyrie,
+			ClearingID:           1,
+			TargetFaction:        game.Marquise,
+			DefenderAmbushed:     true,
+			DefenderAmbushCardID: 12,
+			DefenderLosses:       1,
+		},
+	})
+
+	if len(next.Map.Clearings[0].Buildings) != 2 {
+		t.Fatalf("expected ambiguous loss without selected piece to leave buildings unchanged, got %+v", next.Map.Clearings[0].Buildings)
+	}
+	if len(next.Marquise.CardsInHand) != 1 || next.Marquise.CardsInHand[0].ID != 12 {
+		t.Fatalf("expected invalid battle resolution not to consume ambush card, got hand=%+v", next.Marquise.CardsInHand)
+	}
+	if len(next.DiscardPile) != 0 {
+		t.Fatalf("expected invalid battle resolution not to discard side-effect cards, got %+v", next.DiscardPile)
+	}
+	if next.VictoryPoints[game.Eyrie] != 0 {
+		t.Fatalf("expected invalid battle resolution not to score, got %+v", next.VictoryPoints)
 	}
 }
 

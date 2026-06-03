@@ -265,7 +265,9 @@ export interface Action {
     ignoreHitsToAttacker: boolean;
     ignoreHitsToDefender: boolean;
     defenderAmbushed: boolean;
+    defenderAmbushCardID?: number;
     attackerCounterAmbush: boolean;
+    attackerCounterAmbushCardID?: number;
     attackerUsedArmorers: boolean;
     defenderUsedArmorers: boolean;
     attackerUsedBrutalTactics: boolean;
@@ -515,7 +517,9 @@ export interface BattleModifiers {
   ignoreHitsToAttacker: boolean;
   ignoreHitsToDefender: boolean;
   defenderAmbush: boolean;
+  defenderAmbushCardID?: number;
   attackerCounterAmbush: boolean;
+  attackerCounterAmbushCardID?: number;
   attackerUsesArmorers: boolean;
   defenderUsesArmorers: boolean;
   attackerUsesBrutalTactics: boolean;
@@ -556,10 +560,14 @@ export interface BattlePrompt {
   canUseCounterAmbush?: boolean;
   canUseAttackerArmorers?: boolean;
   canUseBrutalTactics?: boolean;
+  ambushCardIDs?: number[];
+  counterAmbushCardIDs?: number[];
   defenderAmbush?: boolean;
+  defenderAmbushCardID?: number;
   defenderUsedArmorers?: boolean;
   defenderUsedSappers?: boolean;
   attackerCounterAmbush?: boolean;
+  attackerCounterAmbushCardID?: number;
   attackerUsedArmorers?: boolean;
   attackerUsedBrutalTactics?: boolean;
 }

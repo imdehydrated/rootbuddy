@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/imdehydrated/rootbuddy/engine"
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
@@ -43,56 +44,64 @@ const (
 )
 
 type BattlePrompt struct {
-	GameID                    string             `json:"gameID"`
-	Revision                  int64              `json:"revision"`
-	Action                    game.Action        `json:"action"`
-	Stage                     BattlePromptStage  `json:"stage"`
-	WaitingOnFaction          game.Faction       `json:"waitingOnFaction"`
-	BattleContext             game.BattleContext `json:"battleContext"`
-	AttackerRoll              int                `json:"attackerRoll,omitempty"`
-	DefenderRoll              int                `json:"defenderRoll,omitempty"`
-	CanUseAmbush              bool               `json:"canUseAmbush,omitempty"`
-	CanUseDefenderArmorers    bool               `json:"canUseDefenderArmorers,omitempty"`
-	CanUseSappers             bool               `json:"canUseSappers,omitempty"`
-	CanUseCounterAmbush       bool               `json:"canUseCounterAmbush,omitempty"`
-	CanUseAttackerArmorers    bool               `json:"canUseAttackerArmorers,omitempty"`
-	CanUseBrutalTactics       bool               `json:"canUseBrutalTactics,omitempty"`
-	DefenderAmbush            bool               `json:"defenderAmbush,omitempty"`
-	DefenderUsedArmorers      bool               `json:"defenderUsedArmorers,omitempty"`
-	DefenderUsedSappers       bool               `json:"defenderUsedSappers,omitempty"`
-	AttackerCounterAmbush     bool               `json:"attackerCounterAmbush,omitempty"`
-	AttackerUsedArmorers      bool               `json:"attackerUsedArmorers,omitempty"`
-	AttackerUsedBrutalTactics bool               `json:"attackerUsedBrutalTactics,omitempty"`
+	GameID                      string             `json:"gameID"`
+	Revision                    int64              `json:"revision"`
+	Action                      game.Action        `json:"action"`
+	Stage                       BattlePromptStage  `json:"stage"`
+	WaitingOnFaction            game.Faction       `json:"waitingOnFaction"`
+	BattleContext               game.BattleContext `json:"battleContext"`
+	AttackerRoll                int                `json:"attackerRoll,omitempty"`
+	DefenderRoll                int                `json:"defenderRoll,omitempty"`
+	CanUseAmbush                bool               `json:"canUseAmbush,omitempty"`
+	CanUseDefenderArmorers      bool               `json:"canUseDefenderArmorers,omitempty"`
+	CanUseSappers               bool               `json:"canUseSappers,omitempty"`
+	CanUseCounterAmbush         bool               `json:"canUseCounterAmbush,omitempty"`
+	CanUseAttackerArmorers      bool               `json:"canUseAttackerArmorers,omitempty"`
+	CanUseBrutalTactics         bool               `json:"canUseBrutalTactics,omitempty"`
+	AmbushCardIDs               []game.CardID      `json:"ambushCardIDs,omitempty"`
+	CounterAmbushCardIDs        []game.CardID      `json:"counterAmbushCardIDs,omitempty"`
+	DefenderAmbush              bool               `json:"defenderAmbush,omitempty"`
+	DefenderAmbushCardID        game.CardID        `json:"defenderAmbushCardID,omitempty"`
+	DefenderUsedArmorers        bool               `json:"defenderUsedArmorers,omitempty"`
+	DefenderUsedSappers         bool               `json:"defenderUsedSappers,omitempty"`
+	AttackerCounterAmbush       bool               `json:"attackerCounterAmbush,omitempty"`
+	AttackerCounterAmbushCardID game.CardID        `json:"attackerCounterAmbushCardID,omitempty"`
+	AttackerUsedArmorers        bool               `json:"attackerUsedArmorers,omitempty"`
+	AttackerUsedBrutalTactics   bool               `json:"attackerUsedBrutalTactics,omitempty"`
 }
 
 type battleSession struct {
-	GameID                    string
-	Revision                  int64
-	Action                    game.Action
-	BattleContext             game.BattleContext
-	AttackerFaction           game.Faction
-	DefenderFaction           game.Faction
-	CreatedAt                 time.Time
-	DefenderCanAmbush         bool
-	DefenderCanArmorers       bool
-	DefenderCanSappers        bool
-	DefenderAmbushResponded   bool
-	DefenderAmbush            bool
-	DefenderEffectsResponded  bool
-	DefenderUsedArmorers      bool
-	DefenderUsedSappers       bool
-	AttackerCanCounterAmbush  bool
-	AttackerCanArmorers       bool
-	AttackerCanBrutalTactics  bool
-	AttackerCounterResponded  bool
-	AttackerCounterAmbush     bool
-	AttackerEffectsResponded  bool
-	AttackerUsedArmorers      bool
-	AttackerUsedBrutalTactics bool
-	RollsResolved             bool
-	AttackerRoll              int
-	DefenderRoll              int
-	ResolvedAction            *game.Action
+	GameID                       string
+	Revision                     int64
+	Action                       game.Action
+	BattleContext                game.BattleContext
+	AttackerFaction              game.Faction
+	DefenderFaction              game.Faction
+	CreatedAt                    time.Time
+	DefenderCanAmbush            bool
+	DefenderCanArmorers          bool
+	DefenderCanSappers           bool
+	DefenderAmbushCardIDs        []game.CardID
+	DefenderAmbushResponded      bool
+	DefenderAmbush               bool
+	DefenderEffectsResponded     bool
+	DefenderUsedArmorers         bool
+	DefenderUsedSappers          bool
+	DefenderAmbushCardID         game.CardID
+	AttackerCanCounterAmbush     bool
+	AttackerCanArmorers          bool
+	AttackerCanBrutalTactics     bool
+	AttackerCounterAmbushCardIDs []game.CardID
+	AttackerCounterResponded     bool
+	AttackerCounterAmbush        bool
+	AttackerCounterAmbushCardID  game.CardID
+	AttackerEffectsResponded     bool
+	AttackerUsedArmorers         bool
+	AttackerUsedBrutalTactics    bool
+	RollsResolved                bool
+	AttackerRoll                 int
+	DefenderRoll                 int
+	ResolvedAction               *game.Action
 }
 
 type battleSessionStore struct {
@@ -108,7 +117,7 @@ func newBattleSessionStore() *battleSessionStore {
 
 var battleSessions = newBattleSessionStore()
 
-func (s *battleSessionStore) open(gameID string, revision int64, action game.Action, context game.BattleContext) (battleSession, bool) {
+func (s *battleSessionStore) open(gameID string, revision int64, action game.Action, context game.BattleContext, state game.GameState) (battleSession, bool) {
 	session := battleSession{
 		GameID:                   gameID,
 		Revision:                 revision,
@@ -124,6 +133,7 @@ func (s *battleSessionStore) open(gameID string, revision int64, action game.Act
 		AttackerCanArmorers:      context.CanAttackerArmorers,
 		AttackerCanBrutalTactics: context.CanAttackerBrutalTactics,
 	}
+	session = enrichBattleSessionChoices(session, state)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -135,6 +145,22 @@ func (s *battleSessionStore) open(gameID string, revision int64, action game.Act
 
 	s.byGame[gameID] = session
 	return session, true
+}
+
+func enrichBattleSessionChoices(session battleSession, state game.GameState) battleSession {
+	session.DefenderAmbushCardIDs = nil
+	session.AttackerCounterAmbushCardIDs = nil
+	if session.Action.Battle == nil {
+		return session
+	}
+	suit := session.BattleContext.ClearingSuit
+	if session.DefenderCanAmbush {
+		session.DefenderAmbushCardIDs = engine.LegalAmbushCardIDs(state, session.DefenderFaction, suit)
+	}
+	if session.AttackerCanCounterAmbush {
+		session.AttackerCounterAmbushCardIDs = engine.LegalAmbushCardIDs(state, session.AttackerFaction, suit)
+	}
+	return session
 }
 
 func (s *battleSessionStore) get(gameID string) (battleSession, bool) {
@@ -253,6 +279,13 @@ func (s *battleSessionStore) applyResponse(gameID string, revision int64, perspe
 			if !session.DefenderCanAmbush && *req.UseAmbush {
 				return battleSession{}, errBattleResponseNotAvailable
 			}
+			if *req.UseAmbush {
+				cardID, ok := chooseBattleResponseCardID(req.AmbushCardID, session.DefenderAmbushCardIDs)
+				if !ok {
+					return battleSession{}, errBattleResponseNotAvailable
+				}
+				session.DefenderAmbushCardID = cardID
+			}
 			session.DefenderAmbush = session.DefenderCanAmbush && *req.UseAmbush
 		}
 		session.DefenderAmbushResponded = true
@@ -280,6 +313,13 @@ func (s *battleSessionStore) applyResponse(gameID string, revision int64, perspe
 		if req.UseCounterAmbush != nil {
 			if !canSessionUseCounterAmbush(session) && *req.UseCounterAmbush {
 				return battleSession{}, errBattleResponseNotAvailable
+			}
+			if *req.UseCounterAmbush {
+				cardID, ok := chooseBattleResponseCardID(req.CounterAmbushCardID, session.AttackerCounterAmbushCardIDs)
+				if !ok {
+					return battleSession{}, errBattleResponseNotAvailable
+				}
+				session.AttackerCounterAmbushCardID = cardID
 			}
 			session.AttackerCounterAmbush = canSessionUseCounterAmbush(session) && *req.UseCounterAmbush
 		}
@@ -365,6 +405,33 @@ func requiresAttackerEffectsResponse(session battleSession) bool {
 
 func canSessionUseCounterAmbush(session battleSession) bool {
 	return session.DefenderAmbush && session.AttackerCanCounterAmbush
+}
+
+func chooseBattleResponseCardID(requested game.CardID, legal []game.CardID) (game.CardID, bool) {
+	if requested > 0 {
+		for _, cardID := range legal {
+			if cardID == requested {
+				return requested, true
+			}
+		}
+		return 0, false
+	}
+	if len(legal) == 1 {
+		return legal[0], true
+	}
+	if len(legal) == 0 {
+		return 0, true
+	}
+	return 0, false
+}
+
+func cloneCardIDs(cardIDs []game.CardID) []game.CardID {
+	if cardIDs == nil {
+		return nil
+	}
+	cloned := make([]game.CardID, len(cardIDs))
+	copy(cloned, cardIDs)
+	return cloned
 }
 
 func currentBattleResponseKind(session battleSession) battleResponseKind {
@@ -455,6 +522,7 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 
 	if perspective == session.DefenderFaction && responseKind == battleResponseDefenderAmbush {
 		prompt.CanUseAmbush = session.DefenderCanAmbush
+		prompt.AmbushCardIDs = cloneCardIDs(session.DefenderAmbushCardIDs)
 	}
 	if perspective == session.DefenderFaction && responseKind == battleResponseDefenderEffects {
 		prompt.CanUseDefenderArmorers = session.DefenderCanArmorers
@@ -462,6 +530,7 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 	}
 	if perspective == session.AttackerFaction && responseKind == battleResponseAttackerCounterAmbush {
 		prompt.CanUseCounterAmbush = canSessionUseCounterAmbush(session)
+		prompt.CounterAmbushCardIDs = cloneCardIDs(session.AttackerCounterAmbushCardIDs)
 	}
 	if perspective == session.AttackerFaction && responseKind == battleResponseAttackerEffects {
 		prompt.CanUseAttackerArmorers = session.AttackerCanArmorers
@@ -469,6 +538,7 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 	}
 	if session.DefenderAmbushResponded {
 		prompt.DefenderAmbush = session.DefenderAmbush
+		prompt.DefenderAmbushCardID = session.DefenderAmbushCardID
 	}
 	if session.DefenderEffectsResponded {
 		prompt.DefenderUsedArmorers = session.DefenderUsedArmorers
@@ -476,6 +546,7 @@ func battlePromptView(session battleSession, perspective game.Faction) *BattlePr
 	}
 	if session.AttackerCounterResponded {
 		prompt.AttackerCounterAmbush = session.AttackerCounterAmbush
+		prompt.AttackerCounterAmbushCardID = session.AttackerCounterAmbushCardID
 	}
 	if session.AttackerEffectsResponded {
 		prompt.AttackerUsedArmorers = session.AttackerUsedArmorers

@@ -363,6 +363,124 @@ func applySelectedPieceLosses(state *game.GameState, clearing *game.Clearing, fa
 	return losses, summary
 }
 
+type nonWarriorLossPool struct {
+	buildings map[game.BuildingType]int
+	tokens    map[game.TokenType]int
+	wood      int
+}
+
+func battleNonWarriorLossPool(clearing game.Clearing, faction game.Faction) nonWarriorLossPool {
+	pool := nonWarriorLossPool{
+		buildings: map[game.BuildingType]int{},
+		tokens:    map[game.TokenType]int{},
+	}
+	for _, building := range clearing.Buildings {
+		if building.Faction == faction {
+			pool.buildings[building.Type]++
+		}
+	}
+	for _, token := range clearing.Tokens {
+		if token.Faction == faction {
+			pool.tokens[token.Type]++
+		}
+	}
+	if faction == game.Marquise {
+		pool.wood = clearing.Wood
+	}
+	return pool
+}
+
+func (pool nonWarriorLossPool) total() int {
+	total := pool.wood
+	for _, count := range pool.buildings {
+		total += count
+	}
+	for _, count := range pool.tokens {
+		total += count
+	}
+	return total
+}
+
+func (pool nonWarriorLossPool) optionCount() int {
+	options := 0
+	for _, count := range pool.buildings {
+		if count > 0 {
+			options++
+		}
+	}
+	for _, count := range pool.tokens {
+		if count > 0 {
+			options++
+		}
+	}
+	if pool.wood > 0 {
+		options++
+	}
+	return options
+}
+
+func (pool nonWarriorLossPool) ambiguous() bool {
+	return pool.optionCount() > 1
+}
+
+func (pool *nonWarriorLossPool) remove(loss game.BattlePieceLoss) bool {
+	switch loss.Kind {
+	case game.BattlePieceBuilding:
+		if pool.buildings[loss.BuildingType] <= 0 {
+			return false
+		}
+		pool.buildings[loss.BuildingType]--
+		return true
+	case game.BattlePieceToken:
+		if pool.tokens[loss.TokenType] <= 0 {
+			return false
+		}
+		pool.tokens[loss.TokenType]--
+		return true
+	case game.BattlePieceWood:
+		if pool.wood <= 0 {
+			return false
+		}
+		pool.wood--
+		return true
+	default:
+		return false
+	}
+}
+
+func canApplyNonVagabondBattleLosses(clearing game.Clearing, faction game.Faction, losses int, selected []game.BattlePieceLoss) bool {
+	if losses <= 0 {
+		return true
+	}
+
+	warriors := 0
+	if clearing.Warriors != nil {
+		warriors = clearing.Warriors[faction]
+	}
+	remaining := losses - min(losses, warriors)
+	if remaining <= 0 {
+		return true
+	}
+
+	pool := battleNonWarriorLossPool(clearing, faction)
+	if pool.total() == 0 {
+		return true
+	}
+
+	selectedIndex := 0
+	for remaining > 0 && pool.total() > 0 && pool.ambiguous() {
+		if selectedIndex >= len(selected) {
+			return false
+		}
+		if !pool.remove(selected[selectedIndex]) {
+			return false
+		}
+		selectedIndex++
+		remaining--
+	}
+	return true
+}
+
 func applyNonVagabondBattleLosses(state *game.GameState, clearing *game.Clearing, faction game.Faction, losses int, selected []game.BattlePieceLoss) battleRemovalSummary {
 	summary := battleRemovalSummary{}
 	if losses <= 0 {
@@ -402,9 +520,9 @@ func applyBattleCardSideEffects(state *game.GameState, action game.Action) {
 
 	suit := clearingSuit(*state, action.BattleResolution.ClearingID)
 	if action.BattleResolution.DefenderAmbushed {
-		consumeAmbushCard(state, action.BattleResolution.TargetFaction, suit)
+		consumeAmbushCard(state, action.BattleResolution.TargetFaction, suit, action.BattleResolution.DefenderAmbushCardID)
 		if action.BattleResolution.AttackerCounterAmbush {
-			consumeAmbushCard(state, action.BattleResolution.Faction, suit)
+			consumeAmbushCard(state, action.BattleResolution.Faction, suit, action.BattleResolution.AttackerCounterAmbushCardID)
 		}
 	}
 
@@ -433,6 +551,14 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	}
 
 	clearing := &state.Map.Clearings[index]
+	if action.BattleResolution.Faction != game.Vagabond &&
+		!canApplyNonVagabondBattleLosses(*clearing, action.BattleResolution.Faction, action.BattleResolution.AttackerLosses, action.BattleResolution.AttackerPieceLosses) {
+		return
+	}
+	if action.BattleResolution.TargetFaction != game.Vagabond &&
+		!canApplyNonVagabondBattleLosses(*clearing, action.BattleResolution.TargetFaction, action.BattleResolution.DefenderLosses, action.BattleResolution.DefenderPieceLosses) {
+		return
+	}
 	if action.BattleResolution.Faction == game.Vagabond {
 		damageHits := action.BattleResolution.AttackerLosses - action.BattleResolution.AlliedWarriorLosses
 		if !canApplyVagabondAlliedBattleLosses(*state, clearing, *action.BattleResolution) {

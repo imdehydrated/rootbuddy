@@ -1,4 +1,5 @@
 import { factionLabels } from "../labels";
+import { describeKnownCardID } from "../cardCatalog";
 import type { Action, BattleContext, BattleModifiers, BattlePrompt } from "../types";
 
 type BattleFlowPanelProps = {
@@ -193,6 +194,8 @@ export function BattleFlowPanel({
   ].filter((effect) => (effect.key === "scouting-party" ? effect.available : effect.available || effect.selected));
   const chosenEffects = effectOptions.filter((effect) => effect.selected);
   const promptHasRolls = multiplayerBattlePrompt?.attackerRoll !== undefined && multiplayerBattlePrompt?.defenderRoll !== undefined;
+  const defenderAmbushCardIDs = multiplayerBattlePrompt?.ambushCardIDs ?? [];
+  const attackerCounterAmbushCardIDs = multiplayerBattlePrompt?.counterAmbushCardIDs ?? [];
 
   return (
     <section className={`panel ${surface === "modal" ? "battle-event-panel" : "sidebar-panel"}`}>
@@ -267,6 +270,48 @@ export function BattleFlowPanel({
                 </span>
               ))}
             </div>
+          ) : null}
+          {isDefenderPrompt && defenderCanAmbush && battleModifiers.defenderAmbush && defenderAmbushCardIDs.length > 1 ? (
+            <label className="battle-card-choice">
+              <span>Ambush Card</span>
+              <select
+                value={battleModifiers.defenderAmbushCardID ?? ""}
+                onChange={(event) =>
+                  onSetBattleModifiers((current) => ({
+                    ...current,
+                    defenderAmbushCardID: Number(event.target.value) || undefined
+                  }))
+                }
+              >
+                <option value="">Choose card</option>
+                {defenderAmbushCardIDs.map((cardID) => (
+                  <option key={`defender-ambush-${cardID}`} value={cardID}>
+                    {describeKnownCardID(cardID)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {isAttackerPrompt && attackerCanCounterAmbush && battleModifiers.attackerCounterAmbush && attackerCounterAmbushCardIDs.length > 1 ? (
+            <label className="battle-card-choice">
+              <span>Counter-Ambush Card</span>
+              <select
+                value={battleModifiers.attackerCounterAmbushCardID ?? ""}
+                onChange={(event) =>
+                  onSetBattleModifiers((current) => ({
+                    ...current,
+                    attackerCounterAmbushCardID: Number(event.target.value) || undefined
+                  }))
+                }
+              >
+                <option value="">Choose card</option>
+                {attackerCounterAmbushCardIDs.map((cardID) => (
+                  <option key={`attacker-counter-ambush-${cardID}`} value={cardID}>
+                    {describeKnownCardID(cardID)}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           {promptHasRolls ? (
             <div className="known-card-pill-list">

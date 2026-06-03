@@ -10,7 +10,9 @@ export const emptyBattleModifiers: BattleModifiers = {
   ignoreHitsToAttacker: false,
   ignoreHitsToDefender: false,
   defenderAmbush: false,
+  defenderAmbushCardID: undefined,
   attackerCounterAmbush: false,
+  attackerCounterAmbushCardID: undefined,
   attackerUsesArmorers: false,
   defenderUsesArmorers: false,
   attackerUsesBrutalTactics: false,
@@ -92,9 +94,15 @@ export function useBattleFlow({
     setBattleModifiers({
       ...emptyBattleModifiers,
       defenderAmbush: multiplayerBattlePrompt.defenderAmbush ?? false,
+      defenderAmbushCardID:
+        multiplayerBattlePrompt.defenderAmbushCardID ??
+        (multiplayerBattlePrompt.ambushCardIDs?.length === 1 ? multiplayerBattlePrompt.ambushCardIDs[0] : undefined),
       defenderUsesArmorers: multiplayerBattlePrompt.defenderUsedArmorers ?? false,
       defenderUsesSappers: multiplayerBattlePrompt.defenderUsedSappers ?? false,
       attackerCounterAmbush: multiplayerBattlePrompt.attackerCounterAmbush ?? false,
+      attackerCounterAmbushCardID:
+        multiplayerBattlePrompt.attackerCounterAmbushCardID ??
+        (multiplayerBattlePrompt.counterAmbushCardIDs?.length === 1 ? multiplayerBattlePrompt.counterAmbushCardIDs[0] : undefined),
       attackerUsesArmorers: multiplayerBattlePrompt.attackerUsedArmorers ?? false,
       attackerUsesBrutalTactics: multiplayerBattlePrompt.attackerUsedBrutalTactics ?? false
     });
@@ -220,11 +228,19 @@ export function useBattleFlow({
         {
           gameID: multiplayerBattlePrompt.gameID,
           useAmbush: multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderAmbush : undefined,
+          ambushCardID:
+            multiplayerBattlePrompt.stage === "defender_response" && battleModifiers.defenderAmbush
+              ? battleModifiers.defenderAmbushCardID
+              : undefined,
           useDefenderArmorers:
             multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderUsesArmorers : undefined,
           useSappers: multiplayerBattlePrompt.stage === "defender_response" ? battleModifiers.defenderUsesSappers : undefined,
           useCounterAmbush:
             multiplayerBattlePrompt.stage === "attacker_response" ? battleModifiers.attackerCounterAmbush : undefined,
+          counterAmbushCardID:
+            multiplayerBattlePrompt.stage === "attacker_response" && battleModifiers.attackerCounterAmbush
+              ? battleModifiers.attackerCounterAmbushCardID
+              : undefined,
           useAttackerArmorers:
             multiplayerBattlePrompt.stage === "attacker_response" ? battleModifiers.attackerUsesArmorers : undefined,
           useBrutalTactics:

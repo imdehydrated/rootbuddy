@@ -128,16 +128,18 @@ type BattleAction struct {
 }
 
 type BattleModifiers struct {
-	AttackerHitModifier       int
-	DefenderHitModifier       int
-	IgnoreHitsToAttacker      bool
-	IgnoreHitsToDefender      bool
-	DefenderAmbush            bool
-	AttackerCounterAmbush     bool
-	AttackerUsesArmorers      bool
-	DefenderUsesArmorers      bool
-	AttackerUsesBrutalTactics bool
-	DefenderUsesSappers       bool
+	AttackerHitModifier         int
+	DefenderHitModifier         int
+	IgnoreHitsToAttacker        bool
+	IgnoreHitsToDefender        bool
+	DefenderAmbush              bool
+	DefenderAmbushCardID        CardID
+	AttackerCounterAmbush       bool
+	AttackerCounterAmbushCardID CardID
+	AttackerUsesArmorers        bool
+	DefenderUsesArmorers        bool
+	AttackerUsesBrutalTactics   bool
+	DefenderUsesSappers         bool
 }
 
 type BattlePieceKind int
@@ -155,33 +157,35 @@ type BattlePieceLoss struct {
 }
 
 type BattleResolutionAction struct {
-	Faction                    Faction
-	ClearingID                 int
-	TargetFaction              Faction
-	DecreeCardID               CardID
-	AttackerRoll               int
-	DefenderRoll               int
-	AttackerHitModifier        int
-	DefenderHitModifier        int
-	IgnoreHitsToAttacker       bool
-	IgnoreHitsToDefender       bool
-	DefenderAmbushed           bool
-	AttackerCounterAmbush      bool
-	AttackerUsedArmorers       bool
-	DefenderUsedArmorers       bool
-	AttackerUsedBrutalTactics  bool
-	DefenderUsedSappers        bool
-	AmbushHitsToAttacker       int
-	AttackerLosses             int
-	DefenderLosses             int
-	UseAlliedFaction           bool
-	AlliedFaction              Faction
-	AlliedWarriorLosses        int
-	AttackerDamagedItemIndexes []int
-	DefenderDamagedItemIndexes []int
-	AttackerPieceLosses        []BattlePieceLoss
-	DefenderPieceLosses        []BattlePieceLoss
-	SourceEffectID             string
+	Faction                     Faction
+	ClearingID                  int
+	TargetFaction               Faction
+	DecreeCardID                CardID
+	AttackerRoll                int
+	DefenderRoll                int
+	AttackerHitModifier         int
+	DefenderHitModifier         int
+	IgnoreHitsToAttacker        bool
+	IgnoreHitsToDefender        bool
+	DefenderAmbushed            bool
+	DefenderAmbushCardID        CardID
+	AttackerCounterAmbush       bool
+	AttackerCounterAmbushCardID CardID
+	AttackerUsedArmorers        bool
+	DefenderUsedArmorers        bool
+	AttackerUsedBrutalTactics   bool
+	DefenderUsedSappers         bool
+	AmbushHitsToAttacker        int
+	AttackerLosses              int
+	DefenderLosses              int
+	UseAlliedFaction            bool
+	AlliedFaction               Faction
+	AlliedWarriorLosses         int
+	AttackerDamagedItemIndexes  []int
+	DefenderDamagedItemIndexes  []int
+	AttackerPieceLosses         []BattlePieceLoss
+	DefenderPieceLosses         []BattlePieceLoss
+	SourceEffectID              string
 }
 
 type BuildAction struct {

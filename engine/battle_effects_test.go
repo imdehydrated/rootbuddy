@@ -45,6 +45,99 @@ func TestResolveBattleWithModifiersDefenderAmbushCanEndBattle(t *testing.T) {
 	}
 }
 
+func TestResolveBattleWithModifiersRequiresAmbushCardChoiceWhenMultipleAreLegal(t *testing.T) {
+	state := game.GameState{
+		PlayerFaction: game.Eyrie,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 2,
+						game.Eyrie:    2,
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{
+				{ID: 12, Kind: game.AmbushCard, Suit: game.Bird},
+				{ID: 13, Kind: game.AmbushCard, Suit: game.Bird},
+			},
+		},
+	}
+
+	unselected := ResolveBattleWithModifiers(state, game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Eyrie,
+		},
+	}, 1, 1, game.BattleModifiers{DefenderAmbush: true})
+	if unselected.BattleResolution == nil || unselected.BattleResolution.DefenderAmbushed {
+		t.Fatalf("expected ambiguous ambush without a card ID to be ignored, got %+v", unselected.BattleResolution)
+	}
+
+	selected := ResolveBattleWithModifiers(state, game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Eyrie,
+		},
+	}, 1, 1, game.BattleModifiers{DefenderAmbush: true, DefenderAmbushCardID: 13})
+	if selected.BattleResolution == nil ||
+		!selected.BattleResolution.DefenderAmbushed ||
+		selected.BattleResolution.DefenderAmbushCardID != 13 {
+		t.Fatalf("expected selected ambush card ID to be recorded, got %+v", selected.BattleResolution)
+	}
+}
+
+func TestApplyBattleResolutionConsumesSelectedAmbushCard(t *testing.T) {
+	state := game.GameState{
+		PlayerFaction: game.Eyrie,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+						game.Eyrie:    2,
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{
+				{ID: 12, Kind: game.AmbushCard, Suit: game.Bird},
+				{ID: 13, Kind: game.AmbushCard, Suit: game.Bird},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:              game.Marquise,
+			ClearingID:           1,
+			TargetFaction:        game.Eyrie,
+			DefenderAmbushed:     true,
+			DefenderAmbushCardID: 13,
+			AttackerLosses:       1,
+			DefenderLosses:       0,
+		},
+	})
+
+	if len(next.Eyrie.CardsInHand) != 1 || next.Eyrie.CardsInHand[0].ID != 12 {
+		t.Fatalf("expected only selected ambush card to be consumed, got %+v", next.Eyrie.CardsInHand)
+	}
+	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 13 {
+		t.Fatalf("expected selected ambush card in discard, got %+v", next.DiscardPile)
+	}
+}
+
 func TestResolveBattleWithModifiersScoutingPartyPreventsAmbush(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

@@ -80,9 +80,11 @@ export type BattlePromptResponseDTO = {
 export type BattleResponseRequestDTO = {
   gameID: string;
   useAmbush?: boolean;
+  ambushCardID?: number;
   useDefenderArmorers?: boolean;
   useSappers?: boolean;
   useCounterAmbush?: boolean;
+  counterAmbushCardID?: number;
   useAttackerArmorers?: boolean;
   useBrutalTactics?: boolean;
 };

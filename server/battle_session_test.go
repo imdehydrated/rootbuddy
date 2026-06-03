@@ -90,6 +90,9 @@ func TestBattleSessionOpenRespondResolveAndBroadcastPrompt(t *testing.T) {
 	if !birdPrompt.Prompt.CanUseAmbush {
 		t.Fatalf("expected defender prompt to allow ambush, got %+v", birdPrompt.Prompt)
 	}
+	if len(birdPrompt.Prompt.AmbushCardIDs) != 1 || birdPrompt.Prompt.AmbushCardIDs[0] != 12 {
+		t.Fatalf("expected defender prompt to expose the legal ambush card ID, got %+v", birdPrompt.Prompt.AmbushCardIDs)
+	}
 	if birdPrompt.Prompt.BattleContext.CanAttackerCounterAmbush {
 		t.Fatalf("expected defender prompt to hide attacker counter-ambush availability, got %+v", birdPrompt.Prompt.BattleContext)
 	}
@@ -142,6 +145,9 @@ func TestBattleSessionOpenRespondResolveAndBroadcastPrompt(t *testing.T) {
 	}
 	if resolveResp.Action.BattleResolution == nil || !resolveResp.Action.BattleResolution.DefenderAmbushed {
 		t.Fatalf("expected stored defender ambush to be applied, got %+v", resolveResp.Action)
+	}
+	if resolveResp.Action.BattleResolution.DefenderAmbushCardID != 12 {
+		t.Fatalf("expected resolved battle to record defender ambush card ID, got %+v", resolveResp.Action.BattleResolution)
 	}
 
 	applyBody, _ := json.Marshal(ApplyActionRequest{
