@@ -21,9 +21,58 @@ func addVictoryPoints(state *game.GameState, faction game.Faction, points int) {
 	}
 
 	state.VictoryPoints[faction] += points
-	if state.VictoryPoints[faction] >= 30 {
-		setWinner(state, faction)
+}
+
+func victoryPointSnapshot(state game.GameState) map[game.Faction]int {
+	if state.VictoryPoints == nil {
+		return nil
 	}
+
+	snapshot := make(map[game.Faction]int, len(state.VictoryPoints))
+	for faction, points := range state.VictoryPoints {
+		snapshot[faction] = points
+	}
+	return snapshot
+}
+
+func resolveVictoryPointWin(state *game.GameState, before map[game.Faction]int) {
+	if state.GamePhase == game.LifecycleGameOver || state.VictoryPoints == nil {
+		return
+	}
+
+	winners := []game.Faction{}
+	for faction, points := range state.VictoryPoints {
+		if points < 30 {
+			continue
+		}
+		if before != nil && before[faction] >= 30 {
+			continue
+		}
+		winners = append(winners, faction)
+	}
+	if len(winners) == 0 {
+		return
+	}
+
+	setWinner(state, chooseVictoryPointWinner(*state, winners))
+}
+
+func chooseVictoryPointWinner(state game.GameState, winners []game.Faction) game.Faction {
+	for _, faction := range winners {
+		if faction == state.FactionTurn {
+			return faction
+		}
+	}
+
+	for _, faction := range effectiveTurnOrder(state) {
+		for _, winner := range winners {
+			if winner == faction {
+				return winner
+			}
+		}
+	}
+
+	return winners[0]
 }
 
 func scoreMarquiseBuilding(state *game.GameState, buildingType game.BuildingType, alreadyPlaced int) {

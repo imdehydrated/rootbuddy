@@ -620,6 +620,49 @@ func TestApplyActionBattleResolutionDespotDoesNotScoreBonusForWarriorsOnly(t *te
 	}
 }
 
+func TestApplyActionBattleResolutionResolvesSimultaneousThirtyPointWinAfterAllScoring(t *testing.T) {
+	state := game.GameState{
+		GamePhase:   game.LifecyclePlaying,
+		FactionTurn: game.Marquise,
+		TurnOrder:   []game.Faction{game.Marquise, game.Eyrie},
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 1,
+		},
+		VictoryPoints: map[game.Faction]int{
+			game.Marquise: 29,
+			game.Eyrie:    29,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:                   game.Marquise,
+			ClearingID:                1,
+			TargetFaction:             game.Eyrie,
+			AttackerUsedBrutalTactics: true,
+			DefenderLosses:            1,
+		},
+	})
+
+	if next.VictoryPoints[game.Marquise] != 30 || next.VictoryPoints[game.Eyrie] != 30 {
+		t.Fatalf("expected both factions to reach 30 in the same battle window, got %+v", next.VictoryPoints)
+	}
+	if next.GamePhase != game.LifecycleGameOver || next.Winner != game.Marquise {
+		t.Fatalf("expected current player to win simultaneous 30 VP window, got phase=%v winner=%v", next.GamePhase, next.Winner)
+	}
+}
+
 func TestApplyActionBattleResolutionUsesSelectedDefenderBuildingLoss(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

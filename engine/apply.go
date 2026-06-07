@@ -60,6 +60,7 @@ func ApplyAction(state game.GameState, action game.Action) game.GameState {
 func ApplyActionDetailed(state game.GameState, action game.Action) (game.GameState, *game.EffectResult) {
 	next := cloneState(state)
 	materializeAssistHandPlaceholders(&next)
+	victoryPointsBefore := victoryPointSnapshot(next)
 	var result *game.EffectResult
 
 	switch action.Type {
@@ -73,6 +74,11 @@ func ApplyActionDetailed(state game.GameState, action game.Action) (game.GameSta
 	}
 
 	pruneFieldHospitalsPending(&next)
+	resolveVictoryPointWin(&next, victoryPointsBefore)
+	if next.GamePhase == game.LifecycleGameOver {
+		return next, result
+	}
+
 	advanceTurnState(&next, action)
 	return next, result
 }

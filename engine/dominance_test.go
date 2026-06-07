@@ -437,7 +437,9 @@ func TestCoalitionSharesPartnerVictory(t *testing.T) {
 		},
 	}
 
+	before := victoryPointSnapshot(state)
 	addVictoryPoints(&state, game.Marquise, 1)
+	resolveVictoryPointWin(&state, before)
 
 	if state.GamePhase != game.LifecycleGameOver || state.Winner != game.Marquise {
 		t.Fatalf("expected coalition partner victory to end the game, got phase=%v winner=%v", state.GamePhase, state.Winner)
