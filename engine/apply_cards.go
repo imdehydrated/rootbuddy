@@ -1,6 +1,9 @@
 package engine
 
-import "github.com/imdehydrated/rootbuddy/game"
+import (
+	"github.com/imdehydrated/rootbuddy/game"
+	"github.com/imdehydrated/rootbuddy/rules"
+)
 
 func applyCraft(state *game.GameState, action game.Action) {
 	if action.Craft == nil {
@@ -8,6 +11,9 @@ func applyCraft(state *game.GameState, action game.Action) {
 	}
 
 	card, found := CardByID(action.Craft.CardID)
+	if found && !canApplyCraftRoute(*state, *action.Craft, card) {
+		return
+	}
 	if found && card.CraftedItem != nil {
 		ensureItemSupply(state)
 		if state.ItemSupply[*card.CraftedItem] <= 0 {
@@ -47,6 +53,63 @@ func applyCraft(state *game.GameState, action game.Action) {
 		state.TurnProgress.UsedWorkshopClearings,
 		action.Craft.UsedWorkshopClearings...,
 	)
+}
+
+func canApplyCraftRoute(state game.GameState, craft game.CraftAction, card game.Card) bool {
+	if !craftableCardKind(card.Kind) {
+		return false
+	}
+	if card.CraftingCost.Fox == 0 &&
+		card.CraftingCost.Rabbit == 0 &&
+		card.CraftingCost.Mouse == 0 &&
+		card.CraftingCost.Any == 0 {
+		return len(craft.UsedWorkshopClearings) == 0
+	}
+	if len(craft.UsedWorkshopClearings) == 0 {
+		return true
+	}
+
+	routes := rules.WorkshopIDRoutesForCost(card.CraftingCost, craftingPiecesBySuit(state, craft.Faction))
+	return rules.WorkshopRouteIsLegal(craft.UsedWorkshopClearings, routes)
+}
+
+func craftableCardKind(kind game.CardKind) bool {
+	return kind == game.ItemCard ||
+		kind == game.PersistentEffectCard ||
+		kind == game.OneTimeEffectCard
+}
+
+func craftingPiecesBySuit(state game.GameState, faction game.Faction) map[game.Suit][]int {
+	switch faction {
+	case game.Marquise:
+		return rules.UsableWorkshopClearingsBySuit(state)
+	case game.Eyrie:
+		return rules.UsableRoostClearingsBySuit(state)
+	case game.Alliance:
+		return rules.UsableAllianceBasesBySuit(state)
+	case game.Vagabond:
+		return vagabondCraftingPiecesBySuit(state)
+	default:
+		return nil
+	}
+}
+
+func vagabondCraftingPiecesBySuit(state game.GameState) map[game.Suit][]int {
+	if state.Vagabond.InForest {
+		return nil
+	}
+
+	clearing := findClearing(&state, state.Vagabond.ClearingID)
+	if clearing == nil {
+		return nil
+	}
+
+	hammers := len(vagabondItemIndexesByStatus(state, game.ItemHammer, game.ItemReady))
+	pieces := map[game.Suit][]int{}
+	for i := 0; i < hammers; i++ {
+		pieces[clearing.Suit] = append(pieces[clearing.Suit], clearing.ID)
+	}
+	return pieces
 }
 
 func applyBirdsongWood(state *game.GameState, action game.Action) {

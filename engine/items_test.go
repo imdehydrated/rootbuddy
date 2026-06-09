@@ -108,10 +108,16 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 	hammer := game.ItemHammer
 	sword := game.ItemSword
 	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{ID: 1, Suit: game.Fox},
+			},
+		},
 		ItemSupply: map[game.ItemType]int{
 			game.ItemSword: 1,
 		},
 		Vagabond: game.VagabondState{
+			ClearingID: 1,
 			CardsInHand: []game.Card{
 				{
 					ID:          33,
@@ -119,6 +125,7 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 				},
 			},
 			Items: []game.Item{
+				{Type: hammer, Status: game.ItemReady},
 				{Type: hammer, Status: game.ItemReady},
 			},
 		},
@@ -129,18 +136,18 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 		Craft: &game.CraftAction{
 			Faction:               game.Vagabond,
 			CardID:                33,
-			UsedWorkshopClearings: []int{1},
+			UsedWorkshopClearings: []int{1, 1},
 		},
 	})
 
 	if next.ItemSupply[game.ItemSword] != 0 {
 		t.Fatalf("expected sword supply to be deducted to 0, got %+v", next.ItemSupply)
 	}
-	if len(next.Vagabond.Items) != 2 || next.Vagabond.Items[1].Type != game.ItemSword {
+	if len(next.Vagabond.Items) != 3 || next.Vagabond.Items[2].Type != game.ItemSword {
 		t.Fatalf("expected crafted sword to be added to Vagabond items, got %+v", next.Vagabond.Items)
 	}
-	if next.Vagabond.Items[1].Zone != game.ItemZoneSatchel {
-		t.Fatalf("expected crafted sword to enter satchel, got %+v", next.Vagabond.Items[1])
+	if next.Vagabond.Items[2].Zone != game.ItemZoneSatchel {
+		t.Fatalf("expected crafted sword to enter satchel, got %+v", next.Vagabond.Items[2])
 	}
 	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 33 {
 		t.Fatalf("expected crafted card to be discarded, got %+v", next.DiscardPile)
@@ -150,6 +157,17 @@ func TestApplyCraftDeductsItemSupplyAndAddsVagabondItem(t *testing.T) {
 func TestApplyCraftDeductsItemSupplyAndAddsNonVagabondCraftedItem(t *testing.T) {
 	card := firstItemSupplyTestCard(t, game.ItemBoots)
 	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
 		ItemSupply: map[game.ItemType]int{
 			game.ItemBoots: 1,
 		},

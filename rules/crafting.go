@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"sort"
+	"strconv"
+
 	"github.com/imdehydrated/rootbuddy/carddata"
 	"github.com/imdehydrated/rootbuddy/game"
 )
@@ -31,7 +34,7 @@ func marquiseWorkshopCount(c game.Clearing) int {
 	return count
 }
 
-func usableWorkshopClearingsBySuit(state game.GameState) map[game.Suit][]int {
+func UsableWorkshopClearingsBySuit(state game.GameState) map[game.Suit][]int {
 	workshops := map[game.Suit][]int{}
 	for _, clearing := range state.Map.Clearings {
 		total := marquiseWorkshopCount(clearing)
@@ -53,65 +56,160 @@ func usableWorkshopClearingsBySuit(state game.GameState) map[game.Suit][]int {
 	return workshops
 }
 
-func workshopIDsForCost(cost game.CraftingCost, workshops map[game.Suit][]int) ([]int, bool) {
-	chosen := []int{}
-	remaining := map[game.Suit][]int{}
-
-	for suit, ids := range workshops {
-		copied := make([]int, len(ids))
-		copy(copied, ids)
-		remaining[suit] = copied
+func WorkshopIDRoutesForCost(cost game.CraftingCost, workshops map[game.Suit][]int) [][]int {
+	if cost.Fox < 0 || cost.Rabbit < 0 || cost.Mouse < 0 || cost.Any < 0 {
+		return nil
 	}
 
-	claimFromSuit := func(suit game.Suit) bool {
-		available := remaining[suit]
-		if len(available) == 0 {
-			return false
-		}
-
-		id := available[0]
-		remaining[suit] = available[1:]
-		chosen = append(chosen, id)
-		return true
+	states := []workshopRouteState{
+		{
+			route:     []int{},
+			remaining: cloneWorkshopMap(workshops),
+		},
 	}
 
-	claimAny := func() bool {
-		for _, suit := range []game.Suit{game.Fox, game.Rabbit, game.Mouse, game.Bird} {
-			available := remaining[suit]
-			if len(available) == 0 {
-				continue
+	for _, requirement := range []struct {
+		suit  game.Suit
+		count int
+	}{
+		{suit: game.Fox, count: cost.Fox},
+		{suit: game.Rabbit, count: cost.Rabbit},
+		{suit: game.Mouse, count: cost.Mouse},
+	} {
+		nextStates := []workshopRouteState{}
+		for _, state := range states {
+			for _, selected := range workshopIDCombinations(state.remaining[requirement.suit], requirement.count) {
+				nextRemaining := cloneWorkshopMap(state.remaining)
+				nextRemaining[requirement.suit] = removeWorkshopIDs(nextRemaining[requirement.suit], selected)
+				nextStates = append(nextStates, workshopRouteState{
+					route:     append(append([]int(nil), state.route...), selected...),
+					remaining: nextRemaining,
+				})
 			}
-
-			id := available[0]
-			remaining[suit] = available[1:]
-			chosen = append(chosen, id)
-			return true
 		}
+		if len(nextStates) == 0 {
+			return nil
+		}
+		states = nextStates
+	}
+
+	routes := [][]int{}
+	for _, state := range states {
+		availableAny := []int{}
+		for _, suit := range []game.Suit{game.Fox, game.Rabbit, game.Mouse, game.Bird} {
+			availableAny = append(availableAny, state.remaining[suit]...)
+		}
+		for _, selected := range workshopIDCombinations(availableAny, cost.Any) {
+			routes = append(routes, append(append([]int(nil), state.route...), selected...))
+		}
+	}
+
+	return uniqueWorkshopRoutes(routes)
+}
+
+type workshopRouteState struct {
+	route     []int
+	remaining map[game.Suit][]int
+}
+
+func cloneWorkshopMap(workshops map[game.Suit][]int) map[game.Suit][]int {
+	cloned := map[game.Suit][]int{}
+	for suit, ids := range workshops {
+		cloned[suit] = append([]int(nil), ids...)
+	}
+	return cloned
+}
+
+func workshopIDCombinations(ids []int, count int) [][]int {
+	if count < 0 || count > len(ids) {
+		return nil
+	}
+	if count == 0 {
+		return [][]int{{}}
+	}
+
+	combinations := [][]int{}
+	var choose func(start int, selected []int)
+	choose = func(start int, selected []int) {
+		if len(selected) == count {
+			combinations = append(combinations, append([]int(nil), selected...))
+			return
+		}
+		needed := count - len(selected)
+		for index := start; index <= len(ids)-needed; index++ {
+			choose(index+1, append(selected, ids[index]))
+		}
+	}
+	choose(0, nil)
+	return combinations
+}
+
+func removeWorkshopIDs(ids []int, selected []int) []int {
+	counts := map[int]int{}
+	for _, id := range selected {
+		counts[id]++
+	}
+
+	remaining := make([]int, 0, len(ids)-len(selected))
+	for _, id := range ids {
+		if counts[id] > 0 {
+			counts[id]--
+			continue
+		}
+		remaining = append(remaining, id)
+	}
+	return remaining
+}
+
+func uniqueWorkshopRoutes(routes [][]int) [][]int {
+	seen := map[string]bool{}
+	unique := make([][]int, 0, len(routes))
+	for _, route := range routes {
+		key := workshopRouteKey(route)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		unique = append(unique, route)
+	}
+	return unique
+}
+
+func workshopRouteKey(route []int) string {
+	canonical := append([]int(nil), route...)
+	sort.Ints(canonical)
+
+	key := ""
+	for _, id := range canonical {
+		key += strconv.Itoa(id) + ","
+	}
+	return key
+}
+
+func WorkshopRouteMatches(route []int, legal []int) bool {
+	if len(route) != len(legal) {
 		return false
 	}
+	routeKey := append([]int(nil), route...)
+	legalKey := append([]int(nil), legal...)
+	sort.Ints(routeKey)
+	sort.Ints(legalKey)
 
-	for i := 0; i < cost.Fox; i++ {
-		if !claimFromSuit(game.Fox) {
-			return nil, false
+	for index := range routeKey {
+		if routeKey[index] != legalKey[index] {
+			return false
 		}
 	}
-	for i := 0; i < cost.Rabbit; i++ {
-		if !claimFromSuit(game.Rabbit) {
-			return nil, false
-		}
-	}
-	for i := 0; i < cost.Mouse; i++ {
-		if !claimFromSuit(game.Mouse) {
-			return nil, false
-		}
-	}
-	for i := 0; i < cost.Any; i++ {
-		if !claimAny() {
-			return nil, false
-		}
-	}
+	return true
+}
 
-	return chosen, true
+func WorkshopRouteIsLegal(route []int, legalRoutes [][]int) bool {
+	for _, legal := range legalRoutes {
+		if WorkshopRouteMatches(route, legal) {
+			return true
+		}
+	}
+	return false
 }
 
 func itemCraftAvailable(state game.GameState, card game.Card) bool {
@@ -161,7 +259,7 @@ func ValidCraftActions(state game.GameState) []game.Action {
 		return actions
 	}
 
-	workshops := usableWorkshopClearingsBySuit(state)
+	workshops := UsableWorkshopClearingsBySuit(state)
 
 	for _, card := range state.Marquise.CardsInHand {
 		if !isCraftable(card.Kind) {
@@ -177,19 +275,21 @@ func ValidCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		usedWorkshopIDs, ok := workshopIDsForCost(card.CraftingCost, workshops)
-		if !ok {
+		routes := WorkshopIDRoutesForCost(card.CraftingCost, workshops)
+		if len(routes) == 0 {
 			continue
 		}
 
-		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
-			Type: game.ActionCraft,
-			Craft: &game.CraftAction{
-				Faction:               game.Marquise,
-				CardID:                card.ID,
-				UsedWorkshopClearings: usedWorkshopIDs,
-			},
-		}, card)...)
+		for _, route := range routes {
+			actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
+				Type: game.ActionCraft,
+				Craft: &game.CraftAction{
+					Faction:               game.Marquise,
+					CardID:                card.ID,
+					UsedWorkshopClearings: append([]int(nil), route...),
+				},
+			}, card)...)
+		}
 	}
 
 	return actions

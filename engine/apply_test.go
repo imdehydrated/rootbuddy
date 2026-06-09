@@ -868,6 +868,18 @@ func TestApplyActionBattleResolutionSpillsAttackerLossesIntoSelectedBuilding(t *
 
 func TestApplyActionCraft(t *testing.T) {
 	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
 		Marquise: game.MarquiseState{
 			CardsInHand: []game.Card{
 				{ID: 20, Name: "Crafted Card"},
@@ -913,6 +925,107 @@ func TestApplyActionCraft(t *testing.T) {
 	}
 	if len(state.TurnProgress.UsedWorkshopClearings) != 1 || state.TurnProgress.UsedWorkshopClearings[0] != 1 {
 		t.Fatalf("expected original used workshops to remain [1], got %+v", state.TurnProgress.UsedWorkshopClearings)
+	}
+}
+
+func TestApplyActionCraftAcceptsSelectedLegalRoute(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		ItemSupply: map[game.ItemType]int{
+			game.ItemBoots: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 24, Name: "A Visit to Friends"},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:               game.Marquise,
+			CardID:                24,
+			UsedWorkshopClearings: []int{2},
+		},
+	})
+
+	if hasCard(next.Marquise.CardsInHand, 24) {
+		t.Fatalf("expected legal alternate route to craft card")
+	}
+	if next.ItemSupply[game.ItemBoots] != 0 {
+		t.Fatalf("expected crafted boots to be deducted, got %+v", next.ItemSupply)
+	}
+	if next.VictoryPoints[game.Marquise] != 1 {
+		t.Fatalf("expected craft VP to be scored, got %+v", next.VictoryPoints)
+	}
+	if len(next.TurnProgress.UsedWorkshopClearings) != 1 || next.TurnProgress.UsedWorkshopClearings[0] != 2 {
+		t.Fatalf("expected selected route to be recorded, got %+v", next.TurnProgress.UsedWorkshopClearings)
+	}
+}
+
+func TestApplyActionCraftRejectsIllegalRoute(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Marquise, Type: game.Workshop},
+					},
+				},
+			},
+		},
+		ItemSupply: map[game.ItemType]int{
+			game.ItemBoots: 1,
+		},
+		VictoryPoints: map[game.Faction]int{},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{
+				{ID: 24, Name: "A Visit to Friends"},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionCraft,
+		Craft: &game.CraftAction{
+			Faction:               game.Marquise,
+			CardID:                24,
+			UsedWorkshopClearings: []int{1},
+		},
+	})
+
+	if !hasCard(next.Marquise.CardsInHand, 24) {
+		t.Fatalf("expected illegal route to leave card in hand")
+	}
+	if next.ItemSupply[game.ItemBoots] != 1 {
+		t.Fatalf("expected illegal route not to deduct item supply, got %+v", next.ItemSupply)
+	}
+	if next.VictoryPoints[game.Marquise] != 0 {
+		t.Fatalf("expected illegal route not to score VP, got %+v", next.VictoryPoints)
+	}
+	if len(next.TurnProgress.UsedWorkshopClearings) != 0 {
+		t.Fatalf("expected illegal route not to be recorded, got %+v", next.TurnProgress.UsedWorkshopClearings)
 	}
 }
 

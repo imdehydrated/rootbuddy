@@ -2,7 +2,7 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
-func usableAllianceBasesBySuit(state game.GameState) map[game.Suit][]int {
+func UsableAllianceBasesBySuit(state game.GameState) map[game.Suit][]int {
 	bases := map[game.Suit][]int{}
 	for _, clearing := range allianceBaseClearings(state) {
 		bases[clearing.Suit] = append(bases[clearing.Suit], clearing.ID)
@@ -17,7 +17,7 @@ func ValidAllianceCraftActions(state game.GameState) []game.Action {
 	}
 
 	actions := []game.Action{}
-	bases := usableAllianceBasesBySuit(state)
+	bases := UsableAllianceBasesBySuit(state)
 
 	for _, card := range state.Alliance.CardsInHand {
 		if !isCraftable(card.Kind) {
@@ -33,19 +33,21 @@ func ValidAllianceCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		usedBaseIDs, ok := workshopIDsForCost(card.CraftingCost, bases)
-		if !ok {
+		routes := WorkshopIDRoutesForCost(card.CraftingCost, bases)
+		if len(routes) == 0 {
 			continue
 		}
 
-		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
-			Type: game.ActionCraft,
-			Craft: &game.CraftAction{
-				Faction:               game.Alliance,
-				CardID:                card.ID,
-				UsedWorkshopClearings: usedBaseIDs,
-			},
-		}, card)...)
+		for _, route := range routes {
+			actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
+				Type: game.ActionCraft,
+				Craft: &game.CraftAction{
+					Faction:               game.Alliance,
+					CardID:                card.ID,
+					UsedWorkshopClearings: append([]int(nil), route...),
+				},
+			}, card)...)
+		}
 	}
 
 	return actions

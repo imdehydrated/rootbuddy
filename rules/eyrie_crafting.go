@@ -2,7 +2,7 @@ package rules
 
 import "github.com/imdehydrated/rootbuddy/game"
 
-func usableRoostClearingsBySuit(state game.GameState) map[game.Suit][]int {
+func UsableRoostClearingsBySuit(state game.GameState) map[game.Suit][]int {
 	roosts := map[game.Suit][]int{}
 	for _, clearing := range state.Map.Clearings {
 		total := roostCountInClearing(clearing)
@@ -29,7 +29,7 @@ func ValidEyrieCraftActions(state game.GameState) []game.Action {
 		return actions
 	}
 
-	roosts := usableRoostClearingsBySuit(state)
+	roosts := UsableRoostClearingsBySuit(state)
 
 	for _, card := range state.Eyrie.CardsInHand {
 		if !isCraftable(card.Kind) {
@@ -45,19 +45,21 @@ func ValidEyrieCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		usedRoostIDs, ok := workshopIDsForCost(card.CraftingCost, roosts)
-		if !ok {
+		routes := WorkshopIDRoutesForCost(card.CraftingCost, roosts)
+		if len(routes) == 0 {
 			continue
 		}
 
-		actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
-			Type: game.ActionCraft,
-			Craft: &game.CraftAction{
-				Faction:               game.Eyrie,
-				CardID:                card.ID,
-				UsedWorkshopClearings: usedRoostIDs,
-			},
-		}, card)...)
+		for _, route := range routes {
+			actions = append(actions, craftActionsWithVagabondDamageChoices(state, game.Action{
+				Type: game.ActionCraft,
+				Craft: &game.CraftAction{
+					Faction:               game.Eyrie,
+					CardID:                card.ID,
+					UsedWorkshopClearings: append([]int(nil), route...),
+				},
+			}, card)...)
+		}
 	}
 
 	return actions

@@ -33,19 +33,21 @@ func ValidVagabondCraftActions(state game.GameState) []game.Action {
 			continue
 		}
 
-		usedHammerSlots, ok := workshopIDsForCost(card.CraftingCost, workshops)
-		if !ok {
+		routes := WorkshopIDRoutesForCost(card.CraftingCost, workshops)
+		if len(routes) == 0 {
 			continue
 		}
 
-		actions = append(actions, game.Action{
-			Type: game.ActionCraft,
-			Craft: &game.CraftAction{
-				Faction:               game.Vagabond,
-				CardID:                card.ID,
-				UsedWorkshopClearings: usedHammerSlots,
-			},
-		})
+		for _, route := range routes {
+			actions = append(actions, game.Action{
+				Type: game.ActionCraft,
+				Craft: &game.CraftAction{
+					Faction:               game.Vagabond,
+					CardID:                card.ID,
+					UsedWorkshopClearings: append([]int(nil), route...),
+				},
+			})
+		}
 	}
 
 	return actions
