@@ -541,6 +541,9 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 	if action.BattleResolution == nil {
 		return
 	}
+	if action.BattleResolution.SourceEffectID == "command_warren" && !canUseCommandWarren(*state) {
+		return
+	}
 	if !game.AreEnemies(*state, action.BattleResolution.Faction, action.BattleResolution.TargetFaction) {
 		return
 	}

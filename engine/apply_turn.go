@@ -99,6 +99,12 @@ func advanceTurnState(state *game.GameState, action game.Action) {
 			markResolvedDecreeCard(state, action.Movement.DecreeCardID)
 		}
 	case game.ActionBattleResolution, game.ActionBuild, game.ActionOverwork:
+		if action.Type == game.ActionBattleResolution &&
+			action.BattleResolution != nil &&
+			action.BattleResolution.SourceEffectID == "command_warren" &&
+			!canUseCommandWarren(*state) {
+			return
+		}
 		if (action.Type == game.ActionBattleResolution && action.BattleResolution != nil && action.BattleResolution.Faction == game.Marquise && action.BattleResolution.SourceEffectID == "") ||
 			(action.Type == game.ActionBuild && action.Build != nil && action.Build.Faction == game.Marquise) ||
 			action.Type == game.ActionOverwork {

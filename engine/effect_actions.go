@@ -71,9 +71,7 @@ func daylightEffectActions(state game.GameState) []game.Action {
 	faction := state.FactionTurn
 	actions := []game.Action{}
 
-	if !state.TurnProgress.DaylightMainActionTaken &&
-		hasPersistentEffect(state, faction, "command_warren") &&
-		!persistentEffectUsedThisTurn(state, "command_warren") {
+	if canUseCommandWarren(state) {
 		for _, action := range commandWarrenBattles(state) {
 			actions = append(actions, action)
 		}
@@ -93,6 +91,20 @@ func daylightEffectActions(state game.GameState) []game.Action {
 	}
 
 	return actions
+}
+
+func canUseCommandWarren(state game.GameState) bool {
+	if state.CurrentPhase != game.Daylight {
+		return false
+	}
+	if effectiveStep(state) != game.DaylightEntryStep(state.FactionTurn) {
+		return false
+	}
+	if state.TurnProgress.DaylightMainActionTaken || state.TurnProgress.HasCrafted {
+		return false
+	}
+	return hasPersistentEffect(state, state.FactionTurn, "command_warren") &&
+		!persistentEffectUsedThisTurn(state, "command_warren")
 }
 
 func eveningEffectActions(state game.GameState) []game.Action {

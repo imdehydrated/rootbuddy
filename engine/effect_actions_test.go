@@ -85,7 +85,7 @@ func TestValidActionsIncludesCommandWarrenBattle(t *testing.T) {
 		},
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Daylight,
-		CurrentStep:  game.StepDaylightActions,
+		CurrentStep:  game.StepDaylightCraft,
 		PersistentEffects: map[game.Faction][]game.CardID{
 			game.Marquise: {19},
 		},
@@ -106,6 +106,103 @@ func TestValidActionsIncludesCommandWarrenBattle(t *testing.T) {
 	}
 }
 
+func TestValidActionsExcludesCommandWarrenAfterCraftWindow(t *testing.T) {
+	tests := []struct {
+		name         string
+		currentStep  game.TurnStep
+		turnProgress game.TurnProgress
+	}{
+		{
+			name:        "after crafting",
+			currentStep: game.StepDaylightCraft,
+			turnProgress: game.TurnProgress{
+				HasCrafted: true,
+			},
+		},
+		{
+			name:        "after passing craft step",
+			currentStep: game.StepDaylightActions,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := game.GameState{
+				Map: game.Map{
+					Clearings: []game.Clearing{
+						{
+							ID:   1,
+							Suit: game.Rabbit,
+							Warriors: map[game.Faction]int{
+								game.Marquise: 1,
+								game.Eyrie:    1,
+							},
+						},
+					},
+				},
+				FactionTurn:  game.Marquise,
+				CurrentPhase: game.Daylight,
+				CurrentStep:  tt.currentStep,
+				TurnProgress: tt.turnProgress,
+				PersistentEffects: map[game.Faction][]game.CardID{
+					game.Marquise: {19},
+				},
+			}
+
+			unwant := game.Action{
+				Type: game.ActionBattle,
+				Battle: &game.BattleAction{
+					Faction:        game.Marquise,
+					ClearingID:     1,
+					TargetFaction:  game.Eyrie,
+					SourceEffectID: "command_warren",
+				},
+			}
+
+			if containsAction(ValidActions(state), unwant) {
+				t.Fatalf("expected Command Warren battle to be unavailable, got %+v", ValidActions(state))
+			}
+		})
+	}
+}
+
+func TestValidActionsIncludesAllianceCommandWarrenAtDaylightEntry(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Warriors: map[game.Faction]int{
+						game.Alliance: 1,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Alliance,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Alliance: {19},
+		},
+	}
+
+	want := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:        game.Alliance,
+			ClearingID:     1,
+			TargetFaction:  game.Eyrie,
+			SourceEffectID: "command_warren",
+		},
+	}
+
+	if !containsAction(ValidActions(state), want) {
+		t.Fatalf("expected Alliance Command Warren battle at Daylight entry, got %+v", ValidActions(state))
+	}
+}
+
 func TestApplyCommandWarrenBattleDoesNotSpendNormalAction(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{
@@ -122,7 +219,7 @@ func TestApplyCommandWarrenBattleDoesNotSpendNormalAction(t *testing.T) {
 		},
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Daylight,
-		CurrentStep:  game.StepDaylightActions,
+		CurrentStep:  game.StepDaylightCraft,
 		PersistentEffects: map[game.Faction][]game.CardID{
 			game.Marquise: {19},
 		},
@@ -146,6 +243,50 @@ func TestApplyCommandWarrenBattleDoesNotSpendNormalAction(t *testing.T) {
 	}
 	if !reflect.DeepEqual(next.TurnProgress.UsedPersistentEffectIDs, []string{"command_warren"}) {
 		t.Fatalf("expected Command Warren to be marked used, got %+v", next.TurnProgress.UsedPersistentEffectIDs)
+	}
+}
+
+func TestApplyCommandWarrenBattleRejectsAfterCraft(t *testing.T) {
+	state := game.GameState{
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Rabbit,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    1,
+					},
+				},
+			},
+		},
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightCraft,
+		TurnProgress: game.TurnProgress{
+			HasCrafted: true,
+		},
+		PersistentEffects: map[game.Faction][]game.CardID{
+			game.Marquise: {19},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Eyrie,
+			DefenderLosses: 1,
+			SourceEffectID: "command_warren",
+		},
+	})
+
+	if next.Map.Clearings[0].Warriors[game.Eyrie] != 1 {
+		t.Fatalf("expected rejected Command Warren to leave defender warrior, got %+v", next.Map.Clearings[0].Warriors)
+	}
+	if len(next.TurnProgress.UsedPersistentEffectIDs) != 0 {
+		t.Fatalf("expected rejected Command Warren not to be marked used, got %+v", next.TurnProgress.UsedPersistentEffectIDs)
 	}
 }
 
