@@ -74,6 +74,7 @@ export const sampleState: GameState = {
   hiddenCards: [],
   nextHiddenCardID: 1,
   pendingFieldHospitals: [],
+  pendingOutrage: [],
   victoryPoints: {
     "0": 7,
     "1": 4,

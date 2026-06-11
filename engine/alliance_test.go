@@ -797,6 +797,163 @@ func TestApplyMovementIntoSympathyDrawsSupporterWhenNoMatchingCard(t *testing.T)
 	}
 }
 
+func TestApplyMovementIntoSympathyQueuesOutrageForHiddenAssistHand(t *testing.T) {
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Alliance,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Adj:  []int{2},
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Adj:  []int{1},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+		Deck: []game.CardID{rabbitCard.ID},
+		OtherHandCounts: map[game.Faction]int{
+			game.Marquise: 1,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionMovement,
+		Movement: &game.MovementAction{
+			Faction:  game.Marquise,
+			Count:    1,
+			MaxCount: 1,
+			From:     1,
+			To:       2,
+		},
+	})
+
+	if len(next.PendingOutrage) != 1 || next.PendingOutrage[0].Faction != game.Marquise || next.PendingOutrage[0].Suit != game.Rabbit {
+		t.Fatalf("expected pending Marquise rabbit Outrage, got %+v", next.PendingOutrage)
+	}
+	if len(next.Alliance.Supporters) != 0 {
+		t.Fatalf("expected no auto supporter before Outrage is resolved, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.Deck) != 1 || next.Deck[0] != rabbitCard.ID {
+		t.Fatalf("expected no fallback draw before Outrage is resolved, got deck %+v", next.Deck)
+	}
+	if hiddenCardCount(next, game.Marquise, game.HiddenCardZoneHand) != 1 {
+		t.Fatalf("expected hidden Marquise hand placeholder to remain, got %+v", next.HiddenCards)
+	}
+}
+
+func TestApplyResolveOutrageRevealedHiddenCardBecomesSupporter(t *testing.T) {
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Alliance,
+		PendingOutrage: []game.OutragePending{
+			{Faction: game.Marquise, Suit: game.Rabbit},
+		},
+		OtherHandCounts: map[game.Faction]int{
+			game.Marquise: 1,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionResolveOutrage,
+		ResolveOutrage: &game.ResolveOutrageAction{
+			Faction: game.Marquise,
+			Suit:    game.Rabbit,
+			CardID:  rabbitCard.ID,
+		},
+	})
+
+	if len(next.PendingOutrage) != 0 {
+		t.Fatalf("expected Outrage pending queue to clear, got %+v", next.PendingOutrage)
+	}
+	if hiddenCardCount(next, game.Marquise, game.HiddenCardZoneHand) != 0 || next.OtherHandCounts[game.Marquise] != 0 {
+		t.Fatalf("expected revealed hidden hand card to be consumed, hidden=%+v counts=%+v", next.HiddenCards, next.OtherHandCounts)
+	}
+	if len(next.Alliance.Supporters) != 1 || next.Alliance.Supporters[0].ID != rabbitCard.ID {
+		t.Fatalf("expected revealed card to become supporter, got %+v", next.Alliance.Supporters)
+	}
+}
+
+func TestValidActionsReturnsPendingOutrageResolution(t *testing.T) {
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Alliance,
+		FactionTurn:   game.Marquise,
+		PendingOutrage: []game.OutragePending{
+			{Faction: game.Marquise, Suit: game.Rabbit},
+		},
+		OtherHandCounts: map[game.Faction]int{
+			game.Marquise: 1,
+		},
+	}
+
+	want := game.Action{
+		Type: game.ActionResolveOutrage,
+		ResolveOutrage: &game.ResolveOutrageAction{
+			Faction:       game.Marquise,
+			Suit:          game.Rabbit,
+			DrawSupporter: true,
+		},
+	}
+
+	got := ValidActions(state)
+	if len(got) != 1 || !containsAction(got, want) {
+		t.Fatalf("expected only pending Outrage resolution, got %+v", got)
+	}
+}
+
+func TestApplyResolveOutrageNoMatchDrawsSupporter(t *testing.T) {
+	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
+
+	state := game.GameState{
+		GameMode:      game.GameModeAssist,
+		PlayerFaction: game.Alliance,
+		Deck:          []game.CardID{rabbitCard.ID},
+		PendingOutrage: []game.OutragePending{
+			{Faction: game.Marquise, Suit: game.Rabbit},
+		},
+		OtherHandCounts: map[game.Faction]int{
+			game.Marquise: 1,
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionResolveOutrage,
+		ResolveOutrage: &game.ResolveOutrageAction{
+			Faction:       game.Marquise,
+			Suit:          game.Rabbit,
+			DrawSupporter: true,
+		},
+	})
+
+	if len(next.PendingOutrage) != 0 {
+		t.Fatalf("expected Outrage pending queue to clear, got %+v", next.PendingOutrage)
+	}
+	if hiddenCardCount(next, game.Marquise, game.HiddenCardZoneHand) != 1 {
+		t.Fatalf("expected no-match reveal to leave hidden hand count unchanged, got %+v", next.HiddenCards)
+	}
+	if len(next.Alliance.Supporters) != 1 || next.Alliance.Supporters[0].ID != rabbitCard.ID {
+		t.Fatalf("expected fallback draw to add supporter, got %+v", next.Alliance.Supporters)
+	}
+	if len(next.Deck) != 0 {
+		t.Fatalf("expected fallback draw to consume deck card, got %+v", next.Deck)
+	}
+}
+
 func TestApplyMovementIntoSympathyDiscardsSupporterWhenStackIsCapped(t *testing.T) {
 	rabbitCard := firstAllianceTestCard(t, game.Rabbit)
 	foxCard := firstAllianceTestCard(t, game.Fox)

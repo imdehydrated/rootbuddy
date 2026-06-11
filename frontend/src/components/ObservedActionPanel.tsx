@@ -28,6 +28,7 @@ export type ObservedTemplateKey =
   | "evening_discard"
   | "other_player_draw"
   | "other_player_play"
+  | "resolve_outrage"
   | "activate_dominance"
   | "take_dominance";
 
@@ -59,6 +60,7 @@ type ObservedFormState = {
   defenderUsedArmorers: boolean;
   attackerUsedBrutalTactics: boolean;
   defenderUsedSappers: boolean;
+  outrageDrawSupporter: boolean;
 };
 
 type ObservedIssue = {
@@ -80,6 +82,7 @@ const templateLabels: Record<ObservedTemplateKey, string> = {
   evening_discard: "Evening Discard",
   other_player_draw: "Other Player Draw",
   other_player_play: "Other Player Play",
+  resolve_outrage: "Resolve Outrage",
   activate_dominance: "Activate Dominance",
   take_dominance: "Take Dominance"
 };
@@ -92,13 +95,13 @@ function parseNumber(value: string, fallback = 0): number {
 function templatesForFaction(faction: number): ObservedTemplateKey[] {
   switch (faction) {
     case 0:
-      return ["battle_resolution", "craft", "overwork", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "craft", "overwork", "evening_discard", "other_player_draw", "other_player_play", "resolve_outrage", "pass_phase", "activate_dominance", "take_dominance"];
     case 1:
       return ["battle_resolution", "spread_sympathy", "revolt", "mobilize", "train", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
     case 2:
-      return ["battle_resolution", "add_to_decree", "craft", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "add_to_decree", "craft", "evening_discard", "other_player_draw", "other_player_play", "resolve_outrage", "pass_phase", "activate_dominance", "take_dominance"];
     case 3:
-      return ["battle_resolution", "aid", "craft", "evening_discard", "other_player_draw", "other_player_play", "pass_phase", "activate_dominance", "take_dominance"];
+      return ["battle_resolution", "aid", "craft", "evening_discard", "other_player_draw", "other_player_play", "resolve_outrage", "pass_phase", "activate_dominance", "take_dominance"];
     default:
       return ["battle_resolution", "other_player_draw", "other_player_play", "pass_phase"];
   }
@@ -109,11 +112,12 @@ function availableTargetFactions(actorFaction: number): number[] {
 }
 
 function initialFormState(state: GameState): ObservedFormState {
-  const actorFaction = state.factionTurn;
+  const pendingOutrage = state.pendingOutrage?.[0] ?? null;
+  const actorFaction = pendingOutrage?.faction ?? state.factionTurn;
   const targetFaction = availableTargetFactions(actorFaction)[0] ?? state.playerFaction;
   return {
     actorFaction,
-    template: templatesForFaction(actorFaction)[0],
+    template: pendingOutrage ? "resolve_outrage" : templatesForFaction(actorFaction)[0],
     cardID: "24",
     itemIndex: "0",
     count: "1",
@@ -125,7 +129,7 @@ function initialFormState(state: GameState): ObservedFormState {
     defenderLosses: "0",
     decreeCardID: "0",
     sourceEffectID: "",
-    baseSuit: 0,
+    baseSuit: pendingOutrage?.suit ?? 0,
     spentCardID: "24",
     dominanceCardID: "14",
     usedWorkshopClearings: [],
@@ -138,7 +142,8 @@ function initialFormState(state: GameState): ObservedFormState {
     attackerUsedArmorers: false,
     defenderUsedArmorers: false,
     attackerUsedBrutalTactics: false,
-    defenderUsedSappers: false
+    defenderUsedSappers: false,
+    outrageDrawSupporter: false
   };
 }
 
@@ -286,6 +291,16 @@ function buildObservedAction(form: ObservedFormState): Action {
           cardID: parseNumber(form.cardID)
         }
       };
+    case "resolve_outrage":
+      return {
+        type: ACTION_TYPE.RESOLVE_OUTRAGE,
+        resolveOutrage: {
+          faction,
+          suit: form.baseSuit,
+          cardID: form.outrageDrawSupporter ? 0 : parseNumber(form.cardID),
+          drawSupporter: form.outrageDrawSupporter
+        }
+      };
     case "activate_dominance":
       return {
         type: 30,
@@ -342,6 +357,8 @@ function templateHint(template: ObservedTemplateKey): string {
       return "Use for hidden draws when only the count is known.";
     case "other_player_play":
       return "Use for hidden plays/discards when you know the card ID that left hand.";
+    case "resolve_outrage":
+      return "Use when Outrage requires a non-Alliance player to reveal a matching or bird card, or when they reveal no matching card and the Alliance draws.";
     case "activate_dominance":
       return "Use when a faction revealed and activated a dominance card.";
     case "take_dominance":
@@ -416,6 +433,13 @@ function observedFormIssues(form: ObservedFormState): ObservedIssue[] {
     }
   }
 
+  if (form.template === "resolve_outrage" && !form.outrageDrawSupporter) {
+    const cardIssue = integerFieldIssue("Revealed card", form.cardID, 1);
+    if (cardIssue) {
+      issues.push(cardIssue);
+    }
+  }
+
   return issues;
 }
 
@@ -438,7 +462,7 @@ export function ObservedActionPanel({
 
   useEffect(() => {
     setForm(initialFormState(state));
-  }, [state.factionTurn, state.playerFaction, state.map.clearings]);
+  }, [state.factionTurn, state.playerFaction, state.map.clearings, state.pendingOutrage]);
 
   useEffect(() => {
     if (preferredActorFaction === null) {
@@ -525,6 +549,9 @@ export function ObservedActionPanel({
     form.template === "take_dominance" && enteredSpentCardID > 0
       ? { label: "Spent Card", items: [previewCardLabel(enteredSpentCardID)] }
       : null,
+    form.template === "resolve_outrage" && !form.outrageDrawSupporter && enteredCardID > 0
+      ? { label: "Revealed Card", items: [previewCardLabel(enteredCardID)] }
+      : null,
     form.template === "craft" && enteredWorkshopClearings.length > 0
       ? { label: "Workshops", items: enteredWorkshopClearings.map((clearingID) => `Clearing ${clearingID}`) }
       : null,
@@ -608,6 +635,7 @@ export function ObservedActionPanel({
           form.template === "mobilize" ||
           form.template === "train" ||
           form.template === "aid" ||
+          (form.template === "resolve_outrage" && !form.outrageDrawSupporter) ||
           form.template === "other_player_play") ? (
           <label>
             <span>Card</span>
@@ -694,9 +722,9 @@ export function ObservedActionPanel({
           </>
         ) : null}
 
-        {form.template === "revolt" ? (
+        {(form.template === "revolt" || form.template === "resolve_outrage") ? (
           <label>
-            <span>Base Suit</span>
+            <span>{form.template === "resolve_outrage" ? "Outrage Suit" : "Base Suit"}</span>
             <select value={form.baseSuit} onChange={(event) => updateForm("baseSuit", Number(event.target.value))}>
               {suitLabels.slice(0, 3).map((label, index) => (
                 <option key={label} value={index}>
@@ -704,6 +732,17 @@ export function ObservedActionPanel({
                 </option>
               ))}
             </select>
+          </label>
+        ) : null}
+
+        {form.template === "resolve_outrage" ? (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={form.outrageDrawSupporter}
+              onChange={(event) => updateForm("outrageDrawSupporter", event.target.checked)}
+            />
+            <span>No matching card revealed</span>
           </label>
         ) : null}
 

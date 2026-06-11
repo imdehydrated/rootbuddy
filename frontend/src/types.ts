@@ -47,6 +47,11 @@ export interface FieldHospitalsPending {
   warriorCount: number;
 }
 
+export interface OutragePending {
+  faction: number;
+  suit: number;
+}
+
 export type HighlightedClearing = {
   clearingID: number;
   role: "source" | "target" | "affected";
@@ -150,6 +155,7 @@ export interface GameState {
   hiddenCards: HiddenCard[];
   nextHiddenCardID: number;
   pendingFieldHospitals: FieldHospitalsPending[];
+  pendingOutrage: OutragePending[];
   marquise: {
     cardsInHand: Card[];
     warriorSupply: number;
@@ -508,6 +514,12 @@ export interface Action {
   marquiseExtraAction?: {
     faction: number;
     cardID: number;
+  } | null;
+  resolveOutrage?: {
+    faction: number;
+    suit: number;
+    cardID: number;
+    drawSupporter: boolean;
   } | null;
 }
 

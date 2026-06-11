@@ -611,7 +611,7 @@ export function AssistWorkflowPanel({
           state={state}
           onApply={onApply}
           embedded
-          preferredActorFaction={state.factionTurn}
+          preferredActorFaction={state.pendingOutrage?.[0]?.faction ?? state.factionTurn}
           preferredTemplate={preferredTemplate}
         />
       </div>

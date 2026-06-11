@@ -47,6 +47,7 @@ type GameState struct {
 	HiddenCards           []HiddenCard
 	NextHiddenCardID      int
 	PendingFieldHospitals []FieldHospitalsPending
+	PendingOutrage        []OutragePending
 	Marquise              MarquiseState
 	Eyrie                 EyrieState
 	Alliance              AllianceState

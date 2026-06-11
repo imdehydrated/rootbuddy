@@ -21,6 +21,9 @@ func ValidActions(state game.GameState) []game.Action {
 	if len(state.PendingFieldHospitals) > 0 {
 		return validFieldHospitalsActions(state)
 	}
+	if len(state.PendingOutrage) > 0 {
+		return validOutrageActions(state)
+	}
 
 	switch state.FactionTurn {
 	case game.Marquise:

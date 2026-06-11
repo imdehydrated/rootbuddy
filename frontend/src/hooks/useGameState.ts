@@ -61,6 +61,7 @@ export function normalizeState(nextState: GameState): GameState {
   normalized.hiddenCards ??= [];
   normalized.nextHiddenCardID ??= 1;
   normalized.pendingFieldHospitals ??= [];
+  normalized.pendingOutrage ??= [];
   normalized.marquise.cardsInHand ??= [];
   normalized.eyrie.cardsInHand ??= [];
   normalized.eyrie.availableLeaders ??= [];

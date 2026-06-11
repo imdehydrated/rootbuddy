@@ -286,6 +286,16 @@ func validateApplyActionRequest(req ApplyActionRequest) string {
 		if !req.Action.FieldHospitals.Decline && req.Action.FieldHospitals.CardID <= 0 {
 			return "field hospitals action must spend a card or decline"
 		}
+	case game.ActionResolveOutrage:
+		if req.Action.ResolveOutrage == nil {
+			return "resolve outrage payload is required"
+		}
+		if req.Action.ResolveOutrage.Faction == game.Alliance {
+			return "outrage must be resolved for a non-Alliance faction"
+		}
+		if !req.Action.ResolveOutrage.DrawSupporter && req.Action.ResolveOutrage.CardID <= 0 {
+			return "outrage resolution must reveal a card or draw a supporter"
+		}
 	case game.ActionMarquiseExtraAction:
 		if req.Action.MarquiseExtraAction == nil {
 			return "marquise extra action payload is required"

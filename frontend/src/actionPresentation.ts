@@ -151,6 +151,8 @@ export function actionHeadline(action: Action): string {
       return "Overwork";
     case ACTION_TYPE.FIELD_HOSPITALS:
       return "Field Hospitals";
+    case ACTION_TYPE.RESOLVE_OUTRAGE:
+      return "Resolve Outrage";
     case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
       return "Extra Action";
     case ACTION_TYPE.ACTIVATE_DOMINANCE:
@@ -205,6 +207,8 @@ export function actionCardReferences(action: Action): ActionCardReference[] {
       return (action.eveningDiscard?.cardIDs ?? []).map((cardID) => ({ cardID, zoneLabel: "Hand" }));
     case ACTION_TYPE.FIELD_HOSPITALS:
       return action.fieldHospitals?.cardID ? [{ cardID: action.fieldHospitals.cardID, zoneLabel: "Hand" }] : [];
+    case ACTION_TYPE.RESOLVE_OUTRAGE:
+      return action.resolveOutrage?.cardID ? [{ cardID: action.resolveOutrage.cardID, zoneLabel: "Revealed" }] : [];
     case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
       return action.marquiseExtraAction?.cardID ? [{ cardID: action.marquiseExtraAction.cardID, zoneLabel: "Hand" }] : [];
     case ACTION_TYPE.VAGABOND_DAY_LABOR:
@@ -244,6 +248,8 @@ export function actionContextTags(action: Action): string[] {
       return [`Count ${action.otherPlayerDraw?.count ?? 0}`];
     case ACTION_TYPE.FIELD_HOSPITALS:
       return [`Clearing ${action.fieldHospitals?.clearingID ?? "?"}`];
+    case ACTION_TYPE.RESOLVE_OUTRAGE:
+      return [suitLabels[action.resolveOutrage?.suit ?? -1] ?? "Unknown suit"];
     default:
       return [];
   }
@@ -295,6 +301,11 @@ export function describeAction(action: Action, state?: GameState): string {
         return `Decline Field Hospitals for clearing ${action.fieldHospitals.clearingID}`;
       }
       return `Use Field Hospitals for clearing ${action.fieldHospitals?.clearingID ?? "?"} with ${describeKnownCardID(action.fieldHospitals?.cardID ?? 0)}`;
+    case ACTION_TYPE.RESOLVE_OUTRAGE:
+      if (action.resolveOutrage?.drawSupporter) {
+        return `Resolve Outrage: ${factionLabels[action.resolveOutrage.faction] ?? "Faction"} revealed no ${suitLabels[action.resolveOutrage.suit] ?? "matching"} or bird card`;
+      }
+      return `Resolve Outrage: ${factionLabels[action.resolveOutrage?.faction ?? -1] ?? "Faction"} revealed ${describeKnownCardID(action.resolveOutrage?.cardID ?? 0)}`;
     case ACTION_TYPE.MARQUISE_EXTRA_ACTION:
       return `Spend ${describeKnownCardID(action.marquiseExtraAction?.cardID ?? 0)} for an extra Marquise action`;
     case ACTION_TYPE.CRAFT:

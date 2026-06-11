@@ -209,6 +209,11 @@ func summarizeAction(action game.Action) string {
 			return fmt.Sprintf("Decline Field Hospitals for clearing %d", action.FieldHospitals.ClearingID)
 		}
 		return fmt.Sprintf("Use Field Hospitals for clearing %d with card %d", action.FieldHospitals.ClearingID, action.FieldHospitals.CardID)
+	case game.ActionResolveOutrage:
+		if action.ResolveOutrage.DrawSupporter {
+			return fmt.Sprintf("Resolve Outrage for %s with Alliance draw", factionLabel(action.ResolveOutrage.Faction))
+		}
+		return fmt.Sprintf("Resolve Outrage for %s with card %d", factionLabel(action.ResolveOutrage.Faction), action.ResolveOutrage.CardID)
 	case game.ActionMarquiseExtraAction:
 		return fmt.Sprintf("Spend bird card %d for an extra Marquise action", action.MarquiseExtraAction.CardID)
 	default:
@@ -330,6 +335,8 @@ func actionTypeLabel(actionType game.ActionType) string {
 		return "Use Persistent Effect"
 	case game.ActionFieldHospitals:
 		return "Field Hospitals"
+	case game.ActionResolveOutrage:
+		return "Resolve Outrage"
 	case game.ActionMarquiseExtraAction:
 		return "Marquise Extra Action"
 	default:

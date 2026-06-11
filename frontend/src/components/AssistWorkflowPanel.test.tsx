@@ -445,4 +445,63 @@ describe("AssistWorkflowPanel", () => {
     expect(screen.getByRole("heading", { name: /Observed Turn Tools/i })).toBeInTheDocument();
     expect(screen.getByText(/Use for hidden draws when only the count is known/i)).toBeInTheDocument();
   });
+
+  it("records a pending Outrage revealed-card resolution for the offending faction", async () => {
+    const onApply = vi.fn(async () => undefined);
+    const state = observedState({
+      playerFaction: 1,
+      factionTurn: 0,
+      pendingOutrage: [{ faction: 0, suit: 1 }]
+    });
+
+    renderPanel({ state, actions: [], onApply });
+
+    fireEvent.click(screen.getByRole("button", { name: /Resolve Outrage/i }));
+
+    expect(screen.getByRole("heading", { name: /Observed Turn Tools/i })).toBeInTheDocument();
+    expect(screen.getByText(/Outrage requires a non-Alliance player/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Outrage Suit/i)).toHaveValue("1");
+    expect(screen.getByLabelText(/^Card$/i)).toHaveValue("24");
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply Observed Action/i }));
+
+    await waitFor(() =>
+      expect(onApply).toHaveBeenCalledWith({
+        type: ACTION_TYPE.RESOLVE_OUTRAGE,
+        resolveOutrage: {
+          faction: 0,
+          suit: 1,
+          cardID: 24,
+          drawSupporter: false
+        }
+      })
+    );
+  });
+
+  it("records a pending Outrage no-match supporter draw", async () => {
+    const onApply = vi.fn(async () => undefined);
+    const state = observedState({
+      playerFaction: 1,
+      factionTurn: 0,
+      pendingOutrage: [{ faction: 0, suit: 2 }]
+    });
+
+    renderPanel({ state, actions: [], onApply });
+
+    fireEvent.click(screen.getByRole("button", { name: /Resolve Outrage/i }));
+    fireEvent.click(screen.getByLabelText(/No matching card revealed/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply Observed Action/i }));
+
+    await waitFor(() =>
+      expect(onApply).toHaveBeenCalledWith({
+        type: ACTION_TYPE.RESOLVE_OUTRAGE,
+        resolveOutrage: {
+          faction: 0,
+          suit: 2,
+          cardID: 0,
+          drawSupporter: true
+        }
+      })
+    );
+  });
 });

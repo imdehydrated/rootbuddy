@@ -7,6 +7,10 @@ export function observedPromptTemplates(state: GameState): Array<{ label: string
     { label: "Known Card Play", template: "other_player_play" }
   ];
 
+  if ((state.pendingOutrage ?? []).length > 0) {
+    prompts.unshift({ label: "Resolve Outrage", template: "resolve_outrage" });
+  }
+
   if (state.factionTurn === 2) {
     prompts.push({ label: "Decree Choice", template: "add_to_decree" });
   }

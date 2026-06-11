@@ -50,6 +50,7 @@ var applyActionHandlers = map[game.ActionType]actionHandler{
 	game.ActionVagabondItemCapacity: applyVagabondItemCapacity,
 	game.ActionFieldHospitals:       applyFieldHospitals,
 	game.ActionMarquiseExtraAction:  applyMarquiseExtraAction,
+	game.ActionResolveOutrage:       applyResolveOutrage,
 }
 
 func ApplyAction(state game.GameState, action game.Action) game.GameState {

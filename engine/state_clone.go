@@ -138,6 +138,11 @@ func cloneState(state game.GameState) game.GameState {
 		copy(next.PendingFieldHospitals, state.PendingFieldHospitals)
 	}
 
+	if state.PendingOutrage != nil {
+		next.PendingOutrage = make([]game.OutragePending, len(state.PendingOutrage))
+		copy(next.PendingOutrage, state.PendingOutrage)
+	}
+
 	if state.Marquise.CardsInHand != nil {
 		next.Marquise.CardsInHand = make([]game.Card, len(state.Marquise.CardsInHand))
 		copy(next.Marquise.CardsInHand, state.Marquise.CardsInHand)
@@ -339,6 +344,16 @@ func cardMatchesSuitOrBird(card game.Card, suit game.Suit) bool {
 
 func transferOutrageCard(state *game.GameState, faction game.Faction, suit game.Suit) {
 	if faction == game.Alliance {
+		return
+	}
+
+	if canUseObservedHiddenCards(*state, faction) {
+		materializeAssistHandPlaceholders(state)
+		if hiddenCardCount(*state, faction, game.HiddenCardZoneHand) > 0 {
+			queueOutrage(state, faction, suit)
+			return
+		}
+		drawAllianceSupporter(state)
 		return
 	}
 
