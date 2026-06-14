@@ -30,6 +30,7 @@ export const sampleState: GameState = {
   gameMode: 0,
   randomSeed: 0,
   shuffleCount: 0,
+  battleRollCount: 0,
   gamePhase: 1,
   setupStage: 4,
   playerFaction: 3,

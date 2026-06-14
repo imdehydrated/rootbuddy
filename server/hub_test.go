@@ -275,7 +275,7 @@ func resetRealtimeTestState(t *testing.T) func() {
 	globalHub = newHub()
 	actionLogs = newActionLogStore()
 	battleSessions = newBattleSessionStore()
-	battleRoller = func() (int, int, error) { return 1, 0, nil }
+	battleRoller = func(game.GameState) (int, int, error) { return 1, 0, nil }
 	multiplayerRandomSeedSource = defaultMultiplayerRandomSeed
 
 	return func() {

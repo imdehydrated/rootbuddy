@@ -263,7 +263,7 @@ func TestHandleBattleContextMultiplayerUsesAuthoritativeHiddenHands(t *testing.T
 			{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
 		}
 		state.OtherHandCounts = map[game.Faction]int{
-			game.Eyrie: 1,
+			game.Eyrie: 0,
 		}
 	})
 
@@ -335,7 +335,7 @@ func TestHandleResolveBattleMultiplayerIgnoresFalseHiddenAmbushClaim(t *testing.
 			{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
 		}
 		state.OtherHandCounts = map[game.Faction]int{
-			game.Eyrie: 1,
+			game.Eyrie: 0,
 		}
 	})
 

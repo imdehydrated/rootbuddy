@@ -576,6 +576,7 @@ func applyBattleResolution(state *game.GameState, action game.Action) {
 		return
 	}
 
+	state.BattleRollCount++
 	applyBattleCardSideEffects(state, action)
 
 	attackerSummary := battleRemovalSummary{}

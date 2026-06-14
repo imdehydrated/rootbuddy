@@ -129,6 +129,7 @@ export interface GameState {
   gameMode: number;
   randomSeed: number;
   shuffleCount: number;
+  battleRollCount: number;
   gamePhase: number;
   setupStage: number;
   playerFaction: number;

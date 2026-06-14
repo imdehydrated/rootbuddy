@@ -180,7 +180,7 @@ func TestBattleSessionAttackerResponseUsesServerOwnedRolls(t *testing.T) {
 	visible := redactStateForPlayer(record.State, game.Marquise)
 
 	previousRoller := battleRoller
-	battleRoller = func() (int, int, error) { return 3, 2, nil }
+	battleRoller = func(game.GameState) (int, int, error) { return 3, 2, nil }
 	defer func() {
 		battleRoller = previousRoller
 	}()
@@ -301,7 +301,7 @@ func TestHandleApplyActionMultiplayerRejectsTamperedResolvedBattleAction(t *test
 	visible := redactStateForPlayer(record.State, game.Marquise)
 
 	previousRoller := battleRoller
-	battleRoller = func() (int, int, error) { return 3, 2, nil }
+	battleRoller = func(game.GameState) (int, int, error) { return 3, 2, nil }
 	defer func() {
 		battleRoller = previousRoller
 	}()

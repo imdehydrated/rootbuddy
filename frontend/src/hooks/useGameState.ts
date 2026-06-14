@@ -40,6 +40,7 @@ export function normalizeState(nextState: GameState): GameState {
   const normalized = structuredClone(nextState);
   normalized.randomSeed ??= 0;
   normalized.shuffleCount ??= 0;
+  normalized.battleRollCount ??= 0;
   normalized.setupStage ??= 0;
   normalized.map.clearings ??= [];
   normalized.map.forests ??= [];

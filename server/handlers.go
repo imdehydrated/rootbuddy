@@ -331,7 +331,7 @@ func HandleResolveBattle(w http.ResponseWriter, r *http.Request) {
 			skipBattleRoll = battleAmbushEndsBeforeRoll(context.state, session)
 		}
 		if !rollsResolved && !skipBattleRoll {
-			rolledAttacker, rolledDefender, err := battleRoller()
+			rolledAttacker, rolledDefender, err := battleRoller(context.state)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, &ErrorResponse{
 					Error:    "failed to roll battle dice",
@@ -628,7 +628,7 @@ func advanceBattleSessionAfterResponses(gameID string, revision int64, state gam
 		return session, nil
 	}
 
-	attackerRoll, defenderRoll, err := battleRoller()
+	attackerRoll, defenderRoll, err := battleRoller(state)
 	if err != nil {
 		return battleSession{}, err
 	}

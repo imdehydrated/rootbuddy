@@ -21,6 +21,7 @@ type GameState struct {
 	TrackAllHands         bool `json:"-"`
 	RandomSeed            int64
 	ShuffleCount          int64
+	BattleRollCount       int64
 	GamePhase             GameLifecycle
 	SetupStage            SetupStage
 	PlayerFaction         Faction
