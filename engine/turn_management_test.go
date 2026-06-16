@@ -102,6 +102,7 @@ func TestApplyActionEveningDiscardAdvancesTurnOrderAndResetsProgress(t *testing.
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Evening,
 		CurrentStep:  game.StepEvening,
+		RoundNumber:  2,
 		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
 		TurnProgress: game.TurnProgress{
 			EveningDrawn: true,
@@ -131,6 +132,9 @@ func TestApplyActionEveningDiscardAdvancesTurnOrderAndResetsProgress(t *testing.
 
 	if next.FactionTurn != game.Eyrie {
 		t.Fatalf("expected discard to advance to Eyrie, got %v", next.FactionTurn)
+	}
+	if next.RoundNumber != 2 {
+		t.Fatalf("expected mid-round discard to keep round 2, got %d", next.RoundNumber)
 	}
 	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
 		t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
@@ -181,6 +185,7 @@ func TestApplyActionVagabondItemCapacityAdvancesTurnOrderAndResetsProgress(t *te
 		FactionTurn:  game.Vagabond,
 		CurrentPhase: game.Evening,
 		CurrentStep:  game.StepEvening,
+		RoundNumber:  2,
 		TurnOrder:    []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
 		TurnProgress: game.TurnProgress{
 			VagabondRestResolved:    true,
@@ -198,6 +203,9 @@ func TestApplyActionVagabondItemCapacityAdvancesTurnOrderAndResetsProgress(t *te
 
 	if next.FactionTurn != game.Marquise {
 		t.Fatalf("expected Vagabond capacity check to advance to Marquise, got %v", next.FactionTurn)
+	}
+	if next.RoundNumber != 3 {
+		t.Fatalf("expected Vagabond capacity check to advance to round 3, got %d", next.RoundNumber)
 	}
 	if next.CurrentPhase != game.Birdsong || next.CurrentStep != game.StepBirdsong {
 		t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", next.CurrentPhase, next.CurrentStep)
@@ -251,6 +259,7 @@ func TestApplyActionEveningDiscardUsesDefaultTurnOrderWhenUnset(t *testing.T) {
 		FactionTurn:  game.Marquise,
 		CurrentPhase: game.Evening,
 		CurrentStep:  game.StepEvening,
+		RoundNumber:  4,
 		TurnProgress: game.TurnProgress{
 			EveningDrawn: true,
 		},
@@ -268,8 +277,97 @@ func TestApplyActionEveningDiscardUsesDefaultTurnOrderWhenUnset(t *testing.T) {
 	if next.FactionTurn != game.Eyrie {
 		t.Fatalf("expected default turn order to advance marquise to eyrie, got %v", next.FactionTurn)
 	}
+	if next.RoundNumber != 4 {
+		t.Fatalf("expected default mid-round advance to keep round 4, got %d", next.RoundNumber)
+	}
 	if !reflect.DeepEqual(next.TurnOrder, defaultTurnOrder) {
 		t.Fatalf("expected default turn order to be stored, got %+v", next.TurnOrder)
+	}
+}
+
+func TestBeginNextFactionTurnIncrementsRoundOnlyOnWrap(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     game.GameState
+		wantTurn  game.Faction
+		wantRound int
+		wantOrder []game.Faction
+	}{
+		{
+			name: "middle of explicit order keeps round",
+			state: game.GameState{
+				FactionTurn: game.Marquise,
+				RoundNumber: 2,
+				TurnOrder:   []game.Faction{game.Marquise, game.Eyrie, game.Alliance},
+			},
+			wantTurn:  game.Eyrie,
+			wantRound: 2,
+			wantOrder: []game.Faction{game.Marquise, game.Eyrie, game.Alliance},
+		},
+		{
+			name: "last faction wraps to first and increments round",
+			state: game.GameState{
+				FactionTurn: game.Alliance,
+				RoundNumber: 2,
+				TurnOrder:   []game.Faction{game.Marquise, game.Eyrie, game.Alliance},
+			},
+			wantTurn:  game.Marquise,
+			wantRound: 3,
+			wantOrder: []game.Faction{game.Marquise, game.Eyrie, game.Alliance},
+		},
+		{
+			name: "custom order wrap increments round",
+			state: game.GameState{
+				FactionTurn: game.Eyrie,
+				RoundNumber: 5,
+				TurnOrder:   []game.Faction{game.Vagabond, game.Marquise, game.Eyrie},
+			},
+			wantTurn:  game.Vagabond,
+			wantRound: 6,
+			wantOrder: []game.Faction{game.Vagabond, game.Marquise, game.Eyrie},
+		},
+		{
+			name: "default fallback order stores order and increments on wrap",
+			state: game.GameState{
+				FactionTurn: game.Vagabond,
+				RoundNumber: 3,
+			},
+			wantTurn:  game.Marquise,
+			wantRound: 4,
+			wantOrder: defaultTurnOrder,
+		},
+		{
+			name: "uninitialized round becomes one on wrap",
+			state: game.GameState{
+				FactionTurn: game.Vagabond,
+				TurnOrder:   []game.Faction{game.Marquise, game.Vagabond},
+			},
+			wantTurn:  game.Marquise,
+			wantRound: 1,
+			wantOrder: []game.Faction{game.Marquise, game.Vagabond},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			beginNextFactionTurn(&tt.state)
+
+			if tt.state.FactionTurn != tt.wantTurn {
+				t.Fatalf("expected next faction %v, got %v", tt.wantTurn, tt.state.FactionTurn)
+			}
+			if tt.state.RoundNumber != tt.wantRound {
+				t.Fatalf("expected round %d, got %d", tt.wantRound, tt.state.RoundNumber)
+			}
+			if !reflect.DeepEqual(tt.state.TurnOrder, tt.wantOrder) {
+				t.Fatalf("expected turn order %+v, got %+v", tt.wantOrder, tt.state.TurnOrder)
+			}
+			if tt.state.CurrentPhase != game.Birdsong || tt.state.CurrentStep != game.StepBirdsong {
+				t.Fatalf("expected next turn to begin at birdsong, got phase=%v step=%v", tt.state.CurrentPhase, tt.state.CurrentStep)
+			}
+			if !reflect.DeepEqual(tt.state.TurnProgress, game.TurnProgress{}) {
+				t.Fatalf("expected turn progress reset, got %+v", tt.state.TurnProgress)
+			}
+		})
 	}
 }
 

@@ -32,6 +32,23 @@ func nextFactionInTurnOrder(state game.GameState) game.Faction {
 	return order[0]
 }
 
+func nextFactionAndRoundWrap(state game.GameState) (game.Faction, bool) {
+	order := effectiveTurnOrder(state)
+	if len(order) == 0 {
+		return state.FactionTurn, false
+	}
+
+	for i, faction := range order {
+		if faction != state.FactionTurn {
+			continue
+		}
+		nextIndex := (i + 1) % len(order)
+		return order[nextIndex], nextIndex == 0
+	}
+
+	return order[0], false
+}
+
 func resetTurnProgress(state *game.GameState) {
 	state.TurnProgress = game.TurnProgress{}
 }
@@ -42,7 +59,15 @@ func beginNextFactionTurn(state *game.GameState) {
 		state.TurnOrder = append([]game.Faction(nil), order...)
 	}
 
-	state.FactionTurn = nextFactionInTurnOrder(*state)
+	nextFaction, wrappedRound := nextFactionAndRoundWrap(*state)
+	state.FactionTurn = nextFaction
+	if wrappedRound {
+		if state.RoundNumber <= 0 {
+			state.RoundNumber = 1
+		} else {
+			state.RoundNumber++
+		}
+	}
 	state.CurrentPhase = game.Birdsong
 	state.CurrentStep = game.StepBirdsong
 	resetTurnProgress(state)
