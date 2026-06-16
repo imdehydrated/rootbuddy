@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/imdehydrated/rootbuddy/game"
@@ -225,5 +226,38 @@ func TestValidBattlesInStateSkipsCoalitionPartnerTargets(t *testing.T) {
 
 	if containsAction(got, unwant) {
 		t.Fatalf("did not expect battle against coalition Vagabond partner, got %+v", got)
+	}
+}
+
+func TestValidBattlesOrdersTargetsDeterministically(t *testing.T) {
+	got := ValidBattles(game.Marquise, game.Map{
+		Clearings: []game.Clearing{
+			{
+				ID: 1,
+				Warriors: map[game.Faction]int{
+					game.Marquise: 1,
+					game.Eyrie:    1,
+					game.Alliance: 1,
+				},
+				Buildings: []game.Building{
+					{Faction: game.Eyrie, Type: game.Roost},
+				},
+				Tokens: []game.Token{
+					{Faction: game.Alliance, Type: game.TokenSympathy},
+				},
+			},
+		},
+	})
+
+	targets := []game.Faction{}
+	for _, action := range got {
+		if action.Battle != nil {
+			targets = append(targets, action.Battle.TargetFaction)
+		}
+	}
+
+	want := []game.Faction{game.Alliance, game.Eyrie}
+	if !reflect.DeepEqual(targets, want) {
+		t.Fatalf("expected deterministic target order %+v, got %+v from actions %+v", want, targets, got)
 	}
 }

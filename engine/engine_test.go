@@ -16,6 +16,51 @@ func containsAction(actions []game.Action, want game.Action) bool {
 	return false
 }
 
+func TestValidActionsBattleOrderingIsStableForClonedState(t *testing.T) {
+	state := game.GameState{
+		GamePhase:    game.LifecyclePlaying,
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+						game.Eyrie:    1,
+						game.Alliance: 1,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+	}
+
+	actions := ValidActions(state)
+	clonedActions := ValidActions(CloneState(state))
+	if !reflect.DeepEqual(actions, clonedActions) {
+		t.Fatalf("expected cloned state to produce identical action ordering\nstate:  %+v\nclone: %+v", actions, clonedActions)
+	}
+
+	targets := []game.Faction{}
+	for _, action := range actions {
+		if action.Battle != nil {
+			targets = append(targets, action.Battle.TargetFaction)
+		}
+	}
+
+	want := []game.Faction{game.Alliance, game.Eyrie}
+	if !reflect.DeepEqual(targets, want) {
+		t.Fatalf("expected deterministic battle target order %+v, got %+v from actions %+v", want, targets, actions)
+	}
+}
+
 func TestValidActionsReturnsBirdsongWoodActionForBirdsong(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

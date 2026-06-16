@@ -1,6 +1,10 @@
 package rules
 
-import "github.com/imdehydrated/rootbuddy/game"
+import (
+	"sort"
+
+	"github.com/imdehydrated/rootbuddy/game"
+)
 
 func ValidBattles(faction game.Faction, m game.Map) []game.Action {
 	battles := []game.Action{}
@@ -10,64 +14,52 @@ func ValidBattles(faction game.Faction, m game.Map) []game.Action {
 			continue
 		}
 
-		seenTargets := map[game.Faction]bool{}
+		targets := map[game.Faction]bool{}
 		for target, count := range c.Warriors {
-			if target == faction || count <= 0 || seenTargets[target] {
+			if target == faction || count <= 0 {
 				continue
 			}
 
-			battles = append(battles, game.Action{
-				Type: game.ActionBattle,
-				Battle: &game.BattleAction{
-					Faction:       faction,
-					ClearingID:    c.ID,
-					TargetFaction: target,
-				},
-			})
-			seenTargets[target] = true
+			targets[target] = true
 		}
 
 		for _, building := range c.Buildings {
 			target := building.Faction
-			if target == faction || seenTargets[target] {
+			if target == faction {
 				continue
 			}
 
-			battles = append(battles, game.Action{
-				Type: game.ActionBattle,
-				Battle: &game.BattleAction{
-					Faction:       faction,
-					ClearingID:    c.ID,
-					TargetFaction: target,
-				},
-			})
-			seenTargets[target] = true
+			targets[target] = true
 		}
 
 		for _, token := range c.Tokens {
 			target := token.Faction
-			if target == faction || seenTargets[target] {
+			if target == faction {
 				continue
 			}
 
+			targets[target] = true
+		}
+
+		if c.Wood > 0 && faction != game.Marquise {
+			targets[game.Marquise] = true
+		}
+
+		targetFactions := make([]game.Faction, 0, len(targets))
+		for target := range targets {
+			targetFactions = append(targetFactions, target)
+		}
+		sort.Slice(targetFactions, func(i, j int) bool {
+			return targetFactions[i] < targetFactions[j]
+		})
+
+		for _, target := range targetFactions {
 			battles = append(battles, game.Action{
 				Type: game.ActionBattle,
 				Battle: &game.BattleAction{
 					Faction:       faction,
 					ClearingID:    c.ID,
 					TargetFaction: target,
-				},
-			})
-			seenTargets[target] = true
-		}
-
-		if c.Wood > 0 && faction != game.Marquise && !seenTargets[game.Marquise] {
-			battles = append(battles, game.Action{
-				Type: game.ActionBattle,
-				Battle: &game.BattleAction{
-					Faction:       faction,
-					ClearingID:    c.ID,
-					TargetFaction: game.Marquise,
 				},
 			})
 		}
