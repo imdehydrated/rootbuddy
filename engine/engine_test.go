@@ -176,6 +176,78 @@ func TestValidActionsReturnsNoActionsAfterGameOver(t *testing.T) {
 	}
 }
 
+func TestValidActionsReturnsNoPendingActionsAfterGameOver(t *testing.T) {
+	state := game.GameState{
+		GamePhase:    game.LifecycleGameOver,
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		PendingFieldHospitals: []game.FieldHospitalsPending{
+			{
+				ClearingID:   1,
+				Suit:         game.Fox,
+				WarriorCount: 2,
+			},
+		},
+		PendingOutrage: []game.OutragePending{
+			{
+				Faction: game.Eyrie,
+				Suit:    game.Fox,
+			},
+		},
+	}
+
+	if got := ValidActions(state); len(got) != 0 {
+		t.Fatalf("expected no pending prompt actions after game over, got %+v", got)
+	}
+}
+
+func TestThirtyVPWinLeavesNoValidActions(t *testing.T) {
+	state := game.GameState{
+		GamePhase:    game.LifecyclePlaying,
+		FactionTurn:  game.Marquise,
+		CurrentPhase: game.Daylight,
+		CurrentStep:  game.StepDaylightActions,
+		VictoryPoints: map[game.Faction]int{
+			game.Marquise: 29,
+		},
+		Map: game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 1,
+					},
+					Tokens: []game.Token{
+						{Faction: game.Alliance, Type: game.TokenSympathy},
+					},
+				},
+			},
+		},
+	}
+
+	next := ApplyAction(state, game.Action{
+		Type: game.ActionBattleResolution,
+		BattleResolution: &game.BattleResolutionAction{
+			Faction:        game.Marquise,
+			ClearingID:     1,
+			TargetFaction:  game.Alliance,
+			DefenderLosses: 1,
+			DefenderPieceLosses: []game.BattlePieceLoss{
+				{Kind: game.BattlePieceToken, TokenType: game.TokenSympathy},
+			},
+		},
+	})
+
+	if next.GamePhase != game.LifecycleGameOver || next.Winner != game.Marquise {
+		t.Fatalf("expected 30 VP battle score to end game for Marquise, got phase=%v winner=%v points=%+v", next.GamePhase, next.Winner, next.VictoryPoints)
+	}
+	if got := ValidActions(next); len(got) != 0 {
+		t.Fatalf("expected no legal actions after 30 VP win, got %+v", got)
+	}
+}
+
 func TestValidActionsReturnsRecruitAndMovementActionsForDaylightStep(t *testing.T) {
 	state := game.GameState{
 		Map: game.Map{

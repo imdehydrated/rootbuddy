@@ -257,6 +257,9 @@ func TestBeginNextFactionTurnChecksDominanceVictory(t *testing.T) {
 	if state.GamePhase != game.LifecycleGameOver || state.Winner != game.Marquise {
 		t.Fatalf("expected bird dominance to win at start of birdsong, got phase=%v winner=%v", state.GamePhase, state.Winner)
 	}
+	if got := ValidActions(state); len(got) != 0 {
+		t.Fatalf("expected no legal actions after dominance win, got %+v", got)
+	}
 }
 
 func TestBirdDominanceAcceptsSecondAutumnOppositeCornerPair(t *testing.T) {
@@ -446,5 +449,8 @@ func TestCoalitionSharesPartnerVictory(t *testing.T) {
 	}
 	if len(state.WinningCoalition) != 2 || state.WinningCoalition[0] != game.Marquise || state.WinningCoalition[1] != game.Vagabond {
 		t.Fatalf("expected coalition winners to include partner and Vagabond, got %+v", state.WinningCoalition)
+	}
+	if got := ValidActions(state); len(got) != 0 {
+		t.Fatalf("expected no legal actions after coalition win, got %+v", got)
 	}
 }

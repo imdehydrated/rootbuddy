@@ -116,6 +116,47 @@ func TestHandleValidActions(t *testing.T) {
 	}
 }
 
+func TestHandleValidActionsReturnsNoActionsAfterGameOver(t *testing.T) {
+	body, _ := json.Marshal(ValidActionsRequest{
+		State: game.GameState{
+			GamePhase:    game.LifecycleGameOver,
+			FactionTurn:  game.Marquise,
+			CurrentPhase: game.Daylight,
+			CurrentStep:  game.StepDaylightActions,
+			Map: game.Map{
+				Clearings: []game.Clearing{
+					{
+						ID: 1,
+						Buildings: []game.Building{
+							{Faction: game.Marquise, Type: game.Recruiter},
+						},
+					},
+				},
+			},
+			Marquise: game.MarquiseState{
+				WarriorSupply: 1,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/valid", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for valid actions after game over, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp ValidActionsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode valid actions response: %v", err)
+	}
+	if len(resp.Actions) != 0 {
+		t.Fatalf("expected no valid actions after game over, got %+v", resp.Actions)
+	}
+}
+
 func TestHandleValidActionsReturnsDaylightMovement(t *testing.T) {
 	body, _ := json.Marshal(ValidActionsRequest{
 		State: game.GameState{
