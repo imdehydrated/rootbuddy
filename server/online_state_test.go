@@ -166,6 +166,98 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 	}
 }
 
+func TestRedactStateForPlayerKeepsNonOwnerHandsAndSupportersCountOnly(t *testing.T) {
+	authoritative := game.GameState{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		TrackAllHands: true,
+		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{{ID: 10, Name: "Cat Card", Suit: game.Fox}},
+		},
+		Eyrie: game.EyrieState{
+			CardsInHand: []game.Card{{ID: 20, Name: "Bird Card", Suit: game.Bird}},
+		},
+		Alliance: game.AllianceState{
+			CardsInHand: []game.Card{{ID: 30, Name: "Alliance Hand", Suit: game.Mouse}},
+			Supporters: []game.Card{
+				{ID: 31, Name: "Alliance Supporter", Suit: game.Rabbit},
+				{ID: 32, Name: "Alliance Bird Supporter", Suit: game.Bird},
+			},
+		},
+		Vagabond: game.VagabondState{
+			CardsInHand: []game.Card{{ID: 40, Name: "Vagabond Card", Suit: game.Fox}},
+		},
+		HiddenCards: []game.HiddenCard{
+			{
+				ID:           99,
+				OwnerFaction: game.Alliance,
+				Zone:         game.HiddenCardZoneSupporters,
+				KnownCardID:  31,
+			},
+		},
+		OtherHandCounts: map[game.Faction]int{
+			game.Eyrie:    7,
+			game.Alliance: 7,
+			game.Vagabond: 7,
+		},
+	}
+
+	visible := redactStateForPlayer(authoritative, game.Marquise)
+
+	if len(visible.Marquise.CardsInHand) != 1 || visible.Marquise.CardsInHand[0].ID != 10 {
+		t.Fatalf("expected own hand to remain visible, got %+v", visible.Marquise.CardsInHand)
+	}
+	if len(visible.Eyrie.CardsInHand) != 0 || len(visible.Alliance.CardsInHand) != 0 || len(visible.Vagabond.CardsInHand) != 0 {
+		t.Fatalf("expected non-owner hands to be redacted, got eyrie=%+v alliance=%+v vagabond=%+v", visible.Eyrie.CardsInHand, visible.Alliance.CardsInHand, visible.Vagabond.CardsInHand)
+	}
+	if visible.OtherHandCounts[game.Eyrie] != 1 || visible.OtherHandCounts[game.Alliance] != 1 || visible.OtherHandCounts[game.Vagabond] != 1 {
+		t.Fatalf("expected non-owner hand counts to reflect authoritative hands, got %+v", visible.OtherHandCounts)
+	}
+	if len(visible.Alliance.Supporters) != 0 {
+		t.Fatalf("expected non-Alliance perspective to hide supporter identities, got %+v", visible.Alliance.Supporters)
+	}
+	if len(visible.HiddenCards) != 2 {
+		t.Fatalf("expected supporter placeholders only, got %+v", visible.HiddenCards)
+	}
+	for _, hidden := range visible.HiddenCards {
+		if hidden.OwnerFaction != game.Alliance || hidden.Zone != game.HiddenCardZoneSupporters {
+			t.Fatalf("expected Alliance supporter placeholder, got %+v", hidden)
+		}
+		if hidden.KnownCardID != 0 {
+			t.Fatalf("expected supporter placeholder to omit known card identity, got %+v", hidden)
+		}
+	}
+}
+
+func TestRedactStateForAlliancePerspectiveKeepsSupportersVisible(t *testing.T) {
+	authoritative := game.GameState{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Alliance,
+		TrackAllHands: true,
+		TurnOrder:     []game.Faction{game.Marquise, game.Alliance},
+		Marquise: game.MarquiseState{
+			CardsInHand: []game.Card{{ID: 10, Name: "Cat Card", Suit: game.Fox}},
+		},
+		Alliance: game.AllianceState{
+			CardsInHand: []game.Card{{ID: 30, Name: "Alliance Hand", Suit: game.Mouse}},
+			Supporters:  []game.Card{{ID: 31, Name: "Alliance Supporter", Suit: game.Rabbit}},
+		},
+	}
+
+	visible := redactStateForPlayer(authoritative, game.Alliance)
+
+	if len(visible.Alliance.CardsInHand) != 1 || visible.Alliance.CardsInHand[0].ID != 30 {
+		t.Fatalf("expected Alliance hand to remain visible, got %+v", visible.Alliance.CardsInHand)
+	}
+	if len(visible.Alliance.Supporters) != 1 || visible.Alliance.Supporters[0].ID != 31 {
+		t.Fatalf("expected Alliance supporters to remain visible to Alliance, got %+v", visible.Alliance.Supporters)
+	}
+	if len(visible.Marquise.CardsInHand) != 0 || visible.OtherHandCounts[game.Marquise] != 1 {
+		t.Fatalf("expected non-owner hand count only, hand=%+v counts=%+v", visible.Marquise.CardsInHand, visible.OtherHandCounts)
+	}
+}
+
 func TestHandleLoadGameRejectsMissingGameID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/game/load", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()

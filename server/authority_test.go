@@ -642,6 +642,66 @@ func TestHandleApplyActionMultiplayerRejectsObservedCardSelectionForStandAndDeli
 	}
 }
 
+func TestHandleApplyActionMultiplayerRejectsFalseOutrageCardClaim(t *testing.T) {
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
+
+	gameID, hostToken, _, _, _ := startLobbyBackedGame(t)
+	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
+		state.GameMode = game.GameModeOnline
+		state.TrackAllHands = true
+		state.GamePhase = game.LifecyclePlaying
+		state.SetupStage = game.SetupStageComplete
+		state.FactionTurn = game.Marquise
+		state.CurrentPhase = game.Daylight
+		state.CurrentStep = game.StepDaylightActions
+		state.TurnOrder = []game.Faction{game.Marquise, game.Eyrie}
+		state.Marquise.CardsInHand = []game.Card{
+			{ID: 10, Name: "Fox Card", Suit: game.Fox},
+		}
+		state.PendingOutrage = []game.OutragePending{
+			{Faction: game.Marquise, Suit: game.Rabbit},
+		}
+		state.Deck = []game.CardID{24}
+		state.OtherHandCounts = map[game.Faction]int{
+			game.Marquise: 1,
+			game.Eyrie:    0,
+		}
+	})
+
+	visible := redactStateForPlayer(record.State, game.Marquise)
+	body, _ := json.Marshal(ApplyActionRequest{
+		GameID:         gameID,
+		State:          visible,
+		ClientRevision: record.Revision,
+		Action: game.Action{
+			Type: game.ActionResolveOutrage,
+			ResolveOutrage: &game.ResolveOutrageAction{
+				Faction: game.Marquise,
+				Suit:    game.Rabbit,
+				CardID:  24,
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/actions/apply", bytes.NewReader(body))
+	req.Header.Set("X-Player-Token", hostToken)
+	rec := httptest.NewRecorder()
+
+	NewServer().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for false Outrage card claim, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := decodeErrorResponse(t, rec)
+	if resp.Error != errInvalidActionForState.Error() {
+		t.Fatalf("unexpected error response: %+v", resp)
+	}
+	if resp.Revision != record.Revision {
+		t.Fatalf("expected revision %d, got %d", record.Revision, resp.Revision)
+	}
+}
+
 func TestHandleLoadGameReturnsServerErrorForInvalidAuthoritativeState(t *testing.T) {
 	previousStore := store
 	store = newOnlineStateStore(t.TempDir())
