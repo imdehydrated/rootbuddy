@@ -303,14 +303,8 @@ func TestHandleBattleContextMultiplayerUsesAuthoritativeHiddenHands(t *testing.T
 }
 
 func TestHandleResolveBattleMultiplayerIgnoresFalseHiddenAmbushClaim(t *testing.T) {
-	previousStore := store
-	previousLobbies := lobbies
-	store = newOnlineStateStore(t.TempDir())
-	lobbies = newLobbyStore()
-	defer func() {
-		store = previousStore
-		lobbies = previousLobbies
-	}()
+	teardown := resetRealtimeTestState(t)
+	defer teardown()
 
 	gameID, hostToken, _, hostState, _ := startLobbyBackedGame(t)
 	record := replaceAuthoritativeState(t, gameID, func(state *game.GameState) {
