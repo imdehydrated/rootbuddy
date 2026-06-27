@@ -97,12 +97,116 @@ func replaceAuthoritativeState(t *testing.T, gameID string, mutate func(state *g
 
 	state := engine.CloneState(record.State)
 	mutate(&state)
+	normalizeAuthoritativeTestState(&state)
 
 	saved, err := store.save(gameID, state)
 	if err != nil {
 		t.Fatalf("failed to replace authoritative state: %v", err)
 	}
 	return saved
+}
+
+func normalizeAuthoritativeTestState(state *game.GameState) {
+	warriors := map[game.Faction]int{}
+	marquiseBuildings := map[game.BuildingType]int{}
+	roosts := 0
+	sympathy := 0
+	basesBySuit := map[game.Suit]int{}
+	wood := 0
+
+	for _, clearing := range state.Map.Clearings {
+		for faction, count := range clearing.Warriors {
+			warriors[faction] += count
+		}
+		wood += clearing.Wood
+		for _, building := range clearing.Buildings {
+			switch {
+			case building.Faction == game.Marquise:
+				marquiseBuildings[building.Type]++
+			case building.Faction == game.Eyrie && building.Type == game.Roost:
+				roosts++
+			case building.Faction == game.Alliance && building.Type == game.Base:
+				basesBySuit[clearing.Suit]++
+			}
+		}
+		for _, token := range clearing.Tokens {
+			if token.Faction == game.Alliance && token.Type == game.TokenSympathy {
+				sympathy++
+			}
+		}
+	}
+
+	state.Marquise.WarriorSupply = nonNegativeTestCount(25 - warriors[game.Marquise])
+	state.Marquise.WoodSupply = nonNegativeTestCount(8 - wood)
+	state.Marquise.SawmillsPlaced = marquiseBuildings[game.Sawmill]
+	state.Marquise.WorkshopsPlaced = marquiseBuildings[game.Workshop]
+	state.Marquise.RecruitersPlaced = marquiseBuildings[game.Recruiter]
+
+	state.Eyrie.WarriorSupply = nonNegativeTestCount(20 - warriors[game.Eyrie])
+	state.Eyrie.RoostsPlaced = roosts
+
+	state.Alliance.WarriorSupply = nonNegativeTestCount(10 - warriors[game.Alliance] - state.Alliance.Officers)
+	state.Alliance.SympathyPlaced = sympathy
+	state.Alliance.FoxBasePlaced = basesBySuit[game.Fox] > 0
+	state.Alliance.RabbitBasePlaced = basesBySuit[game.Rabbit] > 0
+	state.Alliance.MouseBasePlaced = basesBySuit[game.Mouse] > 0
+
+	state.Deck = removeKnownTestCardsFromDeck(*state)
+}
+
+func nonNegativeTestCount(value int) int {
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func removeKnownTestCardsFromDeck(state game.GameState) []game.CardID {
+	known := map[game.CardID]bool{}
+	for _, card := range state.Marquise.CardsInHand {
+		known[card.ID] = true
+	}
+	for _, card := range state.Eyrie.CardsInHand {
+		known[card.ID] = true
+	}
+	for _, card := range state.Alliance.CardsInHand {
+		known[card.ID] = true
+	}
+	for _, card := range state.Vagabond.CardsInHand {
+		known[card.ID] = true
+	}
+	for _, card := range state.Alliance.Supporters {
+		known[card.ID] = true
+	}
+	for _, id := range state.Eyrie.Decree.Recruit {
+		known[id] = true
+	}
+	for _, id := range state.Eyrie.Decree.Move {
+		known[id] = true
+	}
+	for _, id := range state.Eyrie.Decree.Battle {
+		known[id] = true
+	}
+	for _, id := range state.Eyrie.Decree.Build {
+		known[id] = true
+	}
+	for _, cardIDs := range state.PersistentEffects {
+		for _, id := range cardIDs {
+			known[id] = true
+		}
+	}
+	for _, id := range state.DiscardPile {
+		known[id] = true
+	}
+
+	deck := make([]game.CardID, 0, len(state.Deck))
+	for _, id := range state.Deck {
+		if known[id] {
+			continue
+		}
+		deck = append(deck, id)
+	}
+	return deck
 }
 
 func TestHandleValidActionsMultiplayerIgnoresClientStateTampering(t *testing.T) {

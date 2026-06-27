@@ -93,7 +93,24 @@ func TestHandleApplyActionClosesLobbyWhenGameEnds(t *testing.T) {
 		state.VictoryPoints = map[game.Faction]int{
 			game.Eyrie: 29,
 		}
-		state.Eyrie.RoostsPlaced = 2
+		state.Map = game.Map{
+			Clearings: []game.Clearing{
+				{
+					ID:   1,
+					Suit: game.Fox,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+				{
+					ID:   2,
+					Suit: game.Rabbit,
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		}
 	})
 
 	visible := redactStateForPlayer(record.State, game.Eyrie)

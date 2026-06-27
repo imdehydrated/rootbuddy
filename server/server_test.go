@@ -86,7 +86,8 @@ func TestHandleValidActions(t *testing.T) {
 			CurrentPhase: game.Daylight,
 			CurrentStep:  game.StepDaylightActions,
 			Marquise: game.MarquiseState{
-				WarriorSupply: 1,
+				WarriorSupply:    1,
+				RecruitersPlaced: 1,
 			},
 		},
 	})
@@ -134,7 +135,8 @@ func TestHandleValidActionsReturnsNoActionsAfterGameOver(t *testing.T) {
 				},
 			},
 			Marquise: game.MarquiseState{
-				WarriorSupply: 1,
+				WarriorSupply:    1,
+				RecruitersPlaced: 1,
 			},
 		},
 	})

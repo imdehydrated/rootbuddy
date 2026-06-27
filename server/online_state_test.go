@@ -118,7 +118,7 @@ func TestHandleLoadGameReturnsRedactedOnlineState(t *testing.T) {
 		PlayerFaction: game.Marquise,
 		TrackAllHands: true,
 		TurnOrder:     []game.Faction{game.Marquise, game.Eyrie},
-		Deck:          []game.CardID{8, 12},
+		Deck:          []game.CardID{12, 13},
 		DiscardPile:   []game.CardID{9},
 		Marquise: game.MarquiseState{
 			CardsInHand: []game.Card{{ID: 24, Name: "Bird Card"}},
