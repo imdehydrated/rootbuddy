@@ -707,7 +707,8 @@ func TestValidActionsAllianceDaylightOffersCraftMobilizeAndTrainTogether(t *test
 		CurrentPhase: game.Daylight,
 		CurrentStep:  game.StepDaylightActions,
 		Alliance: game.AllianceState{
-			CardsInHand: []game.Card{craftCard},
+			CardsInHand:   []game.Card{craftCard},
+			WarriorSupply: 1,
 		},
 	}
 

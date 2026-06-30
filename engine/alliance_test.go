@@ -260,8 +260,8 @@ func TestApplyRevoltRemovesEnemyPiecesAndPlacesBase(t *testing.T) {
 	if next.Alliance.Officers != 1 {
 		t.Fatalf("expected revolt to grant 1 officer, got %d", next.Alliance.Officers)
 	}
-	if next.Alliance.WarriorSupply != 3 {
-		t.Fatalf("expected revolt to place 2 warriors from supply, got supply %d", next.Alliance.WarriorSupply)
+	if next.Alliance.WarriorSupply != 2 {
+		t.Fatalf("expected revolt to place 2 warriors and 1 officer from supply, got supply %d", next.Alliance.WarriorSupply)
 	}
 	if clearing.Warriors[game.Alliance] != 2 {
 		t.Fatalf("expected 2 alliance warriors after revolt, got %d", clearing.Warriors[game.Alliance])

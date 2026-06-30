@@ -155,7 +155,7 @@ func applyRevolt(state *game.GameState, action game.Action) {
 	}
 	clearing.Warriors[game.Alliance] += recruitCount
 	state.Alliance.WarriorSupply -= recruitCount
-	state.Alliance.Officers++
+	addAllianceOfficerFromSupply(state)
 	addVictoryPoints(state, game.Alliance, removedPieces)
 }
 
@@ -187,11 +187,22 @@ func applyTrain(state *game.GameState, action game.Action) {
 	if action.Train == nil {
 		return
 	}
+	if state.Alliance.WarriorSupply <= 0 {
+		return
+	}
 
 	if _, ok := spendFactionHandCard(state, game.Alliance, action.Train.CardID); !ok {
 		return
 	}
 	DiscardCard(state, action.Train.CardID)
+	addAllianceOfficerFromSupply(state)
+}
+
+func addAllianceOfficerFromSupply(state *game.GameState) {
+	if state.Alliance.WarriorSupply <= 0 {
+		return
+	}
+	state.Alliance.WarriorSupply--
 	state.Alliance.Officers++
 }
 

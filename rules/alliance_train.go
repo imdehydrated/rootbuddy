@@ -12,6 +12,9 @@ func ValidTrainActions(state game.GameState) []game.Action {
 		state.CurrentStep != game.StepDaylightActions {
 		return nil
 	}
+	if state.Alliance.WarriorSupply <= 0 {
+		return nil
+	}
 
 	actions := []game.Action{}
 	for _, card := range state.Alliance.CardsInHand {

@@ -67,7 +67,9 @@ func removeHalfAllianceOfficersRoundedUp(state *game.GameState) {
 		return
 	}
 
-	state.Alliance.Officers -= (state.Alliance.Officers + 1) / 2
+	removed := (state.Alliance.Officers + 1) / 2
+	state.Alliance.Officers -= removed
+	state.Alliance.WarriorSupply += removed
 }
 
 func enforceAllianceNoBaseSupporterLimit(state *game.GameState) {

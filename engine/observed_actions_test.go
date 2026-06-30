@@ -74,6 +74,9 @@ func TestApplyActionTrainObservedHiddenCardInAssistMode(t *testing.T) {
 		OtherHandCounts: map[game.Faction]int{
 			game.Alliance: 2,
 		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 1,
+		},
 	}
 
 	next := ApplyAction(state, game.Action{
@@ -89,6 +92,9 @@ func TestApplyActionTrainObservedHiddenCardInAssistMode(t *testing.T) {
 	}
 	if next.Alliance.Officers != 1 {
 		t.Fatalf("expected train to grant an officer, got %+v", next.Alliance)
+	}
+	if next.Alliance.WarriorSupply != 0 {
+		t.Fatalf("expected train to spend one Alliance warrior from supply, got %+v", next.Alliance)
 	}
 	if len(next.DiscardPile) != 1 || next.DiscardPile[0] != 24 {
 		t.Fatalf("expected trained card to enter discard, got %+v", next.DiscardPile)
