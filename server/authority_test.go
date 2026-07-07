@@ -430,6 +430,7 @@ func TestHandleResolveBattleMultiplayerIgnoresFalseHiddenAmbushClaim(t *testing.
 				},
 			},
 		}
+		state.Marquise.CardsInHand = nil
 		state.Eyrie.CardsInHand = []game.Card{
 			{ID: 24, Name: "A Visit to Friends", Suit: game.Rabbit},
 		}

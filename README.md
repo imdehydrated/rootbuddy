@@ -25,10 +25,8 @@ The current implementation includes:
 
 Current focus:
 
-- UI polish
-- board interaction reliability
-- responsive/layout work
-- ongoing rules-compliance auditing
+- final user verification of the supported base-game rules/RL readiness scope
+- planning the next RL training phase separately from the rules engine audit
 
 ## Architecture
 
@@ -43,6 +41,18 @@ The project is organized into a few clear layers:
 - `frontend/`: React + TypeScript client for setup, board play, assist mode, lobby flow, and multiplayer UI
 
 The rules layer is intentionally pure: given a state, it returns legal actions without mutating anything. The engine applies chosen actions and produces the next state. The server wraps that deterministic core with persistence, player perspective, multiplayer coordination, and transport.
+
+## RL Readiness
+
+The supported base-game scope is ready for a separate RL training harness and PPO strategy plan. Future RL work should use:
+
+- `engine.SetupTrainingGame` for deterministic training setup with an explicit nonzero `RandomSeed`
+- `engine.ValidActions` for the legal action set
+- `engine.ApplyLegalAction` or `engine.ApplyLegalActionDetailed` to apply only generated legal actions
+- `engine.ValidateState` to reject invalid environment states
+- `engine.NewTrainingObservation` for public/count-only observations without hidden card identities, deck order, quest deck order, or RNG internals
+
+Do not use low-level `engine.ApplyAction` as the RL environment action gate. PPO, reward shaping, policy logic, and training loops are future work and are intentionally not implemented by the final audit pass.
 
 ## Running Locally
 
