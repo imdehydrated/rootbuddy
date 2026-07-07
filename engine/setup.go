@@ -15,9 +15,12 @@ type SetupRequest struct {
 	Factions      []game.Faction
 	MapID         game.MapID
 	RandomSeed    int64
+	RequireSeed   bool
 }
 
 var baseQuestRegistry = buildQuestRegistry()
+
+var ErrRandomSeedRequired = errors.New("random seed is required")
 
 func buildQuestRegistry() map[game.QuestID]game.Quest {
 	registry := make(map[game.QuestID]game.Quest, len(carddata.QuestDeck()))
@@ -33,6 +36,9 @@ func questByID(id game.QuestID) (game.Quest, bool) {
 }
 
 func SetupGame(req SetupRequest) (game.GameState, error) {
+	if req.RequireSeed && req.RandomSeed == 0 {
+		return game.GameState{}, ErrRandomSeedRequired
+	}
 	if len(req.Factions) < 2 || len(req.Factions) > 4 {
 		return game.GameState{}, errors.New("setup requires between 2 and 4 factions")
 	}
@@ -88,6 +94,11 @@ func SetupGame(req SetupRequest) (game.GameState, error) {
 	advanceSetupStage(&state)
 
 	return state, nil
+}
+
+func SetupTrainingGame(req SetupRequest) (game.GameState, error) {
+	req.RequireSeed = true
+	return SetupGame(req)
 }
 
 func randomizedTurnOrder(factions []game.Faction, state *game.GameState) []game.Faction {

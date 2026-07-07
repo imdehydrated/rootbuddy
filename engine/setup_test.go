@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/imdehydrated/rootbuddy/game"
@@ -329,6 +330,64 @@ func TestSetupGameWithSameSeedProducesDeterministicRuinsAndDeck(t *testing.T) {
 		if len(first.Map.Clearings[i].RuinItems) == 1 && first.Map.Clearings[i].RuinItems[0] != second.Map.Clearings[i].RuinItems[0] {
 			t.Fatalf("expected ruin item order to match for clearing %d, got %v vs %v", first.Map.Clearings[i].ID, first.Map.Clearings[i].RuinItems, second.Map.Clearings[i].RuinItems)
 		}
+	}
+}
+
+func TestSetupTrainingGameRequiresExplicitRandomSeed(t *testing.T) {
+	_, err := SetupTrainingGame(SetupRequest{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie},
+		MapID:         game.AutumnMapID,
+	})
+
+	if err != ErrRandomSeedRequired {
+		t.Fatalf("expected ErrRandomSeedRequired, got %v", err)
+	}
+}
+
+func TestSetupTrainingGameWithSameSeedIsDeterministic(t *testing.T) {
+	req := SetupRequest{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond},
+		MapID:         game.AutumnMapID,
+		RandomSeed:    9001,
+	}
+
+	first, err := SetupTrainingGame(req)
+	if err != nil {
+		t.Fatalf("expected first training setup to succeed, got %v", err)
+	}
+	second, err := SetupTrainingGame(req)
+	if err != nil {
+		t.Fatalf("expected second training setup to succeed, got %v", err)
+	}
+
+	if first.RandomSeed != 9001 || second.RandomSeed != 9001 {
+		t.Fatalf("expected training setup to preserve explicit seed, got %d and %d", first.RandomSeed, second.RandomSeed)
+	}
+	if !reflect.DeepEqual(first.TurnOrder, second.TurnOrder) ||
+		!reflect.DeepEqual(first.Deck, second.Deck) ||
+		!reflect.DeepEqual(first.QuestDeck, second.QuestDeck) ||
+		!reflect.DeepEqual(first.Map, second.Map) {
+		t.Fatalf("expected seeded training setup to be deterministic\nfirst=%+v\nsecond=%+v", first, second)
+	}
+}
+
+func TestSetupGameWithoutSeedRecordsGeneratedSeed(t *testing.T) {
+	state, err := SetupGame(SetupRequest{
+		GameMode:      game.GameModeOnline,
+		PlayerFaction: game.Marquise,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie},
+		MapID:         game.AutumnMapID,
+	})
+	if err != nil {
+		t.Fatalf("expected setup to succeed, got %v", err)
+	}
+
+	if state.RandomSeed == 0 {
+		t.Fatalf("expected seedless non-training setup to record generated seed")
 	}
 }
 
