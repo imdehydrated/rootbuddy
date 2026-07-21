@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	rootengine "github.com/imdehydrated/rootbuddy/engine"
 	"github.com/imdehydrated/rootbuddy/game"
 )
 
@@ -385,31 +386,51 @@ func TestVecEnvStepEnvRejectsUninitializedDoneAndInvalidAction(t *testing.T) {
 	}
 }
 
-func TestVecEnvStepEnvRejectsBattleUntilAdapterExists(t *testing.T) {
+func TestVecEnvStepEnvAppliesBattleAction(t *testing.T) {
 	env, err := NewVecEnv(VecEnvConfig{
-		NumEnvs:  1,
-		BaseSeed: 707,
+		NumEnvs:          1,
+		BaseSeed:         707,
+		TerminalWinBonus: 30,
 	})
 	if err != nil {
 		t.Fatalf("NewVecEnv failed: %v", err)
 	}
-	if _, err := env.ResetEnv(0); err != nil {
-		t.Fatalf("ResetEnv failed: %v", err)
-	}
-	env.slots[0].legalActions = []game.Action{
-		{
-			Type: game.ActionBattle,
-			Battle: &game.BattleAction{
-				Faction:       game.Marquise,
-				ClearingID:    1,
-				TargetFaction: game.Eyrie,
-			},
+
+	state := testBattleState()
+	action := game.Action{
+		Type: game.ActionBattle,
+		Battle: &game.BattleAction{
+			Faction:       game.Marquise,
+			ClearingID:    1,
+			TargetFaction: game.Eyrie,
 		},
 	}
+	env.slots[0] = envSlot{
+		state:             state,
+		seed:              707,
+		initialized:       true,
+		lastVictoryPoints: victoryPointSnapshot(state),
+		legalActions:      []game.Action{action},
+	}
 
-	_, err = env.StepEnv(0, 0)
-	if !errors.Is(err, ErrBattleActionPending) {
-		t.Fatalf("battle StepEnv error = %v, want ErrBattleActionPending", err)
+	decision, err := env.StepEnv(0, 0)
+	if err != nil {
+		t.Fatalf("StepEnv battle failed: %v", err)
+	}
+	if decision.Step != 1 {
+		t.Fatalf("Step = %d, want 1", decision.Step)
+	}
+	if env.slots[0].state.BattleRollCount != 1 {
+		t.Fatalf("BattleRollCount = %d, want 1", env.slots[0].state.BattleRollCount)
+	}
+	if env.slots[0].state.Eyrie.RoostsPlaced != 0 {
+		t.Fatalf("Eyrie roosts placed = %d, want 0", env.slots[0].state.Eyrie.RoostsPlaced)
+	}
+	if got := env.slots[0].state.VictoryPoints[game.Marquise]; got != 1 {
+		t.Fatalf("Marquise victory points = %d, want 1", got)
+	}
+	if decision.Reward != 1 {
+		t.Fatalf("Reward = %f, want 1", decision.Reward)
 	}
 }
 
@@ -488,6 +509,54 @@ func firstNonBattleActionIndex(t *testing.T, decision EnvDecision) int {
 	}
 	t.Fatalf("decision has no non-battle actions: %+v", decision.LegalActionTypes)
 	return -1
+}
+
+func testBattleState() game.GameState {
+	return game.GameState{
+		Map: game.Map{
+			ID: game.AutumnMapID,
+			Clearings: []game.Clearing{
+				{
+					ID:         1,
+					Suit:       game.Fox,
+					BuildSlots: 1,
+					Warriors: map[game.Faction]int{
+						game.Marquise: 3,
+					},
+					Buildings: []game.Building{
+						{Faction: game.Eyrie, Type: game.Roost},
+					},
+				},
+			},
+		},
+		GameMode:          game.GameModeOnline,
+		RandomSeed:        707,
+		GamePhase:         game.LifecyclePlaying,
+		SetupStage:        game.SetupStageComplete,
+		PlayerFaction:     game.Marquise,
+		RoundNumber:       1,
+		FactionTurn:       game.Marquise,
+		CurrentPhase:      game.Daylight,
+		CurrentStep:       game.StepDaylightActions,
+		TurnOrder:         []game.Faction{game.Marquise, game.Eyrie},
+		VictoryPoints:     map[game.Faction]int{game.Marquise: 0, game.Eyrie: 0},
+		ActiveDominance:   map[game.Faction]game.CardID{},
+		ItemSupply:        rootengine.InitialItemSupply(),
+		CraftedItems:      map[game.Faction][]game.ItemType{},
+		PersistentEffects: map[game.Faction][]game.CardID{},
+		OtherHandCounts:   map[game.Faction]int{},
+		Marquise: game.MarquiseState{
+			WarriorSupply: 22,
+			WoodSupply:    8,
+		},
+		Eyrie: game.EyrieState{
+			WarriorSupply: 20,
+			RoostsPlaced:  1,
+		},
+		Alliance: game.AllianceState{
+			WarriorSupply: 10,
+		},
+	}
 }
 
 func sameFactions(left []game.Faction, right []game.Faction) bool {

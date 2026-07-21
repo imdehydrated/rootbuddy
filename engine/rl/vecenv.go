@@ -19,7 +19,6 @@ var (
 	ErrEnvNotInitialized   = errors.New("env is not initialized")
 	ErrEnvDone             = errors.New("env is done")
 	ErrInvalidActionIndex  = errors.New("invalid action index")
-	ErrBattleActionPending = errors.New("battle action adapter is not implemented")
 	ErrActionCountMismatch = errors.New("action index count does not match env count")
 )
 
@@ -192,12 +191,8 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 	}
 
 	action := slot.legalActions[actionIndex]
-	if action.Type == game.ActionBattle {
-		return EnvDecision{}, fmt.Errorf("%w: env %d action %d", ErrBattleActionPending, index, actionIndex)
-	}
-
 	actingFaction := slot.state.FactionTurn
-	next, _, err := rootengine.ApplyLegalActionDetailed(slot.state, action)
+	next, err := applyEnvAction(slot.state, action)
 	if err != nil {
 		return EnvDecision{}, fmt.Errorf("step env %d action %d: %w", index, actionIndex, err)
 	}
