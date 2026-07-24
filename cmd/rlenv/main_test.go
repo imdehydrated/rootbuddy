@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -137,6 +138,46 @@ func TestProtocolRejectsUnknownMessageType(t *testing.T) {
 	}
 }
 
+func TestProtocolDeterministicForSameSeedAndActions(t *testing.T) {
+	config := rl.VecEnvConfig{
+		NumEnvs:       2,
+		BaseSeed:      909,
+		MaxSteps:      20,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie},
+		PlayerFaction: game.Marquise,
+		TrackAllHands: true,
+	}
+
+	left := runProtocolTranscript(t, deterministicProtocolInput(t, config, 8))
+	right := runProtocolTranscript(t, deterministicProtocolInput(t, config, 8))
+	if !reflect.DeepEqual(left, right) {
+		t.Fatalf("same seed/action protocol transcripts diverged")
+	}
+	if len(left) != 10 {
+		t.Fatalf("response count = %d, want 10", len(left))
+	}
+	for index, response := range left {
+		if !response.OK {
+			t.Fatalf("response %d failed: %s", index, response.Error)
+		}
+	}
+}
+
+func TestProtocolRejectsMalformedJSONFrame(t *testing.T) {
+	input := &bytes.Buffer{}
+	appendRawFrame(input, []byte(`{"type":`))
+
+	output := &bytes.Buffer{}
+	if err := run(input, output); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	response := readResponseFrame(t, output)
+	if response.OK || !strings.Contains(response.Error, "decode request") {
+		t.Fatalf("response = %+v, want decode error", response)
+	}
+}
+
 func appendRequestFrame(t *testing.T, buffer *bytes.Buffer, request requestEnvelope) {
 	t.Helper()
 
@@ -144,10 +185,7 @@ func appendRequestFrame(t *testing.T, buffer *bytes.Buffer, request requestEnvel
 	if err != nil {
 		t.Fatalf("marshal request failed: %v", err)
 	}
-	var header [4]byte
-	binary.BigEndian.PutUint32(header[:], uint32(len(payload)))
-	buffer.Write(header[:])
-	buffer.Write(payload)
+	appendRawFrame(buffer, payload)
 }
 
 func readResponseFrame(t *testing.T, reader io.Reader) responseEnvelope {
@@ -170,4 +208,44 @@ func assertNoMoreFrames(t *testing.T, reader io.Reader) {
 	if _, err := readFrame(reader); err != io.EOF {
 		t.Fatalf("readFrame error = %v, want EOF", err)
 	}
+}
+
+func deterministicProtocolInput(t *testing.T, config rl.VecEnvConfig, steps int) *bytes.Buffer {
+	t.Helper()
+
+	input := &bytes.Buffer{}
+	appendRequestFrame(t, input, requestEnvelope{
+		Type:   "config",
+		Config: &config,
+	})
+	appendRequestFrame(t, input, requestEnvelope{Type: "reset"})
+	for step := 0; step < steps; step++ {
+		appendRequestFrame(t, input, requestEnvelope{
+			Type:          "step",
+			ActionIndices: []int{0, 0},
+		})
+	}
+	return input
+}
+
+func runProtocolTranscript(t *testing.T, input *bytes.Buffer) []responseEnvelope {
+	t.Helper()
+
+	output := &bytes.Buffer{}
+	if err := run(input, output); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	responses := []responseEnvelope{}
+	for output.Len() > 0 {
+		responses = append(responses, readResponseFrame(t, output))
+	}
+	return responses
+}
+
+func appendRawFrame(buffer *bytes.Buffer, payload []byte) {
+	var header [4]byte
+	binary.BigEndian.PutUint32(header[:], uint32(len(payload)))
+	buffer.Write(header[:])
+	buffer.Write(payload)
 }

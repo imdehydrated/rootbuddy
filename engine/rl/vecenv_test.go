@@ -2,6 +2,7 @@ package rl
 
 import (
 	"errors"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -476,6 +477,84 @@ func TestVecEnvStepEnvIsDeterministicForSameActionIndex(t *testing.T) {
 	}
 }
 
+func TestVecEnvRandomPolicyRolloutMaintainsValidState(t *testing.T) {
+	env, err := NewVecEnv(VecEnvConfig{
+		NumEnvs:       2,
+		BaseSeed:      1777,
+		MaxSteps:      5000,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie},
+		PlayerFaction: game.Marquise,
+		TrackAllHands: true,
+	})
+	if err != nil {
+		t.Fatalf("NewVecEnv failed: %v", err)
+	}
+	if _, err := env.Reset(); err != nil {
+		t.Fatalf("Reset failed: %v", err)
+	}
+
+	rng := rand.New(rand.NewSource(1777))
+	completedGames := 0
+	maxedEpisodes := 0
+	observedBattle := false
+	countedDone := make([]bool, env.Len())
+	const targetCompletedGames = 2
+	const maxTransitions = 12_000
+
+	for transition := 0; transition < maxTransitions && completedGames < targetCompletedGames; transition++ {
+		envIndex := transition % env.Len()
+		slot := &env.slots[envIndex]
+		if slot.done {
+			if !countedDone[envIndex] {
+				if slot.state.GamePhase == game.LifecycleGameOver {
+					completedGames++
+				} else {
+					maxedEpisodes++
+				}
+				countedDone[envIndex] = true
+			}
+			if completedGames >= targetCompletedGames {
+				break
+			}
+			if _, err := env.ResetEnv(envIndex); err != nil {
+				t.Fatalf("ResetEnv(%d) after done failed: %v", envIndex, err)
+			}
+			countedDone[envIndex] = false
+			slot = &env.slots[envIndex]
+		}
+		if len(slot.legalActions) == 0 {
+			t.Fatalf("env %d has no legal actions before done at transition %d", envIndex, transition)
+		}
+
+		actionIndex := rng.Intn(len(slot.legalActions))
+		if slot.legalActions[actionIndex].Type == game.ActionBattle {
+			observedBattle = true
+		}
+		decision, err := env.StepEnv(envIndex, actionIndex)
+		if err != nil {
+			t.Fatalf("StepEnv(%d, %d) transition %d failed: %v", envIndex, actionIndex, transition, err)
+		}
+		if err := rootengine.ValidateState(env.slots[envIndex].state); err != nil {
+			t.Fatalf("env %d transition %d produced invalid state: %v", envIndex, transition, err)
+		}
+		assertDecisionShape(t, decision)
+		if decision.Done && !countedDone[envIndex] {
+			if env.slots[envIndex].state.GamePhase == game.LifecycleGameOver {
+				completedGames++
+			} else {
+				maxedEpisodes++
+			}
+			countedDone[envIndex] = true
+		}
+	}
+	if completedGames < targetCompletedGames {
+		t.Fatalf("completed games = %d, want at least %d; maxed episodes=%d", completedGames, targetCompletedGames, maxedEpisodes)
+	}
+	if !observedBattle {
+		t.Fatalf("random rollout did not exercise battle adapter")
+	}
+}
+
 func TestRewardForTransitionUsesActingFactionVPAndWinBonus(t *testing.T) {
 	previous := map[game.Faction]int{
 		game.Marquise: 2,
@@ -496,6 +575,31 @@ func TestRewardForTransitionUsesActingFactionVPAndWinBonus(t *testing.T) {
 	next.Winner = game.Marquise
 	if got := rewardForTransition(previous, next, game.Marquise, 30); got != 32 {
 		t.Fatalf("terminal winner reward = %f, want 32", got)
+	}
+}
+
+func assertDecisionShape(t *testing.T, decision EnvDecision) {
+	t.Helper()
+
+	if len(decision.Observation) != ObservationVectorLength() {
+		t.Fatalf("observation length = %d, want %d", len(decision.Observation), ObservationVectorLength())
+	}
+	if decision.ObservationLength != ObservationVectorLength() {
+		t.Fatalf("observation length field = %d, want %d", decision.ObservationLength, ObservationVectorLength())
+	}
+	if decision.ActionLength != ActionVectorLength() {
+		t.Fatalf("action length field = %d, want %d", decision.ActionLength, ActionVectorLength())
+	}
+	if decision.CandidateCount != len(decision.CandidateActions) {
+		t.Fatalf("candidate count = %d, vectors = %d", decision.CandidateCount, len(decision.CandidateActions))
+	}
+	if len(decision.LegalActionTypes) != decision.CandidateCount {
+		t.Fatalf("legal action types = %d, candidates = %d", len(decision.LegalActionTypes), decision.CandidateCount)
+	}
+	for index, encoded := range decision.CandidateActions {
+		if len(encoded) != ActionVectorLength() {
+			t.Fatalf("candidate %d length = %d, want %d", index, len(encoded), ActionVectorLength())
+		}
 	}
 }
 
