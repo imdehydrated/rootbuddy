@@ -1,6 +1,11 @@
 *.exe
 *.test
 coverage.out
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
 EXECUTION-PLAN.md
 AGENTS.md
 CLAUDE.md

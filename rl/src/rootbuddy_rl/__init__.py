@@ -10,6 +10,7 @@ from .engine_client import (
     ProtocolError,
     VecEnvConfig,
 )
+from .vec_env import RootBuddyVecEnv, VecEnvArrays, batch_to_arrays, sample_random_actions
 
 __all__ = [
     "ConfigResponse",
@@ -19,5 +20,9 @@ __all__ = [
     "EnvDecision",
     "Faction",
     "ProtocolError",
+    "RootBuddyVecEnv",
     "VecEnvConfig",
+    "VecEnvArrays",
+    "batch_to_arrays",
+    "sample_random_actions",
 ]
