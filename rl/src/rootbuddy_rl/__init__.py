@@ -19,6 +19,17 @@ from .model import (
     masked_categorical,
     tensors_from_batch,
 )
+from .ppo import (
+    PPOBatch,
+    PPOConfig,
+    PPOLoss,
+    PPOUpdateStats,
+    compute_gae,
+    iter_minibatches,
+    normalize_advantages,
+    ppo_loss,
+    ppo_update,
+)
 from .vec_env import RootBuddyVecEnv, VecEnvArrays, batch_to_arrays, sample_random_actions
 
 __all__ = [
@@ -32,13 +43,22 @@ __all__ = [
     "EnvDecision",
     "Faction",
     "ModelOutput",
+    "PPOBatch",
+    "PPOConfig",
+    "PPOLoss",
+    "PPOUpdateStats",
     "ProtocolError",
     "RootBuddyVecEnv",
     "VecEnvConfig",
     "VecEnvArrays",
     "batch_to_arrays",
+    "compute_gae",
+    "iter_minibatches",
     "mask_logits",
     "masked_categorical",
+    "normalize_advantages",
+    "ppo_loss",
+    "ppo_update",
     "sample_random_actions",
     "tensors_from_batch",
 ]
