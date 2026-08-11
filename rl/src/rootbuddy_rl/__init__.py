@@ -30,6 +30,14 @@ from .ppo import (
     ppo_loss,
     ppo_update,
 )
+from .rollout import (
+    RolloutConfig,
+    RolloutResult,
+    RolloutStats,
+    bootstrap_values,
+    collect_rollout,
+)
+from .train import TrainConfig, TrainMetrics, TrainResult, build_model_from_batch, train
 from .vec_env import RootBuddyVecEnv, VecEnvArrays, batch_to_arrays, sample_random_actions
 
 __all__ = [
@@ -48,10 +56,19 @@ __all__ = [
     "PPOLoss",
     "PPOUpdateStats",
     "ProtocolError",
+    "RolloutConfig",
+    "RolloutResult",
+    "RolloutStats",
     "RootBuddyVecEnv",
+    "TrainConfig",
+    "TrainMetrics",
+    "TrainResult",
     "VecEnvConfig",
     "VecEnvArrays",
     "batch_to_arrays",
+    "bootstrap_values",
+    "build_model_from_batch",
+    "collect_rollout",
     "compute_gae",
     "iter_minibatches",
     "mask_logits",
@@ -61,4 +78,5 @@ __all__ = [
     "ppo_update",
     "sample_random_actions",
     "tensors_from_batch",
+    "train",
 ]

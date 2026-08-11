@@ -55,6 +55,8 @@ def assert_batch_shape(batch: VecEnvArrays, *, num_envs: int) -> None:
     assert batch.action_mask.shape == batch.candidate_actions.shape[:2]
     assert batch.rewards.shape == (num_envs,)
     assert batch.dones.shape == (num_envs,)
+    assert batch.truncations.shape == (num_envs,)
     assert batch.active_factions.shape == (num_envs,)
     assert batch.candidate_counts.shape == (num_envs,)
+    assert batch.victory_points.shape == (num_envs, 4)
     np.testing.assert_array_equal(batch.action_mask.sum(axis=1), batch.candidate_counts)

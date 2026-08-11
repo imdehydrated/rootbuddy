@@ -19,6 +19,9 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+rootbuddy-train = "rootbuddy_rl.train:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

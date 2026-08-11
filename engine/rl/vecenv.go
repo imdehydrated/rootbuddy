@@ -44,6 +44,7 @@ type envSlot struct {
 	episode           int
 	steps             int
 	done              bool
+	truncated         bool
 	initialized       bool
 	lastVictoryPoints map[game.Faction]int
 	legalActions      []game.Action
@@ -59,8 +60,10 @@ type EnvDecision struct {
 	CandidateCount    int               `json:"candidateCount"`
 	Reward            float32           `json:"reward"`
 	Done              bool              `json:"done"`
+	Truncated         bool              `json:"truncated"`
 	Winner            game.Faction      `json:"winner"`
 	WinningCoalition  []game.Faction    `json:"winningCoalition,omitempty"`
+	VictoryPoints     []int             `json:"victoryPoints"`
 	LegalActionTypes  []game.ActionType `json:"legalActionTypes,omitempty"`
 	ObservationLength int               `json:"observationLength"`
 	ActionLength      int               `json:"actionLength"`
@@ -149,6 +152,7 @@ func (env *VecEnv) ResetEnv(index int) (EnvDecision, error) {
 	slot.state = state
 	slot.steps = 0
 	slot.done = state.GamePhase == game.LifecycleGameOver
+	slot.truncated = false
 	slot.initialized = true
 	slot.lastVictoryPoints = victoryPointSnapshot(state)
 	slot.legalActions = rootengine.ValidActions(state)
@@ -203,7 +207,9 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 	reward := rewardForTransition(slot.lastVictoryPoints, next, actingFaction, env.config.TerminalWinBonus)
 	slot.state = next
 	slot.steps++
-	slot.done = next.GamePhase == game.LifecycleGameOver || slot.steps >= env.config.MaxSteps
+	gameOver := next.GamePhase == game.LifecycleGameOver
+	slot.truncated = !gameOver && slot.steps >= env.config.MaxSteps
+	slot.done = gameOver || slot.truncated
 	slot.lastVictoryPoints = victoryPointSnapshot(next)
 	if slot.done {
 		slot.legalActions = nil
@@ -245,8 +251,10 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		CandidateCount:    len(encodedActions),
 		Reward:            reward,
 		Done:              slot.done,
+		Truncated:         slot.truncated,
 		Winner:            slot.state.Winner,
 		WinningCoalition:  append([]game.Faction(nil), slot.state.WinningCoalition...),
+		VictoryPoints:     victoryPointVector(slot.state),
 		LegalActionTypes:  actionTypes,
 		ObservationLength: len(encodedObservation),
 		ActionLength:      ActionVectorLength(),
@@ -301,6 +309,14 @@ func victoryPointSnapshot(state game.GameState) map[game.Faction]int {
 		snapshot[faction] = state.VictoryPoints[faction]
 	}
 	return snapshot
+}
+
+func victoryPointVector(state game.GameState) []int {
+	points := make([]int, len(orderedFactions))
+	for index, faction := range orderedFactions {
+		points[index] = state.VictoryPoints[faction]
+	}
+	return points
 }
 
 func rewardForTransition(previous map[game.Faction]int, next game.GameState, actingFaction game.Faction, terminalWinBonus float32) float32 {

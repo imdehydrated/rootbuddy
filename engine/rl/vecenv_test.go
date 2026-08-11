@@ -590,6 +590,9 @@ func assertDecisionShape(t *testing.T, decision EnvDecision) {
 	if decision.ActionLength != ActionVectorLength() {
 		t.Fatalf("action length field = %d, want %d", decision.ActionLength, ActionVectorLength())
 	}
+	if len(decision.VictoryPoints) != factionCount {
+		t.Fatalf("victory points length = %d, want %d", len(decision.VictoryPoints), factionCount)
+	}
 	if decision.CandidateCount != len(decision.CandidateActions) {
 		t.Fatalf("candidate count = %d, vectors = %d", decision.CandidateCount, len(decision.CandidateActions))
 	}

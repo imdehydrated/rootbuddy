@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from enum import IntEnum
@@ -61,8 +62,10 @@ class EnvDecision:
     candidate_count: int
     reward: float
     done: bool
+    truncated: bool
     winner: int
     winning_coalition: tuple[int, ...]
+    victory_points: tuple[int, ...]
     legal_action_types: tuple[int, ...]
     observation_length: int
     action_length: int
@@ -122,6 +125,7 @@ class EngineClient:
         self._process = subprocess.Popen(
             self.command,
             cwd=self.cwd,
+            env=_process_env(self.cwd),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -212,8 +216,10 @@ def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_leng
         candidate_count=int(raw.get("candidateCount", 0)),
         reward=float(raw.get("reward", 0.0)),
         done=bool(raw.get("done", False)),
+        truncated=bool(raw.get("truncated", False)),
         winner=int(raw.get("winner", 0)),
         winning_coalition=tuple(int(faction) for faction in raw.get("winningCoalition", [])),
+        victory_points=tuple(int(points) for points in raw.get("victoryPoints", [])),
         legal_action_types=tuple(int(action_type) for action_type in raw.get("legalActionTypes", [])),
         observation_length=int(raw.get("observationLength", observation_length)),
         action_length=int(raw.get("actionLength", action_length)),
@@ -224,9 +230,23 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _process_env(cwd: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    if "GOCACHE" not in env:
+        cache_dir = cwd / ".gocache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        env["GOCACHE"] = str(cache_dir)
+    return env
+
+
 def _read_available_stderr(process: subprocess.Popen[bytes]) -> str:
-    if process.stderr is None or process.poll() is None:
+    if process.stderr is None:
         return ""
+    if process.poll() is None:
+        try:
+            process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            return ""
     try:
         return process.stderr.read().decode("utf-8", errors="replace").strip()
     except OSError:

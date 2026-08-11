@@ -47,6 +47,8 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     assert arrays.candidate_counts.tolist() == [2, 1]
     assert arrays.rewards.tolist() == [0.0, 2.0]
     assert arrays.dones.tolist() == [False, True]
+    assert arrays.truncations.tolist() == [False, False]
+    assert arrays.victory_points.tolist() == [[0, 0, 0, 0], [0, 0, 0, 0]]
     np.testing.assert_array_equal(arrays.candidate_actions[1, 1], np.zeros((3,), dtype=np.float32))
 
 
@@ -73,6 +75,8 @@ def test_rootbuddy_vec_env_configures_once_and_delegates_step() -> None:
     assert reset.steps.tolist() == [0]
     assert stepped.steps.tolist() == [1]
     assert stepped.rewards.tolist() == [1.0]
+    assert stepped.truncations.tolist() == [False]
+    assert stepped.victory_points.tolist() == [[0, 0, 0, 0]]
     assert env.last_batch is stepped
 
 
@@ -102,6 +106,9 @@ def decision(
     step: int = 0,
     reward: float = 0.0,
     done: bool = False,
+    truncated: bool = False,
+    winner: int = 0,
+    victory_points: tuple[int, ...] = (0, 0, 0, 0),
 ) -> EnvDecision:
     action_length = len(candidates[0]) if candidates else 1
     return EnvDecision(
@@ -114,8 +121,10 @@ def decision(
         candidate_count=len(candidates),
         reward=reward,
         done=done,
-        winner=0,
+        truncated=truncated,
+        winner=winner,
         winning_coalition=(),
+        victory_points=victory_points,
         legal_action_types=tuple(range(len(candidates))),
         observation_length=len(observation),
         action_length=action_length,

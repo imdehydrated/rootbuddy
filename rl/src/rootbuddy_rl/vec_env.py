@@ -18,10 +18,12 @@ class VecEnvArrays:
     candidate_counts: np.ndarray
     rewards: np.ndarray
     dones: np.ndarray
+    truncations: np.ndarray
     active_factions: np.ndarray
     episodes: np.ndarray
     steps: np.ndarray
     winners: np.ndarray
+    victory_points: np.ndarray
     decisions: tuple[EnvDecision, ...]
 
     @property
@@ -95,10 +97,12 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
     candidate_counts = np.zeros((num_envs,), dtype=np.int64)
     rewards = np.zeros((num_envs,), dtype=np.float32)
     dones = np.zeros((num_envs,), dtype=np.bool_)
+    truncations = np.zeros((num_envs,), dtype=np.bool_)
     active_factions = np.zeros((num_envs,), dtype=np.int64)
     episodes = np.zeros((num_envs,), dtype=np.int64)
     steps = np.zeros((num_envs,), dtype=np.int64)
     winners = np.zeros((num_envs,), dtype=np.int64)
+    victory_points = np.zeros((num_envs, 4), dtype=np.int64)
 
     for row, decision in enumerate(decisions):
         observations[row, :] = _fit_vector(decision.observation, observation_length)
@@ -106,10 +110,14 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         candidate_counts[row] = count
         rewards[row] = decision.reward
         dones[row] = decision.done
+        truncations[row] = decision.truncated
         active_factions[row] = decision.active_faction
         episodes[row] = decision.episode
         steps[row] = decision.step
         winners[row] = decision.winner
+        point_count = min(len(decision.victory_points), victory_points.shape[1])
+        if point_count > 0:
+            victory_points[row, :point_count] = decision.victory_points[:point_count]
         if count > 0:
             action_mask[row, :count] = True
             candidate_actions[row, :count, :] = _fit_matrix(
@@ -125,10 +133,12 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         candidate_counts=candidate_counts,
         rewards=rewards,
         dones=dones,
+        truncations=truncations,
         active_factions=active_factions,
         episodes=episodes,
         steps=steps,
         winners=winners,
+        victory_points=victory_points,
         decisions=decisions,
     )
 
