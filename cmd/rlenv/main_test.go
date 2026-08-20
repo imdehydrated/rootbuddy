@@ -58,6 +58,9 @@ func TestProtocolConfigResetStep(t *testing.T) {
 		if decision.CandidateCount == 0 {
 			t.Fatalf("reset decision has no candidates: %+v", decision)
 		}
+		if len(decision.CandidateRewards) != decision.CandidateCount {
+			t.Fatalf("reset candidate rewards = %d, want %d", len(decision.CandidateRewards), decision.CandidateCount)
+		}
 		if len(decision.Observation) != rl.ObservationVectorLength() {
 			t.Fatalf("reset observation length = %d, want %d", len(decision.Observation), rl.ObservationVectorLength())
 		}
@@ -76,6 +79,40 @@ func TestProtocolConfigResetStep(t *testing.T) {
 		}
 	}
 	assertNoMoreFrames(t, output)
+}
+
+func TestProtocolCanResetSubsetOfEnvSlots(t *testing.T) {
+	input := &bytes.Buffer{}
+	appendRequestFrame(t, input, requestEnvelope{
+		Type: "config",
+		Config: &rl.VecEnvConfig{
+			NumEnvs:       2,
+			BaseSeed:      717,
+			MaxSteps:      10,
+			Factions:      []game.Faction{game.Marquise, game.Eyrie},
+			PlayerFaction: game.Marquise,
+		},
+	})
+	appendRequestFrame(t, input, requestEnvelope{Type: "reset"})
+	appendRequestFrame(t, input, requestEnvelope{Type: "reset", EnvIndices: []int{1}})
+
+	output := &bytes.Buffer{}
+	if err := run(input, output); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	_ = readResponseFrame(t, output)
+	_ = readResponseFrame(t, output)
+	reset := readResponseFrame(t, output)
+	if !reset.OK {
+		t.Fatalf("partial reset response failed: %s", reset.Error)
+	}
+	if len(reset.Decisions) != 1 {
+		t.Fatalf("partial reset decisions = %d, want 1", len(reset.Decisions))
+	}
+	if reset.Decisions[0].EnvIndex != 1 || reset.Decisions[0].Episode != 1 {
+		t.Fatalf("partial reset decision = env %d episode %d, want env 1 episode 1", reset.Decisions[0].EnvIndex, reset.Decisions[0].Episode)
+	}
 }
 
 func TestProtocolRejectsResetBeforeConfig(t *testing.T) {

@@ -18,6 +18,7 @@ type requestEnvelope struct {
 	Type          string           `json:"type"`
 	Config        *rl.VecEnvConfig `json:"config,omitempty"`
 	ActionIndices []int            `json:"actionIndices,omitempty"`
+	EnvIndices    []int            `json:"envIndices,omitempty"`
 }
 
 type responseEnvelope struct {
@@ -72,7 +73,7 @@ func (server *protocolServer) handleRequest(request requestEnvelope) responseEnv
 	case "config":
 		return server.handleConfig(request)
 	case "reset":
-		return server.handleReset()
+		return server.handleReset(request)
 	case "step":
 		return server.handleStep(request)
 	default:
@@ -100,19 +101,32 @@ func (server *protocolServer) handleConfig(request requestEnvelope) responseEnve
 	}
 }
 
-func (server *protocolServer) handleReset() responseEnvelope {
+func (server *protocolServer) handleReset(request requestEnvelope) responseEnvelope {
 	if server.env == nil {
 		return errorResponse("reset", errors.New("reset requires config first"))
 	}
 
-	result, err := server.env.Reset()
-	if err != nil {
-		return errorResponse("reset", err)
+	var decisions []rl.EnvDecision
+	if len(request.EnvIndices) == 0 {
+		result, err := server.env.Reset()
+		if err != nil {
+			return errorResponse("reset", err)
+		}
+		decisions = result.Decisions
+	} else {
+		decisions = make([]rl.EnvDecision, len(request.EnvIndices))
+		for row, index := range request.EnvIndices {
+			decision, err := server.env.ResetEnv(index)
+			if err != nil {
+				return errorResponse("reset", err)
+			}
+			decisions[row] = decision
+		}
 	}
 	return responseEnvelope{
 		Type:              "reset",
 		OK:                true,
-		Decisions:         result.Decisions,
+		Decisions:         decisions,
 		ObservationLength: rl.ObservationVectorLength(),
 		ActionLength:      rl.ActionVectorLength(),
 	}

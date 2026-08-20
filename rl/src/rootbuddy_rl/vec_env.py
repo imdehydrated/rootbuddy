@@ -14,6 +14,7 @@ from .engine_client import EngineClient, EnvBatch, EnvDecision, VecEnvConfig
 class VecEnvArrays:
     observations: np.ndarray
     candidate_actions: np.ndarray
+    candidate_rewards: np.ndarray
     action_mask: np.ndarray
     candidate_counts: np.ndarray
     rewards: np.ndarray
@@ -69,9 +70,13 @@ class RootBuddyVecEnv:
         self.client.configure(self.config)
         self._configured = True
 
-    def reset(self) -> VecEnvArrays:
+    def reset(self, env_indices: Iterable[int] | None = None) -> VecEnvArrays:
         self.configure()
-        self.last_batch = batch_to_arrays(self.client.reset())
+        reset_batch = batch_to_arrays(self.client.reset(env_indices))
+        if env_indices is None or self.last_batch is None:
+            self.last_batch = reset_batch
+        else:
+            self.last_batch = merge_batches(self.last_batch, reset_batch)
         return self.last_batch
 
     def step(self, action_indices: Iterable[int]) -> VecEnvArrays:
@@ -93,6 +98,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
 
     observations = np.zeros((num_envs, observation_length), dtype=np.float32)
     candidate_actions = np.zeros((num_envs, max_candidates, action_length), dtype=np.float32)
+    candidate_rewards = np.zeros((num_envs, max_candidates), dtype=np.float32)
     action_mask = np.zeros((num_envs, max_candidates), dtype=np.bool_)
     candidate_counts = np.zeros((num_envs,), dtype=np.int64)
     rewards = np.zeros((num_envs,), dtype=np.float32)
@@ -120,6 +126,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
             victory_points[row, :point_count] = decision.victory_points[:point_count]
         if count > 0:
             action_mask[row, :count] = True
+            candidate_rewards[row, :count] = _fit_vector(decision.candidate_rewards, count)
             candidate_actions[row, :count, :] = _fit_matrix(
                 decision.candidate_actions,
                 rows=count,
@@ -129,6 +136,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
     return VecEnvArrays(
         observations=observations,
         candidate_actions=candidate_actions,
+        candidate_rewards=candidate_rewards,
         action_mask=action_mask,
         candidate_counts=candidate_counts,
         rewards=rewards,
@@ -140,6 +148,23 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         winners=winners,
         victory_points=victory_points,
         decisions=decisions,
+    )
+
+
+def merge_batches(current: VecEnvArrays, reset: VecEnvArrays) -> VecEnvArrays:
+    decisions = list(current.decisions)
+    index_by_env = {decision.env_index: row for row, decision in enumerate(decisions)}
+    for decision in reset.decisions:
+        row = index_by_env.get(decision.env_index)
+        if row is None:
+            raise ValueError(f"reset returned unknown env index {decision.env_index}")
+        decisions[row] = decision
+    return batch_to_arrays(
+        EnvBatch(
+            decisions=tuple(decisions),
+            observation_length=current.observation_length,
+            action_length=current.action_length,
+        )
     )
 
 

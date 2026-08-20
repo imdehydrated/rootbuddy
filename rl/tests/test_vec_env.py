@@ -18,8 +18,10 @@ class FakeClient:
         self.configured_with = config
         return ConfigResponse(config={}, observation_length=2, action_length=3)
 
-    def reset(self) -> EnvBatch:
-        return self.reset_batch
+    def reset(self, env_indices: object | None = None) -> EnvBatch:
+        if env_indices is None:
+            return self.reset_batch
+        return self.step_batch
 
     def step(self, action_indices: object) -> EnvBatch:
         self.step_actions.append(list(action_indices))
@@ -32,8 +34,20 @@ class FakeClient:
 def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     batch = EnvBatch(
         decisions=(
-            decision(0, observation=[1.0, 2.0], candidates=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
-            decision(1, observation=[3.0, 4.0], candidates=[[0.0, 0.0, 1.0]], reward=2.0, done=True),
+            decision(
+                0,
+                observation=[1.0, 2.0],
+                candidates=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+                candidate_rewards=[0.5, 1.5],
+            ),
+            decision(
+                1,
+                observation=[3.0, 4.0],
+                candidates=[[0.0, 0.0, 1.0]],
+                candidate_rewards=[2.5],
+                reward=2.0,
+                done=True,
+            ),
         ),
         observation_length=2,
         action_length=3,
@@ -48,6 +62,7 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     assert arrays.rewards.tolist() == [0.0, 2.0]
     assert arrays.dones.tolist() == [False, True]
     assert arrays.truncations.tolist() == [False, False]
+    assert arrays.candidate_rewards.tolist() == [[0.5, 1.5], [2.5, 0.0]]
     assert arrays.victory_points.tolist() == [[0, 0, 0, 0], [0, 0, 0, 0]]
     np.testing.assert_array_equal(arrays.candidate_actions[1, 1], np.zeros((3,), dtype=np.float32))
 
@@ -80,6 +95,31 @@ def test_rootbuddy_vec_env_configures_once_and_delegates_step() -> None:
     assert env.last_batch is stepped
 
 
+def test_rootbuddy_vec_env_merges_partial_reset_by_env_index() -> None:
+    reset_batch = EnvBatch(
+        decisions=(
+            decision(0, observation=[1.0], candidates=[[1.0]], step=0),
+            decision(1, observation=[2.0], candidates=[[2.0]], step=0),
+        ),
+        observation_length=1,
+        action_length=1,
+    )
+    partial_reset_batch = EnvBatch(
+        decisions=(decision(1, observation=[3.0], candidates=[[3.0], [4.0]], step=0),),
+        observation_length=1,
+        action_length=1,
+    )
+    client = FakeClient(reset_batch=reset_batch, step_batch=partial_reset_batch)
+    env = RootBuddyVecEnv(VecEnvConfig(num_envs=2, base_seed=707), client=client)  # type: ignore[arg-type]
+
+    initial = env.reset()
+    merged = env.reset(env_indices=[1])
+
+    assert initial.observations[:, 0].tolist() == [1.0, 2.0]
+    assert merged.observations[:, 0].tolist() == [1.0, 3.0]
+    assert merged.candidate_counts.tolist() == [1, 2]
+
+
 def test_sample_random_actions_respects_candidate_counts() -> None:
     arrays = batch_to_arrays(
         EnvBatch(
@@ -103,11 +143,13 @@ def decision(
     *,
     observation: list[float],
     candidates: list[list[float]],
+    candidate_rewards: list[float] | None = None,
     step: int = 0,
     reward: float = 0.0,
     done: bool = False,
     truncated: bool = False,
     winner: int = 0,
+    active_faction: int = 0,
     victory_points: tuple[int, ...] = (0, 0, 0, 0),
 ) -> EnvDecision:
     action_length = len(candidates[0]) if candidates else 1
@@ -115,9 +157,13 @@ def decision(
         env_index=env_index,
         episode=0,
         step=step,
-        active_faction=0,
+        active_faction=active_faction,
         observation=np.asarray(observation, dtype=np.float32),
         candidate_actions=np.asarray(candidates, dtype=np.float32).reshape((len(candidates), action_length)),
+        candidate_rewards=np.asarray(
+            candidate_rewards if candidate_rewards is not None else [0.0 for _ in candidates],
+            dtype=np.float32,
+        ),
         candidate_count=len(candidates),
         reward=reward,
         done=done,

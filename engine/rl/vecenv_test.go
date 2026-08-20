@@ -173,6 +173,9 @@ func TestVecEnvResetInitializesSlotsAndDecisions(t *testing.T) {
 		if decision.CandidateCount == 0 || len(decision.CandidateActions) != decision.CandidateCount {
 			t.Fatalf("candidate shape mismatch: count=%d vectors=%d", decision.CandidateCount, len(decision.CandidateActions))
 		}
+		if len(decision.CandidateRewards) != decision.CandidateCount {
+			t.Fatalf("candidate rewards = %d, want %d", len(decision.CandidateRewards), decision.CandidateCount)
+		}
 		if len(decision.LegalActionTypes) != decision.CandidateCount {
 			t.Fatalf("legal action type length = %d, want %d", len(decision.LegalActionTypes), decision.CandidateCount)
 		}
@@ -595,6 +598,9 @@ func assertDecisionShape(t *testing.T, decision EnvDecision) {
 	}
 	if decision.CandidateCount != len(decision.CandidateActions) {
 		t.Fatalf("candidate count = %d, vectors = %d", decision.CandidateCount, len(decision.CandidateActions))
+	}
+	if decision.CandidateCount != len(decision.CandidateRewards) {
+		t.Fatalf("candidate count = %d, rewards = %d", decision.CandidateCount, len(decision.CandidateRewards))
 	}
 	if len(decision.LegalActionTypes) != decision.CandidateCount {
 		t.Fatalf("legal action types = %d, candidates = %d", len(decision.LegalActionTypes), decision.CandidateCount)

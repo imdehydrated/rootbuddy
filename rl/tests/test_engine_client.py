@@ -36,6 +36,7 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
             "activeFaction": 2,
             "observation": [0.0, 1.0],
             "candidateActions": [[1.0, 0.0], [0.0, 1.0]],
+            "candidateRewards": [0.0, 1.0],
             "candidateCount": 2,
             "reward": 1.5,
             "done": False,
@@ -55,5 +56,6 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
     assert decision.candidate_count == 2
     assert decision.observation.dtype == np.float32
     assert decision.candidate_actions.shape == (2, 2)
+    assert decision.candidate_rewards.tolist() == [0.0, 1.0]
     assert not decision.truncated
     assert decision.victory_points == (1, 2, 3, 4)

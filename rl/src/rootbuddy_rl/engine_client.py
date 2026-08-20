@@ -59,6 +59,7 @@ class EnvDecision:
     active_faction: int
     observation: np.ndarray
     candidate_actions: np.ndarray
+    candidate_rewards: np.ndarray
     candidate_count: int
     reward: float
     done: bool
@@ -155,8 +156,11 @@ class EngineClient:
             action_length=int(response.get("actionLength", 0)),
         )
 
-    def reset(self) -> EnvBatch:
-        return self._parse_batch(self._request({"type": "reset"}))
+    def reset(self, env_indices: Iterable[int] | None = None) -> EnvBatch:
+        request: dict[str, Any] = {"type": "reset"}
+        if env_indices is not None:
+            request["envIndices"] = list(env_indices)
+        return self._parse_batch(self._request(request))
 
     def step(self, action_indices: Iterable[int]) -> EnvBatch:
         response = self._request({"type": "step", "actionIndices": list(action_indices)})
@@ -204,6 +208,7 @@ class EngineClient:
 def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_length: int) -> EnvDecision:
     observation = np.asarray(raw.get("observation", []), dtype=np.float32)
     candidates = np.asarray(raw.get("candidateActions", []), dtype=np.float32)
+    rewards = np.asarray(raw.get("candidateRewards", []), dtype=np.float32)
     if candidates.size == 0:
         candidates = candidates.reshape((0, action_length))
     return EnvDecision(
@@ -213,6 +218,7 @@ def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_leng
         active_faction=int(raw.get("activeFaction", 0)),
         observation=observation,
         candidate_actions=candidates,
+        candidate_rewards=rewards,
         candidate_count=int(raw.get("candidateCount", 0)),
         reward=float(raw.get("reward", 0.0)),
         done=bool(raw.get("done", False)),

@@ -57,6 +57,7 @@ type EnvDecision struct {
 	ActiveFaction     game.Faction      `json:"activeFaction"`
 	Observation       []float32         `json:"observation"`
 	CandidateActions  [][]float32       `json:"candidateActions"`
+	CandidateRewards  []float32         `json:"candidateRewards"`
 	CandidateCount    int               `json:"candidateCount"`
 	Reward            float32           `json:"reward"`
 	Done              bool              `json:"done"`
@@ -240,6 +241,10 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		encodedActions[actionIndex] = EncodeAction(slot.state, action)
 		actionTypes[actionIndex] = action.Type
 	}
+	candidateRewards, err := candidateRewardVector(slot.state, slot.legalActions, env.config.TerminalWinBonus)
+	if err != nil {
+		return EnvDecision{}, fmt.Errorf("candidate rewards for env %d: %w", index, err)
+	}
 
 	return EnvDecision{
 		EnvIndex:          index,
@@ -248,6 +253,7 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		ActiveFaction:     activeFaction,
 		Observation:       encodedObservation,
 		CandidateActions:  encodedActions,
+		CandidateRewards:  candidateRewards,
 		CandidateCount:    len(encodedActions),
 		Reward:            reward,
 		Done:              slot.done,
@@ -317,6 +323,20 @@ func victoryPointVector(state game.GameState) []int {
 		points[index] = state.VictoryPoints[faction]
 	}
 	return points
+}
+
+func candidateRewardVector(state game.GameState, actions []game.Action, terminalWinBonus float32) ([]float32, error) {
+	rewards := make([]float32, len(actions))
+	previous := victoryPointSnapshot(state)
+	actingFaction := state.FactionTurn
+	for index, action := range actions {
+		next, err := applyEnvAction(rootengine.CloneState(state), action)
+		if err != nil {
+			return nil, fmt.Errorf("action %d: %w", index, err)
+		}
+		rewards[index] = rewardForTransition(previous, next, actingFaction, terminalWinBonus)
+	}
+	return rewards, nil
 }
 
 func rewardForTransition(previous map[game.Faction]int, next game.GameState, actingFaction game.Faction, terminalWinBonus float32) float32 {

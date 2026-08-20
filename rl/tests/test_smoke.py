@@ -53,6 +53,7 @@ def assert_batch_shape(batch: VecEnvArrays, *, num_envs: int) -> None:
     assert batch.candidate_actions.shape[0] == num_envs
     assert batch.candidate_actions.shape[2] == batch.action_length
     assert batch.action_mask.shape == batch.candidate_actions.shape[:2]
+    assert batch.candidate_rewards.shape == batch.action_mask.shape
     assert batch.rewards.shape == (num_envs,)
     assert batch.dones.shape == (num_envs,)
     assert batch.truncations.shape == (num_envs,)
