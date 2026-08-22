@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping, Protocol
 
+import numpy as np
 import torch
 
 from .model import CandidatePolicyValueNet, tensors_from_batch
 from .ppo import PPOBatch, compute_gae
 from .vec_env import RootBuddyVecEnv, VecEnvArrays
+
+
+class ActionProvider(Protocol):
+    def select_actions(self, batch: VecEnvArrays) -> np.ndarray:
+        """Return one action index per env row."""
 
 
 @dataclass(frozen=True)
@@ -40,6 +47,8 @@ def collect_rollout(
     env: RootBuddyVecEnv,
     model: CandidatePolicyValueNet,
     config: RolloutConfig,
+    *,
+    opponent_agents: Mapping[int, ActionProvider] | None = None,
 ) -> RolloutResult:
     if config.steps <= 0:
         raise ValueError("rollout steps must be positive")
@@ -58,6 +67,7 @@ def collect_rollout(
     values: list[torch.Tensor] = []
     rewards: list[torch.Tensor] = []
     dones: list[torch.Tensor] = []
+    learning_masks: list[torch.Tensor] = []
 
     for _ in range(config.steps):
         if (current.candidate_counts <= 0).any():
@@ -73,17 +83,23 @@ def collect_rollout(
                 deterministic=config.deterministic,
             )
 
-        next_batch = env.step(selection.actions.detach().cpu().tolist())
+        action_indices, learning_mask = choose_rollout_actions(
+            current,
+            selection.actions.detach().cpu().numpy().astype(np.int64),
+            opponent_agents=opponent_agents,
+        )
+        next_batch = env.step(action_indices.tolist())
 
         observations.append(tensors["observations"].detach().cpu())
         candidate_actions.append(tensors["candidate_actions"].detach().cpu())
         action_masks.append(tensors["action_mask"].detach().cpu())
         active_factions.append(tensors["active_factions"].detach().cpu())
-        actions.append(selection.actions.detach().cpu())
+        actions.append(torch.as_tensor(action_indices, dtype=torch.long))
         old_log_probs.append(selection.log_probs.detach().cpu())
         values.append(selection.values.detach().cpu())
         rewards.append(torch.as_tensor(next_batch.rewards, dtype=torch.float32))
         dones.append(torch.as_tensor(next_batch.dones, dtype=torch.float32))
+        learning_masks.append(torch.as_tensor(learning_mask, dtype=torch.bool))
 
         current = next_batch
         if config.stop_on_done and bool(next_batch.dones.any()):
@@ -108,15 +124,19 @@ def collect_rollout(
         gae_lambda=config.gae_lambda,
     )
 
+    learning_mask = torch.cat(learning_masks, dim=0)
+    if not bool(learning_mask.any()):
+        raise ValueError("rollout produced no live-model transitions")
+
     batch = PPOBatch(
-        observations=torch.cat(observations, dim=0),
-        candidate_actions=flatten_padded_candidate_actions(candidate_actions),
-        action_mask=flatten_padded_action_masks(action_masks),
-        active_factions=torch.cat(active_factions, dim=0),
-        actions=torch.cat(actions, dim=0),
-        old_log_probs=torch.cat(old_log_probs, dim=0),
-        returns=returns.reshape(-1),
-        advantages=advantages.reshape(-1),
+        observations=torch.cat(observations, dim=0)[learning_mask],
+        candidate_actions=flatten_padded_candidate_actions(candidate_actions)[learning_mask],
+        action_mask=flatten_padded_action_masks(action_masks)[learning_mask],
+        active_factions=torch.cat(active_factions, dim=0)[learning_mask],
+        actions=torch.cat(actions, dim=0)[learning_mask],
+        old_log_probs=torch.cat(old_log_probs, dim=0)[learning_mask],
+        returns=returns.reshape(-1)[learning_mask],
+        advantages=advantages.reshape(-1)[learning_mask],
     )
     stats = RolloutStats(
         steps=len(rewards),
@@ -125,6 +145,40 @@ def collect_rollout(
         mean_reward=float(rewards_by_time.mean().item()),
     )
     return RolloutResult(batch=batch, stats=stats, last_env_batch=current)
+
+
+def choose_rollout_actions(
+    batch: VecEnvArrays,
+    live_actions: np.ndarray,
+    *,
+    opponent_agents: Mapping[int, ActionProvider] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    if live_actions.shape != (batch.num_envs,):
+        raise ValueError("live_actions must have one action per env")
+    actions = live_actions.copy()
+    learning_mask = np.ones((batch.num_envs,), dtype=np.bool_)
+    if not opponent_agents:
+        return actions, learning_mask
+
+    proposals: dict[int, np.ndarray] = {}
+    for faction, agent in opponent_agents.items():
+        rows = batch.active_factions == int(faction)
+        if not bool(rows.any()):
+            continue
+        proposal_key = id(agent)
+        if proposal_key not in proposals:
+            proposal = agent.select_actions(batch)
+            if proposal.shape != (batch.num_envs,):
+                raise ValueError("opponent agent returned wrong action shape")
+            proposals[proposal_key] = proposal.astype(np.int64, copy=False)
+        actions[rows] = proposals[proposal_key][rows]
+        learning_mask[rows] = False
+    if not bool(learning_mask.any()):
+        learning_mask[0] = True
+        actions[0] = live_actions[0]
+    if np.any(actions < 0):
+        raise ValueError("rollout action selection left invalid rows")
+    return actions, learning_mask
 
 
 def bootstrap_values(

@@ -16,6 +16,14 @@ from rootbuddy_rl.vec_env import VecEnvArrays, batch_to_arrays
 from test_vec_env import decision
 
 
+class ConstantAgent:
+    def __init__(self, action: int) -> None:
+        self.action = action
+
+    def select_actions(self, batch: VecEnvArrays) -> np.ndarray:
+        return np.full((batch.num_envs,), self.action, dtype=np.int64)
+
+
 class FakeVecEnv:
     def __init__(self, reset_batch: VecEnvArrays, step_batches: list[VecEnvArrays]) -> None:
         self.reset_batch = reset_batch
@@ -107,6 +115,66 @@ def test_collect_rollout_can_continue_without_stop_on_done() -> None:
     assert result.batch.size == 2
 
 
+def test_collect_rollout_uses_opponents_and_filters_training_rows() -> None:
+    model = CandidatePolicyValueNet(
+        observation_dim=3,
+        action_dim=2,
+        torso_hidden_dims=(8,),
+        head_hidden_dim=8,
+    )
+    env = FakeVecEnv(
+        reset_batch=make_batch(
+            rewards=[0.0, 0.0],
+            dones=[False, False],
+            candidate_counts=[2, 2],
+            active_factions=[0, 2],
+        ),
+        step_batches=[
+            make_batch(
+                rewards=[1.0, 3.0],
+                dones=[False, True],
+                candidate_counts=[2, 2],
+                active_factions=[0, 2],
+            ),
+        ],
+    )
+
+    result = collect_rollout(
+        env,  # type: ignore[arg-type]
+        model,
+        RolloutConfig(steps=1),
+        opponent_agents={2: ConstantAgent(0)},
+    )
+
+    assert len(env.step_actions) == 1
+    assert env.step_actions[0][1] == 0
+    assert result.batch.size == 1
+    assert result.batch.active_factions.tolist() == [0]
+
+
+def test_collect_rollout_keeps_one_live_row_when_all_active_rows_are_opponents() -> None:
+    model = CandidatePolicyValueNet(
+        observation_dim=3,
+        action_dim=2,
+        torso_hidden_dims=(8,),
+        head_hidden_dim=8,
+    )
+    env = FakeVecEnv(
+        reset_batch=make_batch([0.0], [False], [2], active_factions=[0]),
+        step_batches=[make_batch([1.0], [False], [2], active_factions=[0])],
+    )
+
+    result = collect_rollout(
+        env,  # type: ignore[arg-type]
+        model,
+        RolloutConfig(steps=1),
+        opponent_agents={0: ConstantAgent(0)},
+    )
+
+    assert result.batch.size == 1
+    assert result.batch.active_factions.tolist() == [0]
+
+
 def test_bootstrap_values_zeroes_terminal_rows() -> None:
     model = CandidatePolicyValueNet(
         observation_dim=3,
@@ -145,8 +213,10 @@ def make_batch(
     rewards: list[float],
     dones: list[bool],
     candidate_counts: list[int],
+    active_factions: list[int] | None = None,
 ) -> VecEnvArrays:
     decisions = []
+    factions = active_factions if active_factions is not None else [0 for _ in candidate_counts]
     for env_index, count in enumerate(candidate_counts):
         candidates = [[float(slot == feature), 0.5] for slot in range(count) for feature in [slot]]
         decisions.append(
@@ -156,6 +226,7 @@ def make_batch(
                 candidates=candidates,
                 reward=rewards[env_index],
                 done=dones[env_index],
+                active_faction=factions[env_index],
             )
         )
     return batch_to_arrays(

@@ -11,12 +11,12 @@ from typing import Sequence
 import torch
 
 from .engine_client import Faction, VecEnvConfig
+from .league import LeaguePool, discover_snapshots
 from .model import CandidatePolicyValueNet
 from .ppo import PPOConfig, PPOUpdateStats, ppo_update
 from .rollout import RolloutConfig, RolloutStats, collect_rollout
+from .train_constants import FACTION_COUNT
 from .vec_env import RootBuddyVecEnv, VecEnvArrays
-
-FACTION_COUNT = 4
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,10 @@ class TrainConfig:
     head_hidden_dim: int = 128
     seed: int = 0
     stop_on_done: bool = True
+    league_opponent_fraction: float = 0.0
+    league_max_snapshots: int = 8
+    league_snapshot_dir: str | Path | None = None
+    league_seed: int = 0
 
 
 @dataclass(frozen=True)
@@ -61,6 +65,8 @@ class TrainMetrics:
     approx_kl: float
     clip_fraction: float
     checkpoint_path: str | None = None
+    league_opponent_factions: tuple[int, ...] = ()
+    league_pool_size: int = 0
 
 
 @dataclass(frozen=True)
@@ -81,6 +87,8 @@ def train(
         raise ValueError("updates must be positive")
     if config.rollout_steps <= 0:
         raise ValueError("rollout_steps must be positive")
+    if not 0.0 <= config.league_opponent_fraction <= 1.0:
+        raise ValueError("league_opponent_fraction must be between 0 and 1")
     if config.seed != 0:
         torch.manual_seed(config.seed)
 
@@ -96,10 +104,23 @@ def train(
         model.to(device)
         if optimizer is None:
             optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+        league_pool = build_league_pool(config)
+        factions = training_factions(config.env_config)
 
         metrics: list[TrainMetrics] = []
         for update in range(1, config.updates + 1):
             started = time.perf_counter()
+            opponent_agents = (
+                league_pool.sample_faction_opponents(
+                    factions,
+                    observation_dim=model.observation_dim,
+                    action_dim=model.action_dim,
+                    opponent_fraction=config.league_opponent_fraction,
+                    device=device,
+                )
+                if league_pool is not None
+                else {}
+            )
             rollout = collect_rollout(
                 active_env,
                 model,
@@ -110,6 +131,7 @@ def train(
                     device=device,
                     stop_on_done=config.stop_on_done,
                 ),
+                opponent_agents=opponent_agents,
             )
             ppo_stats = ppo_update(
                 model,
@@ -131,6 +153,8 @@ def train(
                 last_env_batch=rollout.last_env_batch,
                 ppo_stats=ppo_stats,
                 elapsed=elapsed,
+                league_opponent_factions=tuple(sorted(opponent_agents)),
+                league_pool_size=len(league_pool.snapshots) if league_pool is not None else 0,
             )
             checkpoint_path = maybe_save_checkpoint(
                 config,
@@ -142,6 +166,8 @@ def train(
             )
             if checkpoint_path is not None:
                 metric = replace(metric, checkpoint_path=str(checkpoint_path))
+                if league_pool is not None:
+                    league_pool.add_snapshot(checkpoint_path, update=update)
             metrics.append(metric)
             log_metrics(writer, metric)
         return TrainResult(model=model, optimizer=optimizer, metrics=tuple(metrics))
@@ -169,6 +195,8 @@ def make_train_metrics(
     ppo_stats: PPOUpdateStats,
     elapsed: float,
     checkpoint_path: Path | None = None,
+    league_opponent_factions: tuple[int, ...] = (),
+    league_pool_size: int = 0,
 ) -> TrainMetrics:
     outcomes = terminal_outcomes(last_env_batch)
     return TrainMetrics(
@@ -188,6 +216,8 @@ def make_train_metrics(
         approx_kl=ppo_stats.approx_kl,
         clip_fraction=ppo_stats.clip_fraction,
         checkpoint_path=str(checkpoint_path) if checkpoint_path is not None else None,
+        league_opponent_factions=league_opponent_factions,
+        league_pool_size=league_pool_size,
     )
 
 
@@ -246,6 +276,21 @@ def maybe_save_checkpoint(
     return path
 
 
+def build_league_pool(config: TrainConfig) -> LeaguePool | None:
+    if config.league_opponent_fraction <= 0:
+        return None
+    pool = LeaguePool(max_snapshots=config.league_max_snapshots, seed=config.league_seed)
+    snapshot_dir = config.league_snapshot_dir if config.league_snapshot_dir is not None else config.checkpoint_dir
+    pool.extend(discover_snapshots(snapshot_dir))
+    return pool
+
+
+def training_factions(config: VecEnvConfig) -> tuple[int, ...]:
+    if config.factions is None:
+        return tuple(range(FACTION_COUNT))
+    return tuple(int(faction) for faction in config.factions)
+
+
 def config_to_dict(config: TrainConfig) -> dict[str, object]:
     data = asdict(config)
     env_config = config.env_config.to_wire()
@@ -253,6 +298,7 @@ def config_to_dict(config: TrainConfig) -> dict[str, object]:
     data["checkpoint_dir"] = str(config.checkpoint_dir)
     data["log_dir"] = str(config.log_dir) if config.log_dir is not None else None
     data["device"] = str(config.device) if config.device is not None else None
+    data["league_snapshot_dir"] = str(config.league_snapshot_dir) if config.league_snapshot_dir is not None else None
     return data
 
 
@@ -278,6 +324,8 @@ def log_metrics(writer, metrics: TrainMetrics) -> None:
     writer.add_scalar(f"{prefix}/entropy", metrics.entropy, metrics.update)
     writer.add_scalar(f"{prefix}/approx_kl", metrics.approx_kl, metrics.update)
     writer.add_scalar(f"{prefix}/clip_fraction", metrics.clip_fraction, metrics.update)
+    writer.add_scalar(f"{prefix}/league_pool_size", metrics.league_pool_size, metrics.update)
+    writer.add_scalar(f"{prefix}/league_opponent_factions", len(metrics.league_opponent_factions), metrics.update)
     for faction, value in enumerate(metrics.per_faction_win_rate):
         writer.add_scalar(f"{prefix}/faction_{faction}_win_rate", value, metrics.update)
     for faction, value in enumerate(metrics.per_faction_terminal_vp):
@@ -303,6 +351,10 @@ def two_player_train_config(args: argparse.Namespace) -> TrainConfig:
         checkpoint_every=args.checkpoint_every,
         log_dir=args.log_dir,
         seed=args.seed,
+        league_opponent_fraction=args.league_opponent_fraction,
+        league_max_snapshots=args.league_max_snapshots,
+        league_snapshot_dir=args.league_snapshot_dir,
+        league_seed=args.league_seed,
     )
 
 
@@ -321,6 +373,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--log-dir", default=None)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--track-all-hands", action="store_true")
+    parser.add_argument("--league-opponent-fraction", type=float, default=0.0)
+    parser.add_argument("--league-max-snapshots", type=int, default=8)
+    parser.add_argument("--league-snapshot-dir", default=None)
+    parser.add_argument("--league-seed", type=int, default=0)
     return parser.parse_args(argv)
 
 

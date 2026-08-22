@@ -13,7 +13,7 @@ import torch
 
 from .engine_client import Faction, VecEnvConfig
 from .model import CandidatePolicyValueNet, tensors_from_batch
-from .train import FACTION_COUNT
+from .train_constants import FACTION_COUNT
 from .vec_env import RootBuddyVecEnv, VecEnvArrays, sample_random_actions
 
 

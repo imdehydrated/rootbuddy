@@ -143,6 +143,14 @@ def test_cli_args_build_two_player_training_config() -> None:
             "909",
             "--rollout-steps",
             "5",
+            "--league-opponent-fraction",
+            "0.5",
+            "--league-max-snapshots",
+            "3",
+            "--league-snapshot-dir",
+            "snapshots",
+            "--league-seed",
+            "42",
             "--track-all-hands",
         ]
     )
@@ -155,6 +163,10 @@ def test_cli_args_build_two_player_training_config() -> None:
     assert config.env_config.base_seed == 909
     assert config.env_config.factions == [Faction.MARQUISE, Faction.EYRIE]
     assert config.env_config.track_all_hands
+    assert config.league_opponent_fraction == 0.5
+    assert config.league_max_snapshots == 3
+    assert config.league_snapshot_dir == "snapshots"
+    assert config.league_seed == 42
 
 
 def make_batch(
