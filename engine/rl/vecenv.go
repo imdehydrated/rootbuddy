@@ -157,6 +157,10 @@ func (env *VecEnv) ResetEnv(index int) (EnvDecision, error) {
 	slot.initialized = true
 	slot.lastVictoryPoints = victoryPointSnapshot(state)
 	slot.legalActions = rootengine.ValidActions(state)
+	if !slot.done && len(slot.legalActions) == 0 {
+		slot.done = true
+		slot.truncated = true
+	}
 
 	return env.decision(index, 0)
 }
@@ -216,6 +220,10 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 		slot.legalActions = nil
 	} else {
 		slot.legalActions = rootengine.ValidActions(next)
+		if len(slot.legalActions) == 0 {
+			slot.done = true
+			slot.truncated = true
+		}
 	}
 
 	return env.decision(index, reward)

@@ -116,30 +116,31 @@ def evaluate_agents(
     try:
         batch = active_env.reset()
         while episodes < config.episodes:
+            done_rows = np.flatnonzero(batch.dones)
+            if done_rows.size > 0:
+                for row in done_rows:
+                    if episodes >= config.episodes:
+                        break
+                    episodes += 1
+                    game_lengths.append(int(batch.steps[row]))
+                    terminal_vp.append(batch.victory_points[row].astype(np.float32))
+                    if bool(batch.truncations[row]):
+                        truncated_episodes += 1
+                        continue
+                    winner = int(batch.winners[row])
+                    if 0 <= winner < FACTION_COUNT:
+                        winner_counts[winner] += 1
+                if episodes >= config.episodes:
+                    break
+                batch = active_env.reset(env_indices=env_indices_for_rows(batch, done_rows))
+                continue
+
+            if np.any(batch.candidate_counts <= 0):
+                raise ValueError("cannot evaluate env rows without legal actions")
             actions = select_actions_by_faction(batch, agents=agents, default_agent=fallback)
             batch = active_env.step(actions.tolist())
             transitions += batch.num_envs
             reward_sum += float(batch.rewards.sum())
-
-            done_rows = np.flatnonzero(batch.dones)
-            if done_rows.size == 0:
-                continue
-
-            for row in done_rows:
-                if episodes >= config.episodes:
-                    break
-                episodes += 1
-                game_lengths.append(int(batch.steps[row]))
-                terminal_vp.append(batch.victory_points[row].astype(np.float32))
-                if bool(batch.truncations[row]):
-                    truncated_episodes += 1
-                    continue
-                winner = int(batch.winners[row])
-                if 0 <= winner < FACTION_COUNT:
-                    winner_counts[winner] += 1
-
-            if episodes < config.episodes:
-                batch = active_env.reset(env_indices=done_rows.tolist())
     finally:
         if owns_env:
             active_env.close()
@@ -155,6 +156,10 @@ def evaluate_agents(
         per_faction_win_rate=tuple(count / episodes for count in winner_counts),
         per_faction_terminal_vp=mean_terminal_vp(terminal_vp),
     )
+
+
+def env_indices_for_rows(batch: VecEnvArrays, rows: np.ndarray) -> list[int]:
+    return [int(batch.decisions[int(row)].env_index) for row in rows]
 
 
 def select_actions_by_faction(

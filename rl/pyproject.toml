@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 rootbuddy-eval = "rootbuddy_rl.evaluate:main"
+rootbuddy-experiment = "rootbuddy_rl.experiment:main"
 rootbuddy-train = "rootbuddy_rl.train:main"
 
 [tool.setuptools.packages.find]
