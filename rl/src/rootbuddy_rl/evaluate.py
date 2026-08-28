@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import time
-from dataclasses import dataclass
+from collections import Counter, deque
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
@@ -77,6 +78,17 @@ class EvaluationConfig:
 
 
 @dataclass(frozen=True)
+class EvaluationDiagnostics:
+    terminal_reasons: tuple[tuple[str, int], ...] = ()
+    final_active_factions: tuple[tuple[int, int], ...] = ()
+    final_phase_steps: tuple[tuple[tuple[int, int], int], ...] = ()
+    action_type_counts: tuple[tuple[int, int], ...] = ()
+    truncated_recent_action_type_counts: tuple[tuple[int, int], ...] = ()
+    per_faction_action_counts: tuple[int, ...] = field(default_factory=lambda: tuple(0 for _ in range(FACTION_COUNT)))
+    mean_candidate_count: float = 0.0
+
+
+@dataclass(frozen=True)
 class EvaluationMetrics:
     episodes: int
     transitions: int
@@ -86,6 +98,7 @@ class EvaluationMetrics:
     transitions_per_second: float
     per_faction_win_rate: tuple[float, ...]
     per_faction_terminal_vp: tuple[float, ...]
+    diagnostics: EvaluationDiagnostics = field(default_factory=EvaluationDiagnostics)
 
 
 def evaluate_agents(
@@ -111,6 +124,15 @@ def evaluate_agents(
     game_lengths: list[int] = []
     winner_counts = [0 for _ in range(FACTION_COUNT)]
     terminal_vp: list[np.ndarray] = []
+    terminal_reasons: Counter[str] = Counter()
+    final_active_factions: Counter[int] = Counter()
+    final_phase_steps: Counter[tuple[int, int]] = Counter()
+    action_type_counts: Counter[int] = Counter()
+    truncated_recent_action_type_counts: Counter[int] = Counter()
+    per_faction_action_counts = [0 for _ in range(FACTION_COUNT)]
+    candidate_count_sum = 0
+    candidate_count_samples = 0
+    recent_actions: dict[int, deque[int]] = {}
     started = time.perf_counter()
 
     try:
@@ -124,8 +146,14 @@ def evaluate_agents(
                     episodes += 1
                     game_lengths.append(int(batch.steps[row]))
                     terminal_vp.append(batch.victory_points[row].astype(np.float32))
+                    terminal_reasons[terminal_reason(batch, int(row), config.env_config.max_steps)] += 1
+                    final_active_factions[int(batch.active_factions[row])] += 1
+                    final_phase_steps[(int(batch.current_phases[row]), int(batch.current_steps[row]))] += 1
+                    recent_action_types = recent_actions_for_row(batch, int(row), recent_actions)
+                    recent_actions.pop(int(batch.decisions[int(row)].env_index), None)
                     if bool(batch.truncations[row]):
                         truncated_episodes += 1
+                        truncated_recent_action_type_counts.update(recent_action_types)
                         continue
                     winner = int(batch.winners[row])
                     if 0 <= winner < FACTION_COUNT:
@@ -137,7 +165,16 @@ def evaluate_agents(
 
             if np.any(batch.candidate_counts <= 0):
                 raise ValueError("cannot evaluate env rows without legal actions")
+            candidate_count_sum += int(batch.candidate_counts.sum())
+            candidate_count_samples += batch.num_envs
             actions = select_actions_by_faction(batch, agents=agents, default_agent=fallback)
+            record_selected_actions(
+                batch,
+                actions,
+                recent_actions=recent_actions,
+                action_type_counts=action_type_counts,
+                per_faction_action_counts=per_faction_action_counts,
+            )
             batch = active_env.step(actions.tolist())
             transitions += batch.num_envs
             reward_sum += float(batch.rewards.sum())
@@ -155,11 +192,62 @@ def evaluate_agents(
         transitions_per_second=transitions / elapsed,
         per_faction_win_rate=tuple(count / episodes for count in winner_counts),
         per_faction_terminal_vp=mean_terminal_vp(terminal_vp),
+        diagnostics=EvaluationDiagnostics(
+            terminal_reasons=sorted_count_items(terminal_reasons),
+            final_active_factions=sorted_count_items(final_active_factions),
+            final_phase_steps=sorted_count_items(final_phase_steps),
+            action_type_counts=sorted_count_items(action_type_counts),
+            truncated_recent_action_type_counts=sorted_count_items(truncated_recent_action_type_counts),
+            per_faction_action_counts=tuple(per_faction_action_counts),
+            mean_candidate_count=candidate_count_sum / max(candidate_count_samples, 1),
+        ),
     )
 
 
 def env_indices_for_rows(batch: VecEnvArrays, rows: np.ndarray) -> list[int]:
     return [int(batch.decisions[int(row)].env_index) for row in rows]
+
+
+def terminal_reason(batch: VecEnvArrays, row: int, max_steps: int) -> str:
+    if not bool(batch.truncations[row]):
+        return "win"
+    if int(batch.steps[row]) < max_steps:
+        return "no_legal"
+    return "max_steps"
+
+
+def recent_actions_for_row(
+    batch: VecEnvArrays,
+    row: int,
+    recent_actions: Mapping[int, deque[int]],
+) -> tuple[int, ...]:
+    env_index = int(batch.decisions[row].env_index)
+    return tuple(recent_actions.get(env_index, ()))
+
+
+def record_selected_actions(
+    batch: VecEnvArrays,
+    actions: np.ndarray,
+    *,
+    recent_actions: dict[int, deque[int]],
+    action_type_counts: Counter[int],
+    per_faction_action_counts: list[int],
+) -> None:
+    for row, action_index in enumerate(actions):
+        index = int(action_index)
+        if index < 0 or index >= len(batch.decisions[row].legal_action_types):
+            continue
+        action_type = int(batch.decisions[row].legal_action_types[index])
+        action_type_counts[action_type] += 1
+        faction = int(batch.active_factions[row])
+        if 0 <= faction < len(per_faction_action_counts):
+            per_faction_action_counts[faction] += 1
+        env_index = int(batch.decisions[row].env_index)
+        recent_actions.setdefault(env_index, deque(maxlen=64)).append(action_type)
+
+
+def sorted_count_items(counter: Mapping) -> tuple:
+    return tuple(sorted(counter.items(), key=lambda item: item[0]))
 
 
 def select_actions_by_faction(
@@ -231,7 +319,9 @@ def two_player_eval_config(args: argparse.Namespace) -> EvaluationConfig:
             max_steps=args.max_steps,
             factions=[Faction.MARQUISE, Faction.EYRIE],
             player_faction=Faction.MARQUISE,
-            track_all_hands=args.track_all_hands,
+            track_all_hands=not args.partial_observability,
+            step_penalty=args.step_penalty,
+            truncation_penalty=args.truncation_penalty,
         ),
         episodes=args.episodes,
     )
@@ -248,14 +338,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--num-envs", type=int, default=2)
     parser.add_argument("--base-seed", type=int, default=1707)
-    parser.add_argument("--max-steps", type=int, default=256)
+    parser.add_argument("--max-steps", type=int, default=1024)
     parser.add_argument("--baseline", choices=["random", "greedy-vp"], default="random")
     parser.add_argument("--model-checkpoint", default=None)
     parser.add_argument("--model-factions", default="0")
     parser.add_argument("--stochastic-model", action="store_true")
     parser.add_argument("--device", default=None)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--track-all-hands", action="store_true")
+    parser.add_argument("--step-penalty", type=float, default=0.01)
+    parser.add_argument("--truncation-penalty", type=float, default=10.0)
+    parser.add_argument(
+        "--partial-observability",
+        action="store_true",
+        help="request hidden opponent hands; currently overridden by the Go RL env until hidden-card action generation is supported",
+    )
+    parser.add_argument("--track-all-hands", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args(argv)
 
 
@@ -290,7 +387,7 @@ def format_metrics(metrics: EvaluationMetrics) -> str:
     return (
         "episodes={episodes} transitions={transitions} truncated={truncated} "
         "reward={reward:.4f} game_length={length:.2f} tps={tps:.1f} "
-        "win_rate={wins} terminal_vp={vp}"
+        "win_rate={wins} terminal_vp={vp} diagnostics={diagnostics}"
     ).format(
         episodes=metrics.episodes,
         transitions=metrics.transitions,
@@ -300,7 +397,20 @@ def format_metrics(metrics: EvaluationMetrics) -> str:
         tps=metrics.transitions_per_second,
         wins=tuple(round(value, 4) for value in metrics.per_faction_win_rate),
         vp=tuple(round(value, 2) for value in metrics.per_faction_terminal_vp),
+        diagnostics=format_diagnostics(metrics.diagnostics),
     )
+
+
+def format_diagnostics(diagnostics: EvaluationDiagnostics) -> str:
+    return {
+        "terminal_reasons": dict(diagnostics.terminal_reasons),
+        "final_active_factions": dict(diagnostics.final_active_factions),
+        "final_phase_steps": {f"{phase}:{step}": count for (phase, step), count in diagnostics.final_phase_steps},
+        "action_type_counts": dict(diagnostics.action_type_counts),
+        "truncated_recent_action_type_counts": dict(diagnostics.truncated_recent_action_type_counts),
+        "per_faction_action_counts": diagnostics.per_faction_action_counts,
+        "mean_candidate_count": round(diagnostics.mean_candidate_count, 2),
+    }
 
 
 if __name__ == "__main__":

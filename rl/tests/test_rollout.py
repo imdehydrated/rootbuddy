@@ -9,6 +9,7 @@ from rootbuddy_rl.rollout import (
     RolloutConfig,
     bootstrap_values,
     collect_rollout,
+    compute_turn_based_gae,
     flatten_padded_action_masks,
     flatten_padded_candidate_actions,
 )
@@ -28,9 +29,11 @@ class FakeVecEnv:
     def __init__(self, reset_batch: VecEnvArrays, step_batches: list[VecEnvArrays]) -> None:
         self.reset_batch = reset_batch
         self.step_batches = step_batches
+        self.reset_indices: list[list[int] | None] = []
         self.step_actions: list[list[int]] = []
 
-    def reset(self) -> VecEnvArrays:
+    def reset(self, env_indices: list[int] | None = None) -> VecEnvArrays:
+        self.reset_indices.append(env_indices)
         return self.reset_batch
 
     def step(self, action_indices: list[int]) -> VecEnvArrays:
@@ -113,6 +116,31 @@ def test_collect_rollout_can_continue_without_stop_on_done() -> None:
     assert result.stats.steps == 2
     assert result.stats.completed_episodes == 1
     assert result.batch.size == 2
+    assert env.reset_indices == [None, [0]]
+
+
+def test_collect_rollout_uses_initial_batch_without_full_reset() -> None:
+    model = CandidatePolicyValueNet(
+        observation_dim=3,
+        action_dim=2,
+        torso_hidden_dims=(8,),
+        head_hidden_dim=8,
+    )
+    initial_batch = make_batch([0.0], [False], [2])
+    env = FakeVecEnv(
+        reset_batch=make_batch([0.0], [False], [1]),
+        step_batches=[make_batch([1.0], [False], [2])],
+    )
+
+    result = collect_rollout(
+        env,  # type: ignore[arg-type]
+        model,
+        RolloutConfig(steps=1),
+        initial_batch=initial_batch,
+    )
+
+    assert env.reset_indices == []
+    assert result.stats.transitions == 1
 
 
 def test_collect_rollout_uses_opponents_and_filters_training_rows() -> None:
@@ -192,6 +220,30 @@ def test_bootstrap_values_zeroes_terminal_rows() -> None:
 
     assert values.shape == (2,)
     assert values[1] == 0
+
+
+def test_compute_turn_based_gae_does_not_mix_opponent_rewards() -> None:
+    rewards = torch.tensor([[1.0], [10.0], [2.0]])
+    values = torch.zeros_like(rewards)
+    dones = torch.zeros_like(rewards)
+    active_factions = torch.tensor([[0], [2], [0]])
+    last_values = torch.zeros(1)
+    last_active_factions = torch.tensor([2])
+
+    advantages, returns = compute_turn_based_gae(
+        rewards,
+        values,
+        dones,
+        active_factions,
+        last_values,
+        last_active_factions,
+        gamma=0.5,
+        gae_lambda=1.0,
+    )
+
+    expected = torch.tensor([[2.0], [10.0], [2.0]])
+    torch.testing.assert_close(advantages, expected)
+    torch.testing.assert_close(returns, expected)
 
 
 def test_flatten_padded_rollout_tensors_uses_global_candidate_width() -> None:

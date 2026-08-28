@@ -33,8 +33,10 @@ class VecEnvConfig:
     factions: Sequence[int | Faction] | None = None
     player_faction: int | Faction = Faction.MARQUISE
     map_id: str = "autumn"
-    track_all_hands: bool = False
+    track_all_hands: bool = True
     terminal_win_bonus: float = 0.0
+    step_penalty: float = 0.0
+    truncation_penalty: float = 0.0
 
     def to_wire(self) -> dict[str, Any]:
         wire = {
@@ -45,6 +47,8 @@ class VecEnvConfig:
             "mapId": self.map_id,
             "trackAllHands": self.track_all_hands,
             "terminalWinBonus": self.terminal_win_bonus,
+            "stepPenalty": self.step_penalty,
+            "truncationPenalty": self.truncation_penalty,
         }
         if self.factions is not None:
             wire["factions"] = [int(faction) for faction in self.factions]
@@ -57,6 +61,8 @@ class EnvDecision:
     episode: int
     step: int
     active_faction: int
+    current_phase: int
+    current_step: int
     observation: np.ndarray
     candidate_actions: np.ndarray
     candidate_rewards: np.ndarray
@@ -216,6 +222,8 @@ def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_leng
         episode=int(raw.get("episode", 0)),
         step=int(raw.get("step", 0)),
         active_faction=int(raw.get("activeFaction", 0)),
+        current_phase=int(raw.get("currentPhase", 0)),
+        current_step=int(raw.get("currentStep", 0)),
         observation=observation,
         candidate_actions=candidates,
         candidate_rewards=rewards,

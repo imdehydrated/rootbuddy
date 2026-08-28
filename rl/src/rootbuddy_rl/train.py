@@ -40,7 +40,7 @@ class TrainConfig:
     torso_hidden_dims: tuple[int, ...] = (256, 256)
     head_hidden_dim: int = 128
     seed: int = 0
-    stop_on_done: bool = True
+    stop_on_done: bool = False
     league_opponent_fraction: float = 0.0
     league_max_snapshots: int = 8
     league_snapshot_dir: str | Path | None = None
@@ -98,9 +98,9 @@ def train(
     writer = create_summary_writer(config.log_dir)
 
     try:
-        initial_batch = active_env.reset()
+        current_batch = active_env.reset()
         if model is None:
-            model = build_model_from_batch(initial_batch, config)
+            model = build_model_from_batch(current_batch, config)
         model.to(device)
         if optimizer is None:
             optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
@@ -131,8 +131,10 @@ def train(
                     device=device,
                     stop_on_done=config.stop_on_done,
                 ),
+                initial_batch=current_batch,
                 opponent_agents=opponent_agents,
             )
+            current_batch = rollout.last_env_batch
             ppo_stats = ppo_update(
                 model,
                 optimizer,
@@ -150,7 +152,6 @@ def train(
             metric = make_train_metrics(
                 update=update,
                 rollout_stats=rollout.stats,
-                last_env_batch=rollout.last_env_batch,
                 ppo_stats=ppo_stats,
                 elapsed=elapsed,
                 league_opponent_factions=tuple(sorted(opponent_agents)),
@@ -191,23 +192,21 @@ def make_train_metrics(
     *,
     update: int,
     rollout_stats: RolloutStats,
-    last_env_batch: VecEnvArrays,
     ppo_stats: PPOUpdateStats,
     elapsed: float,
     checkpoint_path: Path | None = None,
     league_opponent_factions: tuple[int, ...] = (),
     league_pool_size: int = 0,
 ) -> TrainMetrics:
-    outcomes = terminal_outcomes(last_env_batch)
     return TrainMetrics(
         update=update,
         rollout_steps=rollout_stats.steps,
         transitions=rollout_stats.transitions,
         completed_episodes=rollout_stats.completed_episodes,
         mean_reward=rollout_stats.mean_reward,
-        mean_game_length=outcomes["mean_game_length"],
-        per_faction_win_rate=outcomes["per_faction_win_rate"],
-        per_faction_terminal_vp=outcomes["per_faction_terminal_vp"],
+        mean_game_length=rollout_stats.mean_game_length,
+        per_faction_win_rate=rollout_stats.per_faction_win_rate,
+        per_faction_terminal_vp=rollout_stats.per_faction_terminal_vp,
         transitions_per_second=rollout_stats.transitions / elapsed,
         loss=ppo_stats.loss,
         policy_loss=ppo_stats.policy_loss,
@@ -340,7 +339,9 @@ def two_player_train_config(args: argparse.Namespace) -> TrainConfig:
             max_steps=args.max_steps,
             factions=[Faction.MARQUISE, Faction.EYRIE],
             player_faction=Faction.MARQUISE,
-            track_all_hands=args.track_all_hands,
+            track_all_hands=not args.partial_observability,
+            step_penalty=args.step_penalty,
+            truncation_penalty=args.truncation_penalty,
         ),
         updates=args.updates,
         rollout_steps=args.rollout_steps,
@@ -363,7 +364,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--updates", type=int, default=10)
     parser.add_argument("--num-envs", type=int, default=4)
     parser.add_argument("--base-seed", type=int, default=707)
-    parser.add_argument("--max-steps", type=int, default=256)
+    parser.add_argument("--max-steps", type=int, default=1024)
     parser.add_argument("--rollout-steps", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--ppo-epochs", type=int, default=4)
@@ -372,7 +373,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--checkpoint-every", type=int, default=10)
     parser.add_argument("--log-dir", default=None)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--track-all-hands", action="store_true")
+    parser.add_argument("--step-penalty", type=float, default=0.01)
+    parser.add_argument("--truncation-penalty", type=float, default=10.0)
+    parser.add_argument(
+        "--partial-observability",
+        action="store_true",
+        help="request hidden opponent hands; currently overridden by the Go RL env until hidden-card action generation is supported",
+    )
+    parser.add_argument("--track-all-hands", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--league-opponent-fraction", type=float, default=0.0)
     parser.add_argument("--league-max-snapshots", type=int, default=8)
     parser.add_argument("--league-snapshot-dir", default=None)

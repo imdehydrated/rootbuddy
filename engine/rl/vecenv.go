@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	DefaultVecEnvMaxSteps           = 5000
-	DefaultTerminalWinBonus float32 = 30
+	DefaultVecEnvMaxSteps            = 5000
+	DefaultTerminalWinBonus  float32 = 30
+	DefaultStepPenalty       float32 = 0.01
+	DefaultTruncationPenalty float32 = 10
 )
 
 var (
@@ -23,14 +25,16 @@ var (
 )
 
 type VecEnvConfig struct {
-	NumEnvs          int            `json:"numEnvs"`
-	BaseSeed         int64          `json:"baseSeed"`
-	MaxSteps         int            `json:"maxSteps"`
-	Factions         []game.Faction `json:"factions,omitempty"`
-	PlayerFaction    game.Faction   `json:"playerFaction"`
-	MapID            game.MapID     `json:"mapId"`
-	TrackAllHands    bool           `json:"trackAllHands"`
-	TerminalWinBonus float32        `json:"terminalWinBonus"`
+	NumEnvs           int            `json:"numEnvs"`
+	BaseSeed          int64          `json:"baseSeed"`
+	MaxSteps          int            `json:"maxSteps"`
+	Factions          []game.Faction `json:"factions,omitempty"`
+	PlayerFaction     game.Faction   `json:"playerFaction"`
+	MapID             game.MapID     `json:"mapId"`
+	TrackAllHands     bool           `json:"trackAllHands"`
+	TerminalWinBonus  float32        `json:"terminalWinBonus"`
+	StepPenalty       float32        `json:"stepPenalty"`
+	TruncationPenalty float32        `json:"truncationPenalty"`
 }
 
 type VecEnv struct {
@@ -55,6 +59,8 @@ type EnvDecision struct {
 	Episode           int               `json:"episode"`
 	Step              int               `json:"step"`
 	ActiveFaction     game.Faction      `json:"activeFaction"`
+	CurrentPhase      game.Phase        `json:"currentPhase"`
+	CurrentStep       game.TurnStep     `json:"currentStep"`
 	Observation       []float32         `json:"observation"`
 	CandidateActions  [][]float32       `json:"candidateActions"`
 	CandidateRewards  []float32         `json:"candidateRewards"`
@@ -209,12 +215,20 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 		return EnvDecision{}, fmt.Errorf("step env %d action %d produced invalid state: %w", index, actionIndex, err)
 	}
 
-	reward := rewardForTransition(slot.lastVictoryPoints, next, actingFaction, env.config.TerminalWinBonus)
 	slot.state = next
 	slot.steps++
 	gameOver := next.GamePhase == game.LifecycleGameOver
 	slot.truncated = !gameOver && slot.steps >= env.config.MaxSteps
 	slot.done = gameOver || slot.truncated
+	reward := rewardForTransition(
+		slot.lastVictoryPoints,
+		next,
+		actingFaction,
+		env.config.TerminalWinBonus,
+		env.config.StepPenalty,
+		env.config.TruncationPenalty,
+		slot.truncated,
+	)
 	slot.lastVictoryPoints = victoryPointSnapshot(next)
 	if slot.done {
 		slot.legalActions = nil
@@ -259,6 +273,8 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		Episode:           slot.episode,
 		Step:              slot.steps,
 		ActiveFaction:     activeFaction,
+		CurrentPhase:      slot.state.CurrentPhase,
+		CurrentStep:       slot.state.CurrentStep,
 		Observation:       encodedObservation,
 		CandidateActions:  encodedActions,
 		CandidateRewards:  candidateRewards,
@@ -310,8 +326,15 @@ func normalizeVecEnvConfig(config VecEnvConfig) (VecEnvConfig, error) {
 	if config.MapID != game.AutumnMapID {
 		return VecEnvConfig{}, fmt.Errorf("%w: unsupported map %q", ErrInvalidVecEnvConfig, config.MapID)
 	}
+	config.TrackAllHands = true
 	if config.TerminalWinBonus == 0 {
 		config.TerminalWinBonus = DefaultTerminalWinBonus
+	}
+	if config.StepPenalty == 0 {
+		config.StepPenalty = DefaultStepPenalty
+	}
+	if config.TruncationPenalty == 0 {
+		config.TruncationPenalty = DefaultTruncationPenalty
 	}
 	config.Factions = append([]game.Faction(nil), config.Factions...)
 	return config, nil
@@ -342,18 +365,31 @@ func candidateRewardVector(state game.GameState, actions []game.Action, terminal
 		if err != nil {
 			return nil, fmt.Errorf("action %d: %w", index, err)
 		}
-		rewards[index] = rewardForTransition(previous, next, actingFaction, terminalWinBonus)
+		rewards[index] = rewardForTransition(previous, next, actingFaction, terminalWinBonus, 0, 0, false)
 	}
 	return rewards, nil
 }
 
-func rewardForTransition(previous map[game.Faction]int, next game.GameState, actingFaction game.Faction, terminalWinBonus float32) float32 {
-	reward := float32(next.VictoryPoints[actingFaction] - previous[actingFaction])
+func rewardForTransition(
+	previous map[game.Faction]int,
+	next game.GameState,
+	actingFaction game.Faction,
+	terminalWinBonus float32,
+	stepPenalty float32,
+	truncationPenalty float32,
+	truncated bool,
+) float32 {
+	reward := float32(next.VictoryPoints[actingFaction]-previous[actingFaction]) - stepPenalty
+	if truncated {
+		reward -= truncationPenalty
+	}
 	if next.GamePhase != game.LifecycleGameOver {
 		return reward
 	}
 	if next.Winner == actingFaction || factionInSlice(next.WinningCoalition, actingFaction) {
 		reward += terminalWinBonus
+	} else {
+		reward -= terminalWinBonus
 	}
 	return reward
 }

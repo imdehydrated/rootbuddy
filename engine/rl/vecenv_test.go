@@ -32,6 +32,15 @@ func TestNewVecEnvAppliesDefaults(t *testing.T) {
 	if config.TerminalWinBonus != DefaultTerminalWinBonus {
 		t.Fatalf("TerminalWinBonus = %f, want %f", config.TerminalWinBonus, DefaultTerminalWinBonus)
 	}
+	if config.StepPenalty != DefaultStepPenalty {
+		t.Fatalf("StepPenalty = %f, want %f", config.StepPenalty, DefaultStepPenalty)
+	}
+	if config.TruncationPenalty != DefaultTruncationPenalty {
+		t.Fatalf("TruncationPenalty = %f, want %f", config.TruncationPenalty, DefaultTruncationPenalty)
+	}
+	if !config.TrackAllHands {
+		t.Fatalf("TrackAllHands = false, want true for RL legal action generation")
+	}
 	if got, want := config.Factions, []game.Faction{game.Marquise, game.Eyrie, game.Alliance, game.Vagabond}; !sameFactions(got, want) {
 		t.Fatalf("Factions = %+v, want %+v", got, want)
 	}
@@ -131,6 +140,41 @@ func TestNewVecEnvCopiesConfigSlices(t *testing.T) {
 	}
 }
 
+func TestNewVecEnvNormalizesHiddenHandRequestsToTrackedHands(t *testing.T) {
+	env, err := NewVecEnv(VecEnvConfig{
+		NumEnvs:       1,
+		BaseSeed:      1707,
+		Factions:      []game.Faction{game.Marquise, game.Eyrie},
+		PlayerFaction: game.Marquise,
+		TrackAllHands: false,
+	})
+	if err != nil {
+		t.Fatalf("NewVecEnv failed: %v", err)
+	}
+
+	config := env.Config()
+	if !config.TrackAllHands {
+		t.Fatalf("normalized TrackAllHands = false, want true")
+	}
+
+	decision, err := env.ResetEnv(0)
+	if err != nil {
+		t.Fatalf("ResetEnv failed: %v", err)
+	}
+	if decision.CandidateCount == 0 || decision.Done {
+		t.Fatalf("reset decision = %+v, want live env with legal setup actions", decision)
+	}
+	if !env.slots[0].state.TrackAllHands {
+		t.Fatalf("slot state TrackAllHands = false, want true")
+	}
+	if len(env.slots[0].state.Eyrie.CardsInHand) == 0 {
+		t.Fatalf("expected Eyrie cards to be tracked internally for legal decree actions")
+	}
+	if got := env.slots[0].state.OtherHandCounts[game.Eyrie]; got != 0 {
+		t.Fatalf("Eyrie hidden hand count = %d, want 0 with tracked hands", got)
+	}
+}
+
 func TestSeedForSlotIsDeterministicAndDistinct(t *testing.T) {
 	first := seedForSlot(707, 2, 3)
 	second := seedForSlot(707, 2, 3)
@@ -161,11 +205,15 @@ func TestVecEnvResetInitializesSlotsAndDecisions(t *testing.T) {
 	}
 
 	for index, decision := range result.Decisions {
+		slot := env.slots[index]
 		if decision.EnvIndex != index {
 			t.Fatalf("decision EnvIndex = %d, want %d", decision.EnvIndex, index)
 		}
 		if decision.Episode != 0 || decision.Step != 0 {
 			t.Fatalf("decision episode/step = %d/%d, want 0/0", decision.Episode, decision.Step)
+		}
+		if decision.CurrentPhase != slot.state.CurrentPhase || decision.CurrentStep != slot.state.CurrentStep {
+			t.Fatalf("decision phase/step = %d/%d, want %d/%d", decision.CurrentPhase, decision.CurrentStep, slot.state.CurrentPhase, slot.state.CurrentStep)
 		}
 		if decision.Done {
 			t.Fatalf("reset decision unexpectedly done: %+v", decision)
@@ -188,7 +236,6 @@ func TestVecEnvResetInitializesSlotsAndDecisions(t *testing.T) {
 			}
 		}
 
-		slot := env.slots[index]
 		if !slot.initialized {
 			t.Fatalf("slot %d was not marked initialized", index)
 		}
@@ -433,8 +480,8 @@ func TestVecEnvStepEnvAppliesBattleAction(t *testing.T) {
 	if got := env.slots[0].state.VictoryPoints[game.Marquise]; got != 1 {
 		t.Fatalf("Marquise victory points = %d, want 1", got)
 	}
-	if decision.Reward != 1 {
-		t.Fatalf("Reward = %f, want 1", decision.Reward)
+	if decision.Reward != 0.99 {
+		t.Fatalf("Reward = %f, want 0.99", decision.Reward)
 	}
 }
 
@@ -570,14 +617,24 @@ func TestRewardForTransitionUsesActingFactionVPAndWinBonus(t *testing.T) {
 			game.Eyrie:    10,
 		},
 	}
-	if got := rewardForTransition(previous, next, game.Marquise, 30); got != 2 {
-		t.Fatalf("reward = %f, want 2", got)
+	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != 1.75 {
+		t.Fatalf("reward = %f, want 1.75", got)
 	}
 
 	next.GamePhase = game.LifecycleGameOver
 	next.Winner = game.Marquise
-	if got := rewardForTransition(previous, next, game.Marquise, 30); got != 32 {
-		t.Fatalf("terminal winner reward = %f, want 32", got)
+	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != 31.75 {
+		t.Fatalf("terminal winner reward = %f, want 31.75", got)
+	}
+
+	next.Winner = game.Eyrie
+	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != -28.25 {
+		t.Fatalf("terminal loser reward = %f, want -28.25", got)
+	}
+
+	next.GamePhase = game.LifecyclePlaying
+	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 10, true); got != -8.25 {
+		t.Fatalf("truncated reward = %f, want -8.25", got)
 	}
 }
 

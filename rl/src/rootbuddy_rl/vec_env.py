@@ -21,6 +21,8 @@ class VecEnvArrays:
     dones: np.ndarray
     truncations: np.ndarray
     active_factions: np.ndarray
+    current_phases: np.ndarray
+    current_steps: np.ndarray
     episodes: np.ndarray
     steps: np.ndarray
     winners: np.ndarray
@@ -105,6 +107,8 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
     dones = np.zeros((num_envs,), dtype=np.bool_)
     truncations = np.zeros((num_envs,), dtype=np.bool_)
     active_factions = np.zeros((num_envs,), dtype=np.int64)
+    current_phases = np.zeros((num_envs,), dtype=np.int64)
+    current_steps = np.zeros((num_envs,), dtype=np.int64)
     episodes = np.zeros((num_envs,), dtype=np.int64)
     steps = np.zeros((num_envs,), dtype=np.int64)
     winners = np.zeros((num_envs,), dtype=np.int64)
@@ -118,6 +122,8 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         dones[row] = decision.done
         truncations[row] = decision.truncated
         active_factions[row] = decision.active_faction
+        current_phases[row] = decision.current_phase
+        current_steps[row] = decision.current_step
         episodes[row] = decision.episode
         steps[row] = decision.step
         winners[row] = decision.winner
@@ -143,6 +149,8 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         dones=dones,
         truncations=truncations,
         active_factions=active_factions,
+        current_phases=current_phases,
+        current_steps=current_steps,
         episodes=episodes,
         steps=steps,
         winners=winners,

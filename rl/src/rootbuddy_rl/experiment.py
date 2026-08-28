@@ -159,7 +159,10 @@ def experiment_preset(name: str, *, output_dir: str | Path = "rl/runs") -> Exper
         max_steps=64,
         factions=[Faction.MARQUISE, Faction.EYRIE],
         player_faction=Faction.MARQUISE,
+        track_all_hands=True,
         terminal_win_bonus=30.0,
+        step_penalty=0.01,
+        truncation_penalty=10.0,
     )
     if name == "smoke":
         return ExperimentConfig(
@@ -187,7 +190,7 @@ def experiment_preset(name: str, *, output_dir: str | Path = "rl/runs") -> Exper
         return ExperimentConfig(
             name=name,
             train_config=TrainConfig(
-                env_config=replace(base_env, num_envs=4, max_steps=256),
+                env_config=replace(base_env, num_envs=4, max_steps=1024),
                 updates=25,
                 rollout_steps=32,
                 ppo_epochs=2,
@@ -211,7 +214,7 @@ def experiment_preset(name: str, *, output_dir: str | Path = "rl/runs") -> Exper
         return ExperimentConfig(
             name=name,
             train_config=TrainConfig(
-                env_config=replace(base_env, num_envs=8, max_steps=512),
+                env_config=replace(base_env, num_envs=8, max_steps=2048),
                 updates=100,
                 rollout_steps=64,
                 ppo_epochs=4,
@@ -251,6 +254,16 @@ def apply_overrides(config: ExperimentConfig, args: argparse.Namespace) -> Exper
             train_config,
             env_config=replace(train_config.env_config, terminal_win_bonus=args.terminal_win_bonus),
         )
+    if args.step_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, step_penalty=args.step_penalty),
+        )
+    if args.truncation_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, truncation_penalty=args.truncation_penalty),
+        )
     if args.league_opponent_fraction is not None:
         train_config = replace(train_config, league_opponent_fraction=args.league_opponent_fraction)
     if args.device is not None:
@@ -281,6 +294,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float, default=None)
     parser.add_argument("--entropy-coef", type=float, default=None)
     parser.add_argument("--terminal-win-bonus", type=float, default=None)
+    parser.add_argument("--step-penalty", type=float, default=None)
+    parser.add_argument("--truncation-penalty", type=float, default=None)
     parser.add_argument("--league-opponent-fraction", type=float, default=None)
     parser.add_argument("--eval-episodes", type=int, default=None)
     parser.add_argument("--eval-num-envs", type=int, default=None)

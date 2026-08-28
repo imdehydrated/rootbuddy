@@ -23,8 +23,16 @@ def test_vec_env_config_uses_go_json_keys() -> None:
         "mapId": "autumn",
         "trackAllHands": True,
         "terminalWinBonus": 0.0,
+        "stepPenalty": 0.0,
+        "truncationPenalty": 0.0,
         "factions": [0, 2],
     }
+
+
+def test_vec_env_config_tracks_all_hands_by_default() -> None:
+    config = VecEnvConfig(num_envs=1, base_seed=707)
+
+    assert config.to_wire()["trackAllHands"] is True
 
 
 def test_parse_decision_converts_vectors_to_numpy() -> None:
@@ -34,6 +42,8 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
             "episode": 0,
             "step": 3,
             "activeFaction": 2,
+            "currentPhase": 1,
+            "currentStep": 3,
             "observation": [0.0, 1.0],
             "candidateActions": [[1.0, 0.0], [0.0, 1.0]],
             "candidateRewards": [0.0, 1.0],
@@ -53,6 +63,8 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
     )
 
     assert decision.env_index == 1
+    assert decision.current_phase == 1
+    assert decision.current_step == 3
     assert decision.candidate_count == 2
     assert decision.observation.dtype == np.float32
     assert decision.candidate_actions.shape == (2, 2)

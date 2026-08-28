@@ -26,9 +26,20 @@ def test_experiment_preset_builds_smoke_train_eval_cycle(tmp_path: Path) -> None
     assert config.train_config.updates == 2
     assert config.train_config.checkpoint_every == 1
     assert config.train_config.league_opponent_fraction > 0
+    assert config.train_config.env_config.track_all_hands
+    assert config.train_config.env_config.step_penalty == 0.01
+    assert config.train_config.env_config.truncation_penalty == 10.0
     assert config.eval_episodes == 2
     assert config.baselines == ("random", "greedy-vp")
     assert Path(config.train_config.checkpoint_dir).is_relative_to(tmp_path)
+
+
+def test_two_player_presets_use_eval_sized_step_caps(tmp_path: Path) -> None:
+    fast = experiment_preset("two-player-fast", output_dir=tmp_path)
+    stable = experiment_preset("two-player-stable", output_dir=tmp_path)
+
+    assert fast.train_config.env_config.max_steps == 1024
+    assert stable.train_config.env_config.max_steps == 2048
 
 
 def test_apply_overrides_changes_tuning_knobs(tmp_path: Path) -> None:
@@ -39,6 +50,8 @@ def test_apply_overrides_changes_tuning_knobs(tmp_path: Path) -> None:
         learning_rate=1e-4,
         entropy_coef=0.03,
         terminal_win_bonus=20.0,
+        step_penalty=0.02,
+        truncation_penalty=12.0,
         league_opponent_fraction=0.5,
         device="cpu",
         output_dir=str(tmp_path / "runs"),
@@ -54,6 +67,8 @@ def test_apply_overrides_changes_tuning_knobs(tmp_path: Path) -> None:
     assert updated.train_config.learning_rate == 1e-4
     assert updated.train_config.entropy_coef == 0.03
     assert updated.train_config.env_config.terminal_win_bonus == 20.0
+    assert updated.train_config.env_config.step_penalty == 0.02
+    assert updated.train_config.env_config.truncation_penalty == 12.0
     assert updated.train_config.league_opponent_fraction == 0.5
     assert updated.train_config.device == "cpu"
     assert updated.eval_episodes == 6

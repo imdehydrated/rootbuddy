@@ -62,6 +62,8 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     assert arrays.rewards.tolist() == [0.0, 2.0]
     assert arrays.dones.tolist() == [False, True]
     assert arrays.truncations.tolist() == [False, False]
+    assert arrays.current_phases.tolist() == [0, 0]
+    assert arrays.current_steps.tolist() == [0, 0]
     assert arrays.candidate_rewards.tolist() == [[0.5, 1.5], [2.5, 0.0]]
     assert arrays.victory_points.tolist() == [[0, 0, 0, 0], [0, 0, 0, 0]]
     np.testing.assert_array_equal(arrays.candidate_actions[1, 1], np.zeros((3,), dtype=np.float32))
@@ -150,7 +152,10 @@ def decision(
     truncated: bool = False,
     winner: int = 0,
     active_faction: int = 0,
+    current_phase: int = 0,
+    current_step: int = 0,
     victory_points: tuple[int, ...] = (0, 0, 0, 0),
+    legal_action_types: tuple[int, ...] | None = None,
 ) -> EnvDecision:
     action_length = len(candidates[0]) if candidates else 1
     return EnvDecision(
@@ -158,6 +163,8 @@ def decision(
         episode=0,
         step=step,
         active_faction=active_faction,
+        current_phase=current_phase,
+        current_step=current_step,
         observation=np.asarray(observation, dtype=np.float32),
         candidate_actions=np.asarray(candidates, dtype=np.float32).reshape((len(candidates), action_length)),
         candidate_rewards=np.asarray(
@@ -171,7 +178,7 @@ def decision(
         winner=winner,
         winning_coalition=(),
         victory_points=victory_points,
-        legal_action_types=tuple(range(len(candidates))),
+        legal_action_types=legal_action_types if legal_action_types is not None else tuple(range(len(candidates))),
         observation_length=len(observation),
         action_length=action_length,
     )

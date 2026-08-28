@@ -19,12 +19,17 @@ from test_vec_env import decision
 
 
 class FakeTrainingEnv:
-    def __init__(self) -> None:
-        self.reset_calls = 0
+    def __init__(self, *, done_after: int | None = 2) -> None:
+        self.done_after = done_after
+        self.reset_indices: list[list[int] | None] = []
         self.step_actions: list[list[int]] = []
 
-    def reset(self) -> VecEnvArrays:
-        self.reset_calls += 1
+    @property
+    def reset_calls(self) -> int:
+        return len(self.reset_indices)
+
+    def reset(self, env_indices: list[int] | None = None) -> VecEnvArrays:
+        self.reset_indices.append(env_indices)
         return make_batch(
             rewards=[0.0, 0.0],
             dones=[False, False],
@@ -33,7 +38,7 @@ class FakeTrainingEnv:
 
     def step(self, action_indices: list[int]) -> VecEnvArrays:
         self.step_actions.append(list(action_indices))
-        done = len(self.step_actions) >= 2
+        done = self.done_after is not None and len(self.step_actions) >= self.done_after
         return make_batch(
             rewards=[1.0, 0.0],
             dones=[False, done],
@@ -106,6 +111,35 @@ def test_train_runs_update_and_writes_checkpoint(tmp_path: Path) -> None:
     )
 
 
+def test_train_carries_live_env_batch_across_updates(tmp_path: Path) -> None:
+    torch.manual_seed(808)
+    env = FakeTrainingEnv(done_after=None)
+    model = CandidatePolicyValueNet(
+        observation_dim=3,
+        action_dim=2,
+        torso_hidden_dims=(8,),
+        head_hidden_dim=8,
+    )
+    config = TrainConfig(
+        env_config=VecEnvConfig(num_envs=2, base_seed=808),
+        updates=2,
+        rollout_steps=1,
+        ppo_epochs=1,
+        minibatch_size=2,
+        checkpoint_dir=tmp_path,
+        checkpoint_every=0,
+        torso_hidden_dims=(8,),
+        head_hidden_dim=8,
+        seed=808,
+    )
+
+    result = train(config, env=env, model=model)  # type: ignore[arg-type]
+
+    assert env.reset_indices == [None]
+    assert len(env.step_actions) == 2
+    assert len(result.metrics) == 2
+
+
 def test_terminal_outcomes_returns_zeroes_without_completed_games() -> None:
     outcomes = terminal_outcomes(make_batch([0.0], [False], [1]))
 
@@ -151,6 +185,10 @@ def test_cli_args_build_two_player_training_config() -> None:
             "snapshots",
             "--league-seed",
             "42",
+            "--step-penalty",
+            "0.02",
+            "--truncation-penalty",
+            "12",
             "--track-all-hands",
         ]
     )
@@ -163,10 +201,20 @@ def test_cli_args_build_two_player_training_config() -> None:
     assert config.env_config.base_seed == 909
     assert config.env_config.factions == [Faction.MARQUISE, Faction.EYRIE]
     assert config.env_config.track_all_hands
+    assert config.env_config.step_penalty == 0.02
+    assert config.env_config.truncation_penalty == 12.0
     assert config.league_opponent_fraction == 0.5
     assert config.league_max_snapshots == 3
     assert config.league_snapshot_dir == "snapshots"
     assert config.league_seed == 42
+
+
+def test_partial_observability_request_is_encoded_for_go_backstop() -> None:
+    args = parse_args(["--partial-observability"])
+
+    config = two_player_train_config(args)
+
+    assert not config.env_config.track_all_hands
 
 
 def make_batch(
