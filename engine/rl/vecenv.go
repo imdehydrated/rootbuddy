@@ -58,9 +58,11 @@ type EnvDecision struct {
 	EnvIndex          int               `json:"envIndex"`
 	Episode           int               `json:"episode"`
 	Step              int               `json:"step"`
+	RoundNumber       int               `json:"roundNumber"`
 	ActiveFaction     game.Faction      `json:"activeFaction"`
 	CurrentPhase      game.Phase        `json:"currentPhase"`
 	CurrentStep       game.TurnStep     `json:"currentStep"`
+	Eyrie             EyrieDiagnostics  `json:"eyrie"`
 	Observation       []float32         `json:"observation"`
 	CandidateActions  [][]float32       `json:"candidateActions"`
 	CandidateRewards  []float32         `json:"candidateRewards"`
@@ -74,6 +76,16 @@ type EnvDecision struct {
 	LegalActionTypes  []game.ActionType `json:"legalActionTypes,omitempty"`
 	ObservationLength int               `json:"observationLength"`
 	ActionLength      int               `json:"actionLength"`
+}
+
+type EyrieDiagnostics struct {
+	RoostsPlaced          int   `json:"roostsPlaced"`
+	WarriorSupply         int   `json:"warriorSupply"`
+	DecreeColumnCounts    []int `json:"decreeColumnCounts"`
+	CurrentDecreeColumn   int   `json:"currentDecreeColumn"`
+	DecreeColumnsResolved int   `json:"decreeColumnsResolved"`
+	DecreeCardsResolved   int   `json:"decreeCardsResolved"`
+	CardsAddedToDecree    int   `json:"cardsAddedToDecree"`
 }
 
 type ResetResult struct {
@@ -272,9 +284,11 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		EnvIndex:          index,
 		Episode:           slot.episode,
 		Step:              slot.steps,
+		RoundNumber:       slot.state.RoundNumber,
 		ActiveFaction:     activeFaction,
 		CurrentPhase:      slot.state.CurrentPhase,
 		CurrentStep:       slot.state.CurrentStep,
+		Eyrie:             eyrieDiagnostics(slot.state),
 		Observation:       encodedObservation,
 		CandidateActions:  encodedActions,
 		CandidateRewards:  candidateRewards,
@@ -289,6 +303,68 @@ func (env *VecEnv) decision(index int, reward float32) (EnvDecision, error) {
 		ObservationLength: len(encodedObservation),
 		ActionLength:      ActionVectorLength(),
 	}, nil
+}
+
+func eyrieDiagnostics(state game.GameState) EyrieDiagnostics {
+	currentColumn := -1
+	if column, ok := currentEyrieDecreeColumn(state); ok {
+		currentColumn = int(column)
+	}
+
+	return EyrieDiagnostics{
+		RoostsPlaced:          state.Eyrie.RoostsPlaced,
+		WarriorSupply:         state.Eyrie.WarriorSupply,
+		DecreeColumnCounts:    eyrieDecreeColumnCounts(state.Eyrie.Decree),
+		CurrentDecreeColumn:   currentColumn,
+		DecreeColumnsResolved: state.TurnProgress.DecreeColumnsResolved,
+		DecreeCardsResolved:   state.TurnProgress.DecreeCardsResolved,
+		CardsAddedToDecree:    state.TurnProgress.CardsAddedToDecree,
+	}
+}
+
+func eyrieDecreeColumnCounts(decree game.Decree) []int {
+	return []int{
+		len(decree.Recruit),
+		len(decree.Move),
+		len(decree.Battle),
+		len(decree.Build),
+	}
+}
+
+func currentEyrieDecreeColumn(state game.GameState) (game.DecreeColumn, bool) {
+	for columnIndex := state.TurnProgress.DecreeColumnsResolved; columnIndex < 4; columnIndex++ {
+		column := game.DecreeColumn(columnIndex)
+		for _, cardID := range eyrieDecreeCardsByColumn(state.Eyrie.Decree, column) {
+			if !eyrieDecreeCardResolved(state, cardID) {
+				return column, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func eyrieDecreeCardsByColumn(decree game.Decree, column game.DecreeColumn) []game.CardID {
+	switch column {
+	case game.DecreeRecruit:
+		return decree.Recruit
+	case game.DecreeMove:
+		return decree.Move
+	case game.DecreeBattle:
+		return decree.Battle
+	case game.DecreeBuild:
+		return decree.Build
+	default:
+		return nil
+	}
+}
+
+func eyrieDecreeCardResolved(state game.GameState, cardID game.CardID) bool {
+	for _, resolvedID := range state.TurnProgress.ResolvedDecreeCardIDs {
+		if resolvedID == cardID {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeVecEnvConfig(config VecEnvConfig) (VecEnvConfig, error) {

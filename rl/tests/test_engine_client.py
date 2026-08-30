@@ -41,9 +41,19 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
             "envIndex": 1,
             "episode": 0,
             "step": 3,
+            "roundNumber": 2,
             "activeFaction": 2,
             "currentPhase": 1,
             "currentStep": 3,
+            "eyrie": {
+                "roostsPlaced": 2,
+                "warriorSupply": 14,
+                "decreeColumnCounts": [1, 2, 3, 4],
+                "currentDecreeColumn": 2,
+                "decreeColumnsResolved": 1,
+                "decreeCardsResolved": 0,
+                "cardsAddedToDecree": 1,
+            },
             "observation": [0.0, 1.0],
             "candidateActions": [[1.0, 0.0], [0.0, 1.0]],
             "candidateRewards": [0.0, 1.0],
@@ -63,8 +73,15 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
     )
 
     assert decision.env_index == 1
+    assert decision.round_number == 2
     assert decision.current_phase == 1
     assert decision.current_step == 3
+    assert decision.eyrie.roosts_placed == 2
+    assert decision.eyrie.warrior_supply == 14
+    assert decision.eyrie.decree_column_counts == (1, 2, 3, 4)
+    assert decision.eyrie.current_decree_column == 2
+    assert decision.eyrie.decree_columns_resolved == 1
+    assert decision.eyrie.cards_added_to_decree == 1
     assert decision.candidate_count == 2
     assert decision.observation.dtype == np.float32
     assert decision.candidate_actions.shape == (2, 2)

@@ -23,6 +23,14 @@ class VecEnvArrays:
     active_factions: np.ndarray
     current_phases: np.ndarray
     current_steps: np.ndarray
+    round_numbers: np.ndarray
+    eyrie_roosts: np.ndarray
+    eyrie_warrior_supply: np.ndarray
+    eyrie_decree_counts: np.ndarray
+    eyrie_current_decree_columns: np.ndarray
+    eyrie_decree_columns_resolved: np.ndarray
+    eyrie_decree_cards_resolved: np.ndarray
+    eyrie_cards_added_to_decree: np.ndarray
     episodes: np.ndarray
     steps: np.ndarray
     winners: np.ndarray
@@ -109,6 +117,14 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
     active_factions = np.zeros((num_envs,), dtype=np.int64)
     current_phases = np.zeros((num_envs,), dtype=np.int64)
     current_steps = np.zeros((num_envs,), dtype=np.int64)
+    round_numbers = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_roosts = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_warrior_supply = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_decree_counts = np.zeros((num_envs, 4), dtype=np.int64)
+    eyrie_current_decree_columns = np.full((num_envs,), -1, dtype=np.int64)
+    eyrie_decree_columns_resolved = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_decree_cards_resolved = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_cards_added_to_decree = np.zeros((num_envs,), dtype=np.int64)
     episodes = np.zeros((num_envs,), dtype=np.int64)
     steps = np.zeros((num_envs,), dtype=np.int64)
     winners = np.zeros((num_envs,), dtype=np.int64)
@@ -124,6 +140,14 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         active_factions[row] = decision.active_faction
         current_phases[row] = decision.current_phase
         current_steps[row] = decision.current_step
+        round_numbers[row] = decision.round_number
+        eyrie_roosts[row] = decision.eyrie.roosts_placed
+        eyrie_warrior_supply[row] = decision.eyrie.warrior_supply
+        eyrie_decree_counts[row, :] = np.asarray(decision.eyrie.decree_column_counts, dtype=np.int64)
+        eyrie_current_decree_columns[row] = decision.eyrie.current_decree_column
+        eyrie_decree_columns_resolved[row] = decision.eyrie.decree_columns_resolved
+        eyrie_decree_cards_resolved[row] = decision.eyrie.decree_cards_resolved
+        eyrie_cards_added_to_decree[row] = decision.eyrie.cards_added_to_decree
         episodes[row] = decision.episode
         steps[row] = decision.step
         winners[row] = decision.winner
@@ -151,6 +175,14 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         active_factions=active_factions,
         current_phases=current_phases,
         current_steps=current_steps,
+        round_numbers=round_numbers,
+        eyrie_roosts=eyrie_roosts,
+        eyrie_warrior_supply=eyrie_warrior_supply,
+        eyrie_decree_counts=eyrie_decree_counts,
+        eyrie_current_decree_columns=eyrie_current_decree_columns,
+        eyrie_decree_columns_resolved=eyrie_decree_columns_resolved,
+        eyrie_decree_cards_resolved=eyrie_decree_cards_resolved,
+        eyrie_cards_added_to_decree=eyrie_cards_added_to_decree,
         episodes=episodes,
         steps=steps,
         winners=winners,

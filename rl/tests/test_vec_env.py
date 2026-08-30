@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from rootbuddy_rl.engine_client import ConfigResponse, EnvBatch, EnvDecision, VecEnvConfig
+from rootbuddy_rl.engine_client import ConfigResponse, EnvBatch, EnvDecision, EyrieDiagnostics, VecEnvConfig
 from rootbuddy_rl.vec_env import RootBuddyVecEnv, batch_to_arrays, sample_random_actions
 
 
@@ -47,6 +47,8 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
                 candidate_rewards=[2.5],
                 reward=2.0,
                 done=True,
+                eyrie_roosts=2,
+                eyrie_decree_counts=(1, 2, 3, 4),
             ),
         ),
         observation_length=2,
@@ -64,6 +66,9 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     assert arrays.truncations.tolist() == [False, False]
     assert arrays.current_phases.tolist() == [0, 0]
     assert arrays.current_steps.tolist() == [0, 0]
+    assert arrays.round_numbers.tolist() == [0, 0]
+    assert arrays.eyrie_roosts.tolist() == [0, 2]
+    assert arrays.eyrie_decree_counts.tolist() == [[0, 0, 0, 0], [1, 2, 3, 4]]
     assert arrays.candidate_rewards.tolist() == [[0.5, 1.5], [2.5, 0.0]]
     assert arrays.victory_points.tolist() == [[0, 0, 0, 0], [0, 0, 0, 0]]
     np.testing.assert_array_equal(arrays.candidate_actions[1, 1], np.zeros((3,), dtype=np.float32))
@@ -154,6 +159,14 @@ def decision(
     active_faction: int = 0,
     current_phase: int = 0,
     current_step: int = 0,
+    round_number: int = 0,
+    eyrie_roosts: int = 0,
+    eyrie_warrior_supply: int = 0,
+    eyrie_decree_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
+    eyrie_current_decree_column: int = -1,
+    eyrie_decree_columns_resolved: int = 0,
+    eyrie_decree_cards_resolved: int = 0,
+    eyrie_cards_added_to_decree: int = 0,
     victory_points: tuple[int, ...] = (0, 0, 0, 0),
     legal_action_types: tuple[int, ...] | None = None,
 ) -> EnvDecision:
@@ -162,9 +175,19 @@ def decision(
         env_index=env_index,
         episode=0,
         step=step,
+        round_number=round_number,
         active_faction=active_faction,
         current_phase=current_phase,
         current_step=current_step,
+        eyrie=EyrieDiagnostics(
+            roosts_placed=eyrie_roosts,
+            warrior_supply=eyrie_warrior_supply,
+            decree_column_counts=eyrie_decree_counts,
+            current_decree_column=eyrie_current_decree_column,
+            decree_columns_resolved=eyrie_decree_columns_resolved,
+            decree_cards_resolved=eyrie_decree_cards_resolved,
+            cards_added_to_decree=eyrie_cards_added_to_decree,
+        ),
         observation=np.asarray(observation, dtype=np.float32),
         candidate_actions=np.asarray(candidates, dtype=np.float32).reshape((len(candidates), action_length)),
         candidate_rewards=np.asarray(

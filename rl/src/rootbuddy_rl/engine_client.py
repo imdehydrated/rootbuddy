@@ -56,13 +56,26 @@ class VecEnvConfig:
 
 
 @dataclass(frozen=True)
+class EyrieDiagnostics:
+    roosts_placed: int = 0
+    warrior_supply: int = 0
+    decree_column_counts: tuple[int, int, int, int] = (0, 0, 0, 0)
+    current_decree_column: int = -1
+    decree_columns_resolved: int = 0
+    decree_cards_resolved: int = 0
+    cards_added_to_decree: int = 0
+
+
+@dataclass(frozen=True)
 class EnvDecision:
     env_index: int
     episode: int
     step: int
+    round_number: int
     active_faction: int
     current_phase: int
     current_step: int
+    eyrie: EyrieDiagnostics
     observation: np.ndarray
     candidate_actions: np.ndarray
     candidate_rewards: np.ndarray
@@ -221,9 +234,11 @@ def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_leng
         env_index=int(raw.get("envIndex", 0)),
         episode=int(raw.get("episode", 0)),
         step=int(raw.get("step", 0)),
+        round_number=int(raw.get("roundNumber", 0)),
         active_faction=int(raw.get("activeFaction", 0)),
         current_phase=int(raw.get("currentPhase", 0)),
         current_step=int(raw.get("currentStep", 0)),
+        eyrie=_parse_eyrie_diagnostics(raw.get("eyrie")),
         observation=observation,
         candidate_actions=candidates,
         candidate_rewards=rewards,
@@ -237,6 +252,22 @@ def _parse_decision(raw: dict[str, Any], *, observation_length: int, action_leng
         legal_action_types=tuple(int(action_type) for action_type in raw.get("legalActionTypes", [])),
         observation_length=int(raw.get("observationLength", observation_length)),
         action_length=int(raw.get("actionLength", action_length)),
+    )
+
+
+def _parse_eyrie_diagnostics(raw: object) -> EyrieDiagnostics:
+    if not isinstance(raw, dict):
+        return EyrieDiagnostics()
+    counts = tuple(int(value) for value in raw.get("decreeColumnCounts", []))
+    padded_counts = (counts + (0, 0, 0, 0))[:4]
+    return EyrieDiagnostics(
+        roosts_placed=int(raw.get("roostsPlaced", 0)),
+        warrior_supply=int(raw.get("warriorSupply", 0)),
+        decree_column_counts=padded_counts,
+        current_decree_column=int(raw.get("currentDecreeColumn", -1)),
+        decree_columns_resolved=int(raw.get("decreeColumnsResolved", 0)),
+        decree_cards_resolved=int(raw.get("decreeCardsResolved", 0)),
+        cards_added_to_decree=int(raw.get("cardsAddedToDecree", 0)),
     )
 
 

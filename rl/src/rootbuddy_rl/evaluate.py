@@ -17,6 +17,16 @@ from .model import CandidatePolicyValueNet, tensors_from_batch
 from .train_constants import FACTION_COUNT
 from .vec_env import RootBuddyVecEnv, VecEnvArrays, sample_random_actions
 
+ACTION_BUILD = 3
+ACTION_RECRUIT = 4
+ACTION_ADD_TO_DECREE = 7
+ACTION_TURMOIL = 18
+ACTION_SCORE_ROOSTS = 23
+ACTION_EYRIE_SETUP = 33
+ACTION_EYRIE_NEW_ROOST = 37
+FACTION_MARQUISE = int(Faction.MARQUISE)
+FACTION_EYRIE = int(Faction.EYRIE)
+
 
 class Agent(Protocol):
     def select_actions(self, batch: VecEnvArrays) -> np.ndarray:
@@ -86,6 +96,21 @@ class EvaluationDiagnostics:
     truncated_recent_action_type_counts: tuple[tuple[int, int], ...] = ()
     per_faction_action_counts: tuple[int, ...] = field(default_factory=lambda: tuple(0 for _ in range(FACTION_COUNT)))
     mean_candidate_count: float = 0.0
+    mean_terminal_round_number: float = 0.0
+    eyrie_action_type_counts: tuple[tuple[int, int], ...] = ()
+    eyrie_turmoil_count: int = 0
+    eyrie_turmoil_vp_lost: int = 0
+    eyrie_turmoil_by_decree_column: tuple[tuple[int, int], ...] = ()
+    eyrie_score_roosts_count: int = 0
+    eyrie_score_roosts_vp: int = 0
+    eyrie_roost_builds: int = 0
+    eyrie_roost_losses: int = 0
+    eyrie_roost_losses_on_marquise_turn: int = 0
+    eyrie_cards_added_by_decree_column: tuple[int, int, int, int] = (0, 0, 0, 0)
+    mean_eyrie_roosts: float = 0.0
+    mean_terminal_eyrie_roosts: float = 0.0
+    mean_terminal_eyrie_vp: float = 0.0
+    mean_terminal_eyrie_decree_counts: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -122,6 +147,10 @@ def evaluate_agents(
     truncated_episodes = 0
     reward_sum = 0.0
     game_lengths: list[int] = []
+    terminal_round_numbers: list[int] = []
+    terminal_eyrie_roosts: list[int] = []
+    terminal_eyrie_vp: list[int] = []
+    terminal_eyrie_decree_counts: list[np.ndarray] = []
     winner_counts = [0 for _ in range(FACTION_COUNT)]
     terminal_vp: list[np.ndarray] = []
     terminal_reasons: Counter[str] = Counter()
@@ -132,6 +161,18 @@ def evaluate_agents(
     per_faction_action_counts = [0 for _ in range(FACTION_COUNT)]
     candidate_count_sum = 0
     candidate_count_samples = 0
+    eyrie_roost_sum = 0
+    eyrie_roost_samples = 0
+    eyrie_action_type_counts: Counter[int] = Counter()
+    eyrie_turmoil_count = 0
+    eyrie_turmoil_vp_lost = 0
+    eyrie_turmoil_by_decree_column: Counter[int] = Counter()
+    eyrie_score_roosts_count = 0
+    eyrie_score_roosts_vp = 0
+    eyrie_roost_builds = 0
+    eyrie_roost_losses = 0
+    eyrie_roost_losses_on_marquise_turn = 0
+    eyrie_cards_added_by_decree_column = np.zeros((4,), dtype=np.int64)
     recent_actions: dict[int, deque[int]] = {}
     started = time.perf_counter()
 
@@ -145,6 +186,10 @@ def evaluate_agents(
                         break
                     episodes += 1
                     game_lengths.append(int(batch.steps[row]))
+                    terminal_round_numbers.append(int(batch.round_numbers[row]))
+                    terminal_eyrie_roosts.append(int(batch.eyrie_roosts[row]))
+                    terminal_eyrie_vp.append(int(batch.victory_points[row, FACTION_EYRIE]))
+                    terminal_eyrie_decree_counts.append(batch.eyrie_decree_counts[row].astype(np.float32))
                     terminal_vp.append(batch.victory_points[row].astype(np.float32))
                     terminal_reasons[terminal_reason(batch, int(row), config.env_config.max_steps)] += 1
                     final_active_factions[int(batch.active_factions[row])] += 1
@@ -167,6 +212,8 @@ def evaluate_agents(
                 raise ValueError("cannot evaluate env rows without legal actions")
             candidate_count_sum += int(batch.candidate_counts.sum())
             candidate_count_samples += batch.num_envs
+            eyrie_roost_sum += int(batch.eyrie_roosts.sum())
+            eyrie_roost_samples += batch.num_envs
             actions = select_actions_by_faction(batch, agents=agents, default_agent=fallback)
             record_selected_actions(
                 batch,
@@ -175,7 +222,19 @@ def evaluate_agents(
                 action_type_counts=action_type_counts,
                 per_faction_action_counts=per_faction_action_counts,
             )
+            previous = batch
             batch = active_env.step(actions.tolist())
+            transition_diagnostics = eyrie_transition_diagnostics(previous, batch, actions)
+            eyrie_action_type_counts.update(transition_diagnostics.action_type_counts)
+            eyrie_turmoil_count += transition_diagnostics.turmoil_count
+            eyrie_turmoil_vp_lost += transition_diagnostics.turmoil_vp_lost
+            eyrie_turmoil_by_decree_column.update(transition_diagnostics.turmoil_by_decree_column)
+            eyrie_score_roosts_count += transition_diagnostics.score_roosts_count
+            eyrie_score_roosts_vp += transition_diagnostics.score_roosts_vp
+            eyrie_roost_builds += transition_diagnostics.roost_builds
+            eyrie_roost_losses += transition_diagnostics.roost_losses
+            eyrie_roost_losses_on_marquise_turn += transition_diagnostics.roost_losses_on_marquise_turn
+            eyrie_cards_added_by_decree_column += transition_diagnostics.cards_added_by_decree_column
             transitions += batch.num_envs
             reward_sum += float(batch.rewards.sum())
     finally:
@@ -200,7 +259,99 @@ def evaluate_agents(
             truncated_recent_action_type_counts=sorted_count_items(truncated_recent_action_type_counts),
             per_faction_action_counts=tuple(per_faction_action_counts),
             mean_candidate_count=candidate_count_sum / max(candidate_count_samples, 1),
+            mean_terminal_round_number=float(np.mean(terminal_round_numbers)) if terminal_round_numbers else 0.0,
+            eyrie_action_type_counts=sorted_count_items(eyrie_action_type_counts),
+            eyrie_turmoil_count=eyrie_turmoil_count,
+            eyrie_turmoil_vp_lost=eyrie_turmoil_vp_lost,
+            eyrie_turmoil_by_decree_column=sorted_count_items(eyrie_turmoil_by_decree_column),
+            eyrie_score_roosts_count=eyrie_score_roosts_count,
+            eyrie_score_roosts_vp=eyrie_score_roosts_vp,
+            eyrie_roost_builds=eyrie_roost_builds,
+            eyrie_roost_losses=eyrie_roost_losses,
+            eyrie_roost_losses_on_marquise_turn=eyrie_roost_losses_on_marquise_turn,
+            eyrie_cards_added_by_decree_column=tuple(int(value) for value in eyrie_cards_added_by_decree_column),
+            mean_eyrie_roosts=eyrie_roost_sum / max(eyrie_roost_samples, 1),
+            mean_terminal_eyrie_roosts=float(np.mean(terminal_eyrie_roosts)) if terminal_eyrie_roosts else 0.0,
+            mean_terminal_eyrie_vp=float(np.mean(terminal_eyrie_vp)) if terminal_eyrie_vp else 0.0,
+            mean_terminal_eyrie_decree_counts=mean_decree_counts(terminal_eyrie_decree_counts),
         ),
+    )
+
+
+@dataclass(frozen=True)
+class EyrieTransitionDiagnostics:
+    action_type_counts: Counter[int]
+    turmoil_count: int
+    turmoil_vp_lost: int
+    turmoil_by_decree_column: Counter[int]
+    score_roosts_count: int
+    score_roosts_vp: int
+    roost_builds: int
+    roost_losses: int
+    roost_losses_on_marquise_turn: int
+    cards_added_by_decree_column: np.ndarray
+
+
+def eyrie_transition_diagnostics(
+    previous: VecEnvArrays,
+    current: VecEnvArrays,
+    actions: np.ndarray,
+) -> EyrieTransitionDiagnostics:
+    action_type_counts: Counter[int] = Counter()
+    turmoil_by_decree_column: Counter[int] = Counter()
+    cards_added_by_decree_column = np.zeros((4,), dtype=np.int64)
+    turmoil_count = 0
+    turmoil_vp_lost = 0
+    score_roosts_count = 0
+    score_roosts_vp = 0
+    roost_builds = 0
+    roost_losses = 0
+    roost_losses_on_marquise_turn = 0
+
+    for row, action_index in enumerate(actions):
+        index = int(action_index)
+        if index < 0 or index >= len(previous.decisions[row].legal_action_types):
+            continue
+        action_type = int(previous.decisions[row].legal_action_types[index])
+        acting_faction = int(previous.active_factions[row])
+        before_vp = int(previous.victory_points[row, FACTION_EYRIE])
+        after_vp = int(current.victory_points[row, FACTION_EYRIE])
+        roost_delta = int(current.eyrie_roosts[row] - previous.eyrie_roosts[row])
+
+        if acting_faction == FACTION_EYRIE:
+            action_type_counts[action_type] += 1
+
+            if action_type == ACTION_TURMOIL:
+                turmoil_count += 1
+                turmoil_vp_lost += max(0, before_vp - after_vp)
+                turmoil_by_decree_column[int(previous.eyrie_current_decree_columns[row])] += 1
+
+            if action_type == ACTION_SCORE_ROOSTS:
+                score_roosts_count += 1
+                score_roosts_vp += max(0, after_vp - before_vp)
+
+            decree_delta = current.eyrie_decree_counts[row] - previous.eyrie_decree_counts[row]
+            cards_added_by_decree_column += np.maximum(decree_delta, 0)
+
+        if roost_delta > 0:
+            roost_builds += roost_delta
+        elif roost_delta < 0:
+            lost = abs(roost_delta)
+            roost_losses += lost
+            if acting_faction == FACTION_MARQUISE:
+                roost_losses_on_marquise_turn += lost
+
+    return EyrieTransitionDiagnostics(
+        action_type_counts=action_type_counts,
+        turmoil_count=turmoil_count,
+        turmoil_vp_lost=turmoil_vp_lost,
+        turmoil_by_decree_column=turmoil_by_decree_column,
+        score_roosts_count=score_roosts_count,
+        score_roosts_vp=score_roosts_vp,
+        roost_builds=roost_builds,
+        roost_losses=roost_losses,
+        roost_losses_on_marquise_turn=roost_losses_on_marquise_turn,
+        cards_added_by_decree_column=cards_added_by_decree_column,
     )
 
 
@@ -279,6 +430,13 @@ def mean_terminal_vp(values: list[np.ndarray]) -> tuple[float, ...]:
         return tuple(0.0 for _ in range(FACTION_COUNT))
     stacked = np.stack(values, axis=0)
     return tuple(float(value) for value in stacked.mean(axis=0))
+
+
+def mean_decree_counts(values: list[np.ndarray]) -> tuple[float, float, float, float]:
+    if len(values) == 0:
+        return (0.0, 0.0, 0.0, 0.0)
+    stacked = np.stack(values, axis=0)
+    return tuple(float(value) for value in stacked.mean(axis=0))  # type: ignore[return-value]
 
 
 def load_model_from_checkpoint(
@@ -386,7 +544,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 def format_metrics(metrics: EvaluationMetrics) -> str:
     return (
         "episodes={episodes} transitions={transitions} truncated={truncated} "
-        "reward={reward:.4f} game_length={length:.2f} tps={tps:.1f} "
+        "reward={reward:.4f} decision_steps={length:.2f} tps={tps:.1f} "
         "win_rate={wins} terminal_vp={vp} diagnostics={diagnostics}"
     ).format(
         episodes=metrics.episodes,
@@ -410,6 +568,23 @@ def format_diagnostics(diagnostics: EvaluationDiagnostics) -> str:
         "truncated_recent_action_type_counts": dict(diagnostics.truncated_recent_action_type_counts),
         "per_faction_action_counts": diagnostics.per_faction_action_counts,
         "mean_candidate_count": round(diagnostics.mean_candidate_count, 2),
+        "mean_terminal_round_number": round(diagnostics.mean_terminal_round_number, 2),
+        "eyrie_action_type_counts": dict(diagnostics.eyrie_action_type_counts),
+        "eyrie_turmoil_count": diagnostics.eyrie_turmoil_count,
+        "eyrie_turmoil_vp_lost": diagnostics.eyrie_turmoil_vp_lost,
+        "eyrie_turmoil_by_decree_column": dict(diagnostics.eyrie_turmoil_by_decree_column),
+        "eyrie_score_roosts_count": diagnostics.eyrie_score_roosts_count,
+        "eyrie_score_roosts_vp": diagnostics.eyrie_score_roosts_vp,
+        "eyrie_roost_builds": diagnostics.eyrie_roost_builds,
+        "eyrie_roost_losses": diagnostics.eyrie_roost_losses,
+        "eyrie_roost_losses_on_marquise_turn": diagnostics.eyrie_roost_losses_on_marquise_turn,
+        "eyrie_cards_added_by_decree_column": diagnostics.eyrie_cards_added_by_decree_column,
+        "mean_eyrie_roosts": round(diagnostics.mean_eyrie_roosts, 2),
+        "mean_terminal_eyrie_roosts": round(diagnostics.mean_terminal_eyrie_roosts, 2),
+        "mean_terminal_eyrie_vp": round(diagnostics.mean_terminal_eyrie_vp, 2),
+        "mean_terminal_eyrie_decree_counts": tuple(
+            round(value, 2) for value in diagnostics.mean_terminal_eyrie_decree_counts
+        ),
     }
 
 

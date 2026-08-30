@@ -215,6 +215,15 @@ func TestVecEnvResetInitializesSlotsAndDecisions(t *testing.T) {
 		if decision.CurrentPhase != slot.state.CurrentPhase || decision.CurrentStep != slot.state.CurrentStep {
 			t.Fatalf("decision phase/step = %d/%d, want %d/%d", decision.CurrentPhase, decision.CurrentStep, slot.state.CurrentPhase, slot.state.CurrentStep)
 		}
+		if decision.RoundNumber != slot.state.RoundNumber {
+			t.Fatalf("decision round number = %d, want %d", decision.RoundNumber, slot.state.RoundNumber)
+		}
+		if decision.Eyrie.RoostsPlaced != slot.state.Eyrie.RoostsPlaced {
+			t.Fatalf("decision Eyrie roosts = %d, want %d", decision.Eyrie.RoostsPlaced, slot.state.Eyrie.RoostsPlaced)
+		}
+		if got, want := decision.Eyrie.DecreeColumnCounts, eyrieDecreeColumnCounts(slot.state.Eyrie.Decree); !reflect.DeepEqual(got, want) {
+			t.Fatalf("decision Eyrie decree counts = %+v, want %+v", got, want)
+		}
 		if decision.Done {
 			t.Fatalf("reset decision unexpectedly done: %+v", decision)
 		}

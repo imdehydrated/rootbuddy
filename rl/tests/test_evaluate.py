@@ -15,6 +15,7 @@ from rootbuddy_rl.evaluate import (
     parse_args,
     select_actions_by_faction,
     two_player_eval_config,
+    format_metrics,
 )
 from rootbuddy_rl.model import CandidatePolicyValueNet
 from rootbuddy_rl.vec_env import VecEnvArrays, batch_to_arrays
@@ -42,7 +43,10 @@ class FakeEvalEnv:
                 dones=[False, False],
                 active_factions=[0, 2],
                 candidate_rewards=[[0.0, 2.0], [3.0, 1.0]],
-                legal_action_types=[[10, 11], [20, 21]],
+                legal_action_types=[[10, 11], [7, 21]],
+                victory_points=[(0, 0, 0, 0), (0, 0, 5, 0)],
+                eyrie_roosts=[1, 1],
+                eyrie_decree_counts=[(1, 1, 0, 0), (1, 1, 0, 0)],
             )
         return make_batch(
             rewards=[0.0, 0.0],
@@ -50,6 +54,9 @@ class FakeEvalEnv:
             active_factions=[0, 2],
             candidate_rewards=[[1.0, 0.0], [2.0, 3.0]],
             legal_action_types=[[12, 13], [22, 23]],
+            victory_points=[(0, 0, 0, 0), (4, 6, 8, 0)],
+            eyrie_roosts=[1, 2],
+            eyrie_decree_counts=[(1, 1, 1, 0), (1, 1, 1, 0)],
         )
 
     def step(self, action_indices: list[int]) -> VecEnvArrays:
@@ -64,8 +71,11 @@ class FakeEvalEnv:
                 winners=[0, 0],
                 victory_points=[(30, 7, 5, 0), (4, 6, 8, 0)],
                 steps=[4, 4],
+                round_numbers=[2, 2],
                 current_phases=[2, 1],
                 current_steps=[4, 3],
+                eyrie_roosts=[1, 2],
+                eyrie_decree_counts=[(1, 1, 0, 0), (1, 1, 1, 0)],
             )
         return make_batch(
             rewards=[0.0, 3.0],
@@ -76,8 +86,11 @@ class FakeEvalEnv:
             winners=[0, 2],
             victory_points=[(1, 0, 0, 0), (6, 8, 30, 0)],
             steps=[1, 5],
+            round_numbers=[1, 3],
             current_phases=[0, 2],
             current_steps=[1, 4],
+            eyrie_roosts=[0, 2],
+            eyrie_decree_counts=[(1, 1, 1, 0), (1, 1, 1, 0)],
         )
 
 
@@ -133,9 +146,26 @@ def test_evaluate_agents_counts_completed_games_and_partial_resets() -> None:
     assert metrics.diagnostics.terminal_reasons == (("win", 2),)
     assert metrics.diagnostics.final_active_factions == ((0, 1), (2, 1))
     assert metrics.diagnostics.final_phase_steps == (((2, 4), 2),)
-    assert metrics.diagnostics.action_type_counts == ((11, 1), (12, 1), (20, 1), (23, 1))
+    assert metrics.diagnostics.action_type_counts == ((7, 1), (11, 1), (12, 1), (23, 1))
     assert metrics.diagnostics.per_faction_action_counts == (2, 0, 2, 0)
     assert metrics.diagnostics.mean_candidate_count == 2.0
+    assert metrics.diagnostics.mean_terminal_round_number == 2.5
+    assert metrics.diagnostics.eyrie_action_type_counts == ((7, 1), (23, 1))
+    assert metrics.diagnostics.eyrie_score_roosts_count == 1
+    assert metrics.diagnostics.eyrie_score_roosts_vp == 22
+    assert metrics.diagnostics.eyrie_roost_builds == 1
+    assert metrics.diagnostics.eyrie_roost_losses == 1
+    assert metrics.diagnostics.eyrie_roost_losses_on_marquise_turn == 1
+    assert metrics.diagnostics.eyrie_cards_added_by_decree_column == (0, 0, 1, 0)
+    assert metrics.diagnostics.mean_eyrie_roosts == 1.25
+    assert metrics.diagnostics.mean_terminal_eyrie_roosts == 1.5
+    assert metrics.diagnostics.mean_terminal_eyrie_vp == 17.5
+    assert metrics.diagnostics.mean_terminal_eyrie_decree_counts == (1.0, 1.0, 0.5, 0.0)
+    formatted = format_metrics(metrics)
+    assert "decision_steps=4.50" in formatted
+    assert "game_length=" not in formatted
+    assert "'mean_terminal_round_number': 2.5" in formatted
+    assert "'eyrie_score_roosts_vp': 22" in formatted
 
 
 def test_evaluate_agents_records_truncation_diagnostics() -> None:
@@ -154,6 +184,22 @@ def test_evaluate_agents_records_truncation_diagnostics() -> None:
     assert metrics.diagnostics.final_phase_steps == (((1, 3), 1),)
     assert metrics.diagnostics.action_type_counts == ((30, 1), (31, 1))
     assert metrics.diagnostics.truncated_recent_action_type_counts == ((30, 1), (31, 1))
+
+
+def test_evaluate_agents_records_eyrie_turmoil_diagnostics() -> None:
+    env = FakeEyrieTurmoilEvalEnv()
+
+    metrics = evaluate_agents(
+        EvaluationConfig(env_config=VecEnvConfig(num_envs=1, base_seed=707), episodes=1),
+        agents={},
+        default_agent=ConstantAgent(0),
+        env=env,  # type: ignore[arg-type]
+    )
+
+    assert metrics.diagnostics.eyrie_action_type_counts == ((18, 1),)
+    assert metrics.diagnostics.eyrie_turmoil_count == 1
+    assert metrics.diagnostics.eyrie_turmoil_vp_lost == 2
+    assert metrics.diagnostics.eyrie_turmoil_by_decree_column == ((3, 1),)
 
 
 class FakeTruncatingEvalEnv:
@@ -179,6 +225,7 @@ class FakeTruncatingEvalEnv:
                 candidate_rewards=[[0.0]],
                 legal_action_types=[[31]],
                 steps=[1],
+                round_numbers=[1],
                 current_phases=[0],
                 current_steps=[1],
             )
@@ -190,8 +237,37 @@ class FakeTruncatingEvalEnv:
             legal_action_types=[[]],
             truncations=[True],
             steps=[4],
+            round_numbers=[2],
             current_phases=[1],
             current_steps=[3],
+        )
+
+
+class FakeEyrieTurmoilEvalEnv:
+    def reset(self, env_indices: list[int] | None = None) -> VecEnvArrays:
+        return make_batch(
+            rewards=[0.0],
+            dones=[False],
+            active_factions=[2],
+            candidate_rewards=[[0.0]],
+            legal_action_types=[[18]],
+            victory_points=[(0, 0, 5, 0)],
+            eyrie_roosts=[1],
+            eyrie_decree_counts=[(1, 1, 1, 1)],
+            eyrie_current_decree_columns=[3],
+        )
+
+    def step(self, action_indices: list[int]) -> VecEnvArrays:
+        return make_batch(
+            rewards=[-2.0],
+            dones=[True],
+            active_factions=[2],
+            candidate_rewards=[[]],
+            legal_action_types=[[]],
+            winners=[0],
+            victory_points=[(30, 0, 3, 0)],
+            eyrie_roosts=[1],
+            eyrie_decree_counts=[(1, 1, 0, 0)],
         )
 
 
@@ -258,6 +334,14 @@ def make_batch(
     truncations: list[bool] | None = None,
     victory_points: list[tuple[int, ...]] | None = None,
     steps: list[int] | None = None,
+    round_numbers: list[int] | None = None,
+    eyrie_roosts: list[int] | None = None,
+    eyrie_warrior_supply: list[int] | None = None,
+    eyrie_decree_counts: list[tuple[int, int, int, int]] | None = None,
+    eyrie_current_decree_columns: list[int] | None = None,
+    eyrie_decree_columns_resolved: list[int] | None = None,
+    eyrie_decree_cards_resolved: list[int] | None = None,
+    eyrie_cards_added_to_decree: list[int] | None = None,
     current_phases: list[int] | None = None,
     current_steps: list[int] | None = None,
 ) -> VecEnvArrays:
@@ -266,6 +350,24 @@ def make_batch(
     truncated_rows = truncations if truncations is not None else [False for _ in rewards]
     vp_rows = victory_points if victory_points is not None else [(0, 0, 0, 0) for _ in rewards]
     step_rows = steps if steps is not None else [0 for _ in rewards]
+    round_rows = round_numbers if round_numbers is not None else [0 for _ in rewards]
+    eyrie_roost_rows = eyrie_roosts if eyrie_roosts is not None else [0 for _ in rewards]
+    eyrie_supply_rows = eyrie_warrior_supply if eyrie_warrior_supply is not None else [0 for _ in rewards]
+    eyrie_decree_rows = eyrie_decree_counts if eyrie_decree_counts is not None else [
+        (0, 0, 0, 0) for _ in rewards
+    ]
+    eyrie_column_rows = eyrie_current_decree_columns if eyrie_current_decree_columns is not None else [
+        -1 for _ in rewards
+    ]
+    eyrie_columns_resolved_rows = eyrie_decree_columns_resolved if eyrie_decree_columns_resolved is not None else [
+        0 for _ in rewards
+    ]
+    eyrie_cards_resolved_rows = eyrie_decree_cards_resolved if eyrie_decree_cards_resolved is not None else [
+        0 for _ in rewards
+    ]
+    eyrie_cards_added_rows = eyrie_cards_added_to_decree if eyrie_cards_added_to_decree is not None else [
+        0 for _ in rewards
+    ]
     phase_rows = current_phases if current_phases is not None else [0 for _ in rewards]
     turn_step_rows = current_steps if current_steps is not None else [0 for _ in rewards]
     action_type_rows = legal_action_types if legal_action_types is not None else [
@@ -280,6 +382,14 @@ def make_batch(
                 candidates=candidates,
                 candidate_rewards=rewards_row,
                 step=step_rows[env_index],
+                round_number=round_rows[env_index],
+                eyrie_roosts=eyrie_roost_rows[env_index],
+                eyrie_warrior_supply=eyrie_supply_rows[env_index],
+                eyrie_decree_counts=eyrie_decree_rows[env_index],
+                eyrie_current_decree_column=eyrie_column_rows[env_index],
+                eyrie_decree_columns_resolved=eyrie_columns_resolved_rows[env_index],
+                eyrie_decree_cards_resolved=eyrie_cards_resolved_rows[env_index],
+                eyrie_cards_added_to_decree=eyrie_cards_added_rows[env_index],
                 reward=rewards[env_index],
                 done=dones[env_index],
                 truncated=truncated_rows[env_index],
