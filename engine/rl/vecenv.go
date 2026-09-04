@@ -9,10 +9,16 @@ import (
 )
 
 const (
-	DefaultVecEnvMaxSteps            = 5000
-	DefaultTerminalWinBonus  float32 = 30
-	DefaultStepPenalty       float32 = 0.01
-	DefaultTruncationPenalty float32 = 10
+	DefaultVecEnvMaxSteps                      = 5000
+	DefaultTerminalWinBonus            float32 = 30
+	DefaultStepPenalty                 float32 = 0.01
+	DefaultTruncationPenalty           float32 = 10
+	DefaultEyrieTurmoilPenalty         float32 = 1
+	DefaultEyrieTurmoilVPLossPenalty   float32 = 0.5
+	DefaultEyrieScoreRoostsBonus       float32 = 0.25
+	DefaultEyrieRoostBuildBonus        float32 = 0.5
+	DefaultEyrieRoostLossPenalty       float32 = 0.75
+	DefaultEyrieBuildDecreeCardPenalty float32 = 0.05
 )
 
 var (
@@ -25,16 +31,23 @@ var (
 )
 
 type VecEnvConfig struct {
-	NumEnvs           int            `json:"numEnvs"`
-	BaseSeed          int64          `json:"baseSeed"`
-	MaxSteps          int            `json:"maxSteps"`
-	Factions          []game.Faction `json:"factions,omitempty"`
-	PlayerFaction     game.Faction   `json:"playerFaction"`
-	MapID             game.MapID     `json:"mapId"`
-	TrackAllHands     bool           `json:"trackAllHands"`
-	TerminalWinBonus  float32        `json:"terminalWinBonus"`
-	StepPenalty       float32        `json:"stepPenalty"`
-	TruncationPenalty float32        `json:"truncationPenalty"`
+	NumEnvs                     int            `json:"numEnvs"`
+	BaseSeed                    int64          `json:"baseSeed"`
+	MaxSteps                    int            `json:"maxSteps"`
+	Factions                    []game.Faction `json:"factions,omitempty"`
+	PlayerFaction               game.Faction   `json:"playerFaction"`
+	MapID                       game.MapID     `json:"mapId"`
+	TrackAllHands               bool           `json:"trackAllHands"`
+	TerminalWinBonus            float32        `json:"terminalWinBonus"`
+	StepPenalty                 float32        `json:"stepPenalty"`
+	TruncationPenalty           float32        `json:"truncationPenalty"`
+	DisableEyrieRewardShaping   bool           `json:"disableEyrieRewardShaping"`
+	EyrieTurmoilPenalty         float32        `json:"eyrieTurmoilPenalty"`
+	EyrieTurmoilVPLossPenalty   float32        `json:"eyrieTurmoilVpLossPenalty"`
+	EyrieScoreRoostsBonus       float32        `json:"eyrieScoreRoostsBonus"`
+	EyrieRoostBuildBonus        float32        `json:"eyrieRoostBuildBonus"`
+	EyrieRoostLossPenalty       float32        `json:"eyrieRoostLossPenalty"`
+	EyrieBuildDecreeCardPenalty float32        `json:"eyrieBuildDecreeCardPenalty"`
 }
 
 type VecEnv struct {
@@ -79,6 +92,7 @@ type EnvDecision struct {
 }
 
 type EyrieDiagnostics struct {
+	VictoryPoints         int   `json:"victoryPoints"`
 	RoostsPlaced          int   `json:"roostsPlaced"`
 	WarriorSupply         int   `json:"warriorSupply"`
 	DecreeColumnCounts    []int `json:"decreeColumnCounts"`
@@ -219,6 +233,7 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 
 	action := slot.legalActions[actionIndex]
 	actingFaction := slot.state.FactionTurn
+	previousState := slot.state
 	next, err := applyEnvAction(slot.state, action)
 	if err != nil {
 		return EnvDecision{}, fmt.Errorf("step env %d action %d: %w", index, actionIndex, err)
@@ -234,11 +249,11 @@ func (env *VecEnv) StepEnv(index int, actionIndex int) (EnvDecision, error) {
 	slot.done = gameOver || slot.truncated
 	reward := rewardForTransition(
 		slot.lastVictoryPoints,
+		previousState,
 		next,
+		action,
 		actingFaction,
-		env.config.TerminalWinBonus,
-		env.config.StepPenalty,
-		env.config.TruncationPenalty,
+		env.config,
 		slot.truncated,
 	)
 	slot.lastVictoryPoints = victoryPointSnapshot(next)
@@ -312,6 +327,7 @@ func eyrieDiagnostics(state game.GameState) EyrieDiagnostics {
 	}
 
 	return EyrieDiagnostics{
+		VictoryPoints:         state.VictoryPoints[game.Eyrie],
 		RoostsPlaced:          state.Eyrie.RoostsPlaced,
 		WarriorSupply:         state.Eyrie.WarriorSupply,
 		DecreeColumnCounts:    eyrieDecreeColumnCounts(state.Eyrie.Decree),
@@ -412,6 +428,24 @@ func normalizeVecEnvConfig(config VecEnvConfig) (VecEnvConfig, error) {
 	if config.TruncationPenalty == 0 {
 		config.TruncationPenalty = DefaultTruncationPenalty
 	}
+	if config.EyrieTurmoilPenalty == 0 {
+		config.EyrieTurmoilPenalty = DefaultEyrieTurmoilPenalty
+	}
+	if config.EyrieTurmoilVPLossPenalty == 0 {
+		config.EyrieTurmoilVPLossPenalty = DefaultEyrieTurmoilVPLossPenalty
+	}
+	if config.EyrieScoreRoostsBonus == 0 {
+		config.EyrieScoreRoostsBonus = DefaultEyrieScoreRoostsBonus
+	}
+	if config.EyrieRoostBuildBonus == 0 {
+		config.EyrieRoostBuildBonus = DefaultEyrieRoostBuildBonus
+	}
+	if config.EyrieRoostLossPenalty == 0 {
+		config.EyrieRoostLossPenalty = DefaultEyrieRoostLossPenalty
+	}
+	if config.EyrieBuildDecreeCardPenalty == 0 {
+		config.EyrieBuildDecreeCardPenalty = DefaultEyrieBuildDecreeCardPenalty
+	}
 	config.Factions = append([]game.Faction(nil), config.Factions...)
 	return config, nil
 }
@@ -441,32 +475,89 @@ func candidateRewardVector(state game.GameState, actions []game.Action, terminal
 		if err != nil {
 			return nil, fmt.Errorf("action %d: %w", index, err)
 		}
-		rewards[index] = rewardForTransition(previous, next, actingFaction, terminalWinBonus, 0, 0, false)
+		rewards[index] = rewardForTransition(
+			previous,
+			state,
+			next,
+			action,
+			actingFaction,
+			VecEnvConfig{
+				TerminalWinBonus:          terminalWinBonus,
+				DisableEyrieRewardShaping: true,
+			},
+			false,
+		)
 	}
 	return rewards, nil
 }
 
 func rewardForTransition(
 	previous map[game.Faction]int,
+	previousState game.GameState,
 	next game.GameState,
+	action game.Action,
 	actingFaction game.Faction,
-	terminalWinBonus float32,
-	stepPenalty float32,
-	truncationPenalty float32,
+	config VecEnvConfig,
 	truncated bool,
 ) float32 {
-	reward := float32(next.VictoryPoints[actingFaction]-previous[actingFaction]) - stepPenalty
+	reward := float32(next.VictoryPoints[actingFaction]-previous[actingFaction]) - config.StepPenalty
+	reward += eyrieRewardShaping(previous, previousState, next, action, actingFaction, config)
 	if truncated {
-		reward -= truncationPenalty
+		reward -= config.TruncationPenalty
 	}
 	if next.GamePhase != game.LifecycleGameOver {
 		return reward
 	}
 	if next.Winner == actingFaction || factionInSlice(next.WinningCoalition, actingFaction) {
-		reward += terminalWinBonus
+		reward += config.TerminalWinBonus
 	} else {
-		reward -= terminalWinBonus
+		reward -= config.TerminalWinBonus
 	}
+	return reward
+}
+
+func eyrieRewardShaping(
+	previous map[game.Faction]int,
+	previousState game.GameState,
+	next game.GameState,
+	action game.Action,
+	actingFaction game.Faction,
+	config VecEnvConfig,
+) float32 {
+	if config.DisableEyrieRewardShaping || actingFaction != game.Eyrie {
+		return 0
+	}
+
+	reward := float32(0)
+	beforeVP := previous[game.Eyrie]
+	afterVP := next.VictoryPoints[game.Eyrie]
+	vpDelta := afterVP - beforeVP
+
+	if action.Type == game.ActionTurmoil {
+		reward -= config.EyrieTurmoilPenalty
+		if vpDelta < 0 {
+			reward -= float32(-vpDelta) * config.EyrieTurmoilVPLossPenalty
+		}
+	}
+	if action.Type == game.ActionScoreRoosts && vpDelta > 0 {
+		reward += float32(vpDelta) * config.EyrieScoreRoostsBonus
+	}
+
+	roostDelta := next.Eyrie.RoostsPlaced - previousState.Eyrie.RoostsPlaced
+	if roostDelta > 0 {
+		reward += float32(roostDelta) * config.EyrieRoostBuildBonus
+	} else if roostDelta < 0 {
+		reward -= float32(-roostDelta) * config.EyrieRoostLossPenalty
+	}
+
+	if action.Type == game.ActionAddToDecree && action.AddToDecree != nil {
+		for _, column := range action.AddToDecree.Columns {
+			if column == game.DecreeBuild {
+				reward -= config.EyrieBuildDecreeCardPenalty
+			}
+		}
+	}
+
 	return reward
 }
 

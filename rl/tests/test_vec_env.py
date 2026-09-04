@@ -47,6 +47,7 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
                 candidate_rewards=[2.5],
                 reward=2.0,
                 done=True,
+                eyrie_victory_points=8,
                 eyrie_roosts=2,
                 eyrie_decree_counts=(1, 2, 3, 4),
             ),
@@ -67,6 +68,7 @@ def test_batch_to_arrays_pads_candidates_and_builds_mask() -> None:
     assert arrays.current_phases.tolist() == [0, 0]
     assert arrays.current_steps.tolist() == [0, 0]
     assert arrays.round_numbers.tolist() == [0, 0]
+    assert arrays.eyrie_victory_points.tolist() == [0, 8]
     assert arrays.eyrie_roosts.tolist() == [0, 2]
     assert arrays.eyrie_decree_counts.tolist() == [[0, 0, 0, 0], [1, 2, 3, 4]]
     assert arrays.candidate_rewards.tolist() == [[0.5, 1.5], [2.5, 0.0]]
@@ -160,6 +162,7 @@ def decision(
     current_phase: int = 0,
     current_step: int = 0,
     round_number: int = 0,
+    eyrie_victory_points: int = 0,
     eyrie_roosts: int = 0,
     eyrie_warrior_supply: int = 0,
     eyrie_decree_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
@@ -180,6 +183,7 @@ def decision(
         current_phase=current_phase,
         current_step=current_step,
         eyrie=EyrieDiagnostics(
+            victory_points=eyrie_victory_points,
             roosts_placed=eyrie_roosts,
             warrior_supply=eyrie_warrior_supply,
             decree_column_counts=eyrie_decree_counts,

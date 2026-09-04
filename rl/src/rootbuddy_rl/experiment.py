@@ -163,6 +163,13 @@ def experiment_preset(name: str, *, output_dir: str | Path = "rl/runs") -> Exper
         terminal_win_bonus=30.0,
         step_penalty=0.01,
         truncation_penalty=10.0,
+        disable_eyrie_reward_shaping=False,
+        eyrie_turmoil_penalty=1.0,
+        eyrie_turmoil_vp_loss_penalty=0.5,
+        eyrie_score_roosts_bonus=0.25,
+        eyrie_roost_build_bonus=0.5,
+        eyrie_roost_loss_penalty=0.75,
+        eyrie_build_decree_card_penalty=0.05,
     )
     if name == "smoke":
         return ExperimentConfig(
@@ -264,6 +271,47 @@ def apply_overrides(config: ExperimentConfig, args: argparse.Namespace) -> Exper
             train_config,
             env_config=replace(train_config.env_config, truncation_penalty=args.truncation_penalty),
         )
+    if args.disable_eyrie_reward_shaping:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, disable_eyrie_reward_shaping=True),
+        )
+    if args.eyrie_turmoil_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, eyrie_turmoil_penalty=args.eyrie_turmoil_penalty),
+        )
+    if args.eyrie_turmoil_vp_loss_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(
+                train_config.env_config,
+                eyrie_turmoil_vp_loss_penalty=args.eyrie_turmoil_vp_loss_penalty,
+            ),
+        )
+    if args.eyrie_score_roosts_bonus is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, eyrie_score_roosts_bonus=args.eyrie_score_roosts_bonus),
+        )
+    if args.eyrie_roost_build_bonus is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, eyrie_roost_build_bonus=args.eyrie_roost_build_bonus),
+        )
+    if args.eyrie_roost_loss_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(train_config.env_config, eyrie_roost_loss_penalty=args.eyrie_roost_loss_penalty),
+        )
+    if args.eyrie_build_decree_card_penalty is not None:
+        train_config = replace(
+            train_config,
+            env_config=replace(
+                train_config.env_config,
+                eyrie_build_decree_card_penalty=args.eyrie_build_decree_card_penalty,
+            ),
+        )
     if args.league_opponent_fraction is not None:
         train_config = replace(train_config, league_opponent_fraction=args.league_opponent_fraction)
     if args.device is not None:
@@ -296,6 +344,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--terminal-win-bonus", type=float, default=None)
     parser.add_argument("--step-penalty", type=float, default=None)
     parser.add_argument("--truncation-penalty", type=float, default=None)
+    parser.add_argument("--disable-eyrie-reward-shaping", action="store_true")
+    parser.add_argument("--eyrie-turmoil-penalty", type=float, default=None)
+    parser.add_argument("--eyrie-turmoil-vp-loss-penalty", type=float, default=None)
+    parser.add_argument("--eyrie-score-roosts-bonus", type=float, default=None)
+    parser.add_argument("--eyrie-roost-build-bonus", type=float, default=None)
+    parser.add_argument("--eyrie-roost-loss-penalty", type=float, default=None)
+    parser.add_argument("--eyrie-build-decree-card-penalty", type=float, default=None)
     parser.add_argument("--league-opponent-fraction", type=float, default=None)
     parser.add_argument("--eval-episodes", type=int, default=None)
     parser.add_argument("--eval-num-envs", type=int, default=None)

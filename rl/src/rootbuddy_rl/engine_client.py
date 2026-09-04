@@ -13,6 +13,13 @@ import numpy as np
 
 from .protocol import ProtocolError, read_json_frame, write_json_frame
 
+DEFAULT_EYRIE_TURMOIL_PENALTY = 1.0
+DEFAULT_EYRIE_TURMOIL_VP_LOSS_PENALTY = 0.5
+DEFAULT_EYRIE_SCORE_ROOSTS_BONUS = 0.25
+DEFAULT_EYRIE_ROOST_BUILD_BONUS = 0.5
+DEFAULT_EYRIE_ROOST_LOSS_PENALTY = 0.75
+DEFAULT_EYRIE_BUILD_DECREE_CARD_PENALTY = 0.05
+
 
 class EngineClientError(RuntimeError):
     """Raised when the Go environment rejects a request."""
@@ -37,6 +44,13 @@ class VecEnvConfig:
     terminal_win_bonus: float = 0.0
     step_penalty: float = 0.0
     truncation_penalty: float = 0.0
+    disable_eyrie_reward_shaping: bool = False
+    eyrie_turmoil_penalty: float = DEFAULT_EYRIE_TURMOIL_PENALTY
+    eyrie_turmoil_vp_loss_penalty: float = DEFAULT_EYRIE_TURMOIL_VP_LOSS_PENALTY
+    eyrie_score_roosts_bonus: float = DEFAULT_EYRIE_SCORE_ROOSTS_BONUS
+    eyrie_roost_build_bonus: float = DEFAULT_EYRIE_ROOST_BUILD_BONUS
+    eyrie_roost_loss_penalty: float = DEFAULT_EYRIE_ROOST_LOSS_PENALTY
+    eyrie_build_decree_card_penalty: float = DEFAULT_EYRIE_BUILD_DECREE_CARD_PENALTY
 
     def to_wire(self) -> dict[str, Any]:
         wire = {
@@ -49,6 +63,13 @@ class VecEnvConfig:
             "terminalWinBonus": self.terminal_win_bonus,
             "stepPenalty": self.step_penalty,
             "truncationPenalty": self.truncation_penalty,
+            "disableEyrieRewardShaping": self.disable_eyrie_reward_shaping,
+            "eyrieTurmoilPenalty": self.eyrie_turmoil_penalty,
+            "eyrieTurmoilVpLossPenalty": self.eyrie_turmoil_vp_loss_penalty,
+            "eyrieScoreRoostsBonus": self.eyrie_score_roosts_bonus,
+            "eyrieRoostBuildBonus": self.eyrie_roost_build_bonus,
+            "eyrieRoostLossPenalty": self.eyrie_roost_loss_penalty,
+            "eyrieBuildDecreeCardPenalty": self.eyrie_build_decree_card_penalty,
         }
         if self.factions is not None:
             wire["factions"] = [int(faction) for faction in self.factions]
@@ -57,6 +78,7 @@ class VecEnvConfig:
 
 @dataclass(frozen=True)
 class EyrieDiagnostics:
+    victory_points: int = 0
     roosts_placed: int = 0
     warrior_supply: int = 0
     decree_column_counts: tuple[int, int, int, int] = (0, 0, 0, 0)
@@ -261,6 +283,7 @@ def _parse_eyrie_diagnostics(raw: object) -> EyrieDiagnostics:
     counts = tuple(int(value) for value in raw.get("decreeColumnCounts", []))
     padded_counts = (counts + (0, 0, 0, 0))[:4]
     return EyrieDiagnostics(
+        victory_points=int(raw.get("victoryPoints", 0)),
         roosts_placed=int(raw.get("roostsPlaced", 0)),
         warrior_supply=int(raw.get("warriorSupply", 0)),
         decree_column_counts=padded_counts,

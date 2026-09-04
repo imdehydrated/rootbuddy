@@ -29,6 +29,13 @@ def test_experiment_preset_builds_smoke_train_eval_cycle(tmp_path: Path) -> None
     assert config.train_config.env_config.track_all_hands
     assert config.train_config.env_config.step_penalty == 0.01
     assert config.train_config.env_config.truncation_penalty == 10.0
+    assert not config.train_config.env_config.disable_eyrie_reward_shaping
+    assert config.train_config.env_config.eyrie_turmoil_penalty == 1.0
+    assert config.train_config.env_config.eyrie_turmoil_vp_loss_penalty == 0.5
+    assert config.train_config.env_config.eyrie_score_roosts_bonus == 0.25
+    assert config.train_config.env_config.eyrie_roost_build_bonus == 0.5
+    assert config.train_config.env_config.eyrie_roost_loss_penalty == 0.75
+    assert config.train_config.env_config.eyrie_build_decree_card_penalty == 0.05
     assert config.eval_episodes == 2
     assert config.baselines == ("random", "greedy-vp")
     assert Path(config.train_config.checkpoint_dir).is_relative_to(tmp_path)
@@ -52,6 +59,13 @@ def test_apply_overrides_changes_tuning_knobs(tmp_path: Path) -> None:
         terminal_win_bonus=20.0,
         step_penalty=0.02,
         truncation_penalty=12.0,
+        disable_eyrie_reward_shaping=True,
+        eyrie_turmoil_penalty=2.0,
+        eyrie_turmoil_vp_loss_penalty=0.75,
+        eyrie_score_roosts_bonus=0.4,
+        eyrie_roost_build_bonus=0.8,
+        eyrie_roost_loss_penalty=1.25,
+        eyrie_build_decree_card_penalty=0.1,
         league_opponent_fraction=0.5,
         device="cpu",
         output_dir=str(tmp_path / "runs"),
@@ -69,6 +83,13 @@ def test_apply_overrides_changes_tuning_knobs(tmp_path: Path) -> None:
     assert updated.train_config.env_config.terminal_win_bonus == 20.0
     assert updated.train_config.env_config.step_penalty == 0.02
     assert updated.train_config.env_config.truncation_penalty == 12.0
+    assert updated.train_config.env_config.disable_eyrie_reward_shaping
+    assert updated.train_config.env_config.eyrie_turmoil_penalty == 2.0
+    assert updated.train_config.env_config.eyrie_turmoil_vp_loss_penalty == 0.75
+    assert updated.train_config.env_config.eyrie_score_roosts_bonus == 0.4
+    assert updated.train_config.env_config.eyrie_roost_build_bonus == 0.8
+    assert updated.train_config.env_config.eyrie_roost_loss_penalty == 1.25
+    assert updated.train_config.env_config.eyrie_build_decree_card_penalty == 0.1
     assert updated.train_config.league_opponent_fraction == 0.5
     assert updated.train_config.device == "cpu"
     assert updated.eval_episodes == 6

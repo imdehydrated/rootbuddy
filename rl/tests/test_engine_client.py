@@ -25,6 +25,13 @@ def test_vec_env_config_uses_go_json_keys() -> None:
         "terminalWinBonus": 0.0,
         "stepPenalty": 0.0,
         "truncationPenalty": 0.0,
+        "disableEyrieRewardShaping": False,
+        "eyrieTurmoilPenalty": 1.0,
+        "eyrieTurmoilVpLossPenalty": 0.5,
+        "eyrieScoreRoostsBonus": 0.25,
+        "eyrieRoostBuildBonus": 0.5,
+        "eyrieRoostLossPenalty": 0.75,
+        "eyrieBuildDecreeCardPenalty": 0.05,
         "factions": [0, 2],
     }
 
@@ -46,6 +53,7 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
             "currentPhase": 1,
             "currentStep": 3,
             "eyrie": {
+                "victoryPoints": 8,
                 "roostsPlaced": 2,
                 "warriorSupply": 14,
                 "decreeColumnCounts": [1, 2, 3, 4],
@@ -76,6 +84,7 @@ def test_parse_decision_converts_vectors_to_numpy() -> None:
     assert decision.round_number == 2
     assert decision.current_phase == 1
     assert decision.current_step == 3
+    assert decision.eyrie.victory_points == 8
     assert decision.eyrie.roosts_placed == 2
     assert decision.eyrie.warrior_supply == 14
     assert decision.eyrie.decree_column_counts == (1, 2, 3, 4)

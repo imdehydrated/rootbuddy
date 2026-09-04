@@ -38,6 +38,24 @@ func TestNewVecEnvAppliesDefaults(t *testing.T) {
 	if config.TruncationPenalty != DefaultTruncationPenalty {
 		t.Fatalf("TruncationPenalty = %f, want %f", config.TruncationPenalty, DefaultTruncationPenalty)
 	}
+	if config.EyrieTurmoilPenalty != DefaultEyrieTurmoilPenalty {
+		t.Fatalf("EyrieTurmoilPenalty = %f, want %f", config.EyrieTurmoilPenalty, DefaultEyrieTurmoilPenalty)
+	}
+	if config.EyrieTurmoilVPLossPenalty != DefaultEyrieTurmoilVPLossPenalty {
+		t.Fatalf("EyrieTurmoilVPLossPenalty = %f, want %f", config.EyrieTurmoilVPLossPenalty, DefaultEyrieTurmoilVPLossPenalty)
+	}
+	if config.EyrieScoreRoostsBonus != DefaultEyrieScoreRoostsBonus {
+		t.Fatalf("EyrieScoreRoostsBonus = %f, want %f", config.EyrieScoreRoostsBonus, DefaultEyrieScoreRoostsBonus)
+	}
+	if config.EyrieRoostBuildBonus != DefaultEyrieRoostBuildBonus {
+		t.Fatalf("EyrieRoostBuildBonus = %f, want %f", config.EyrieRoostBuildBonus, DefaultEyrieRoostBuildBonus)
+	}
+	if config.EyrieRoostLossPenalty != DefaultEyrieRoostLossPenalty {
+		t.Fatalf("EyrieRoostLossPenalty = %f, want %f", config.EyrieRoostLossPenalty, DefaultEyrieRoostLossPenalty)
+	}
+	if config.EyrieBuildDecreeCardPenalty != DefaultEyrieBuildDecreeCardPenalty {
+		t.Fatalf("EyrieBuildDecreeCardPenalty = %f, want %f", config.EyrieBuildDecreeCardPenalty, DefaultEyrieBuildDecreeCardPenalty)
+	}
 	if !config.TrackAllHands {
 		t.Fatalf("TrackAllHands = false, want true for RL legal action generation")
 	}
@@ -619,6 +637,9 @@ func TestRewardForTransitionUsesActingFactionVPAndWinBonus(t *testing.T) {
 		game.Marquise: 2,
 		game.Eyrie:    5,
 	}
+	previousState := game.GameState{
+		VictoryPoints: previous,
+	}
 	next := game.GameState{
 		GamePhase: game.LifecyclePlaying,
 		VictoryPoints: map[game.Faction]int{
@@ -626,24 +647,146 @@ func TestRewardForTransitionUsesActingFactionVPAndWinBonus(t *testing.T) {
 			game.Eyrie:    10,
 		},
 	}
-	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != 1.75 {
+	config := VecEnvConfig{
+		TerminalWinBonus:          30,
+		StepPenalty:               0.25,
+		TruncationPenalty:         10,
+		DisableEyrieRewardShaping: true,
+	}
+	action := game.Action{Type: game.ActionRecruit}
+	if got := rewardForTransition(previous, previousState, next, action, game.Marquise, config, false); got != 1.75 {
 		t.Fatalf("reward = %f, want 1.75", got)
 	}
 
 	next.GamePhase = game.LifecycleGameOver
 	next.Winner = game.Marquise
-	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != 31.75 {
+	if got := rewardForTransition(previous, previousState, next, action, game.Marquise, config, false); got != 31.75 {
 		t.Fatalf("terminal winner reward = %f, want 31.75", got)
 	}
 
 	next.Winner = game.Eyrie
-	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 0, false); got != -28.25 {
+	if got := rewardForTransition(previous, previousState, next, action, game.Marquise, config, false); got != -28.25 {
 		t.Fatalf("terminal loser reward = %f, want -28.25", got)
 	}
 
 	next.GamePhase = game.LifecyclePlaying
-	if got := rewardForTransition(previous, next, game.Marquise, 30, 0.25, 10, true); got != -8.25 {
+	if got := rewardForTransition(previous, previousState, next, action, game.Marquise, config, true); got != -8.25 {
 		t.Fatalf("truncated reward = %f, want -8.25", got)
+	}
+}
+
+func TestRewardForTransitionAppliesEyrieTurmoilShaping(t *testing.T) {
+	previous := map[game.Faction]int{game.Eyrie: 5}
+	previousState := game.GameState{
+		VictoryPoints: previous,
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 2,
+		},
+	}
+	next := game.GameState{
+		GamePhase:     game.LifecyclePlaying,
+		VictoryPoints: map[game.Faction]int{game.Eyrie: 3},
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 2,
+		},
+	}
+	config := VecEnvConfig{
+		StepPenalty:               0.25,
+		EyrieTurmoilPenalty:       1,
+		EyrieTurmoilVPLossPenalty: 0.5,
+		DisableEyrieRewardShaping: false,
+	}
+
+	got := rewardForTransition(previous, previousState, next, game.Action{Type: game.ActionTurmoil}, game.Eyrie, config, false)
+	if got != -4.25 {
+		t.Fatalf("Eyrie turmoil reward = %f, want -4.25", got)
+	}
+}
+
+func TestRewardForTransitionAppliesEyriePositiveShaping(t *testing.T) {
+	previous := map[game.Faction]int{game.Eyrie: 5}
+	previousState := game.GameState{
+		VictoryPoints: previous,
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 2,
+		},
+	}
+	next := game.GameState{
+		GamePhase:     game.LifecyclePlaying,
+		VictoryPoints: map[game.Faction]int{game.Eyrie: 7},
+		Eyrie: game.EyrieState{
+			RoostsPlaced: 3,
+		},
+	}
+	config := VecEnvConfig{
+		StepPenalty:               0.25,
+		EyrieScoreRoostsBonus:     0.25,
+		EyrieRoostBuildBonus:      0.5,
+		EyrieRoostLossPenalty:     0.75,
+		EyrieTurmoilPenalty:       1,
+		EyrieTurmoilVPLossPenalty: 0.5,
+	}
+
+	got := rewardForTransition(previous, previousState, next, game.Action{Type: game.ActionScoreRoosts}, game.Eyrie, config, false)
+	if got != 2.75 {
+		t.Fatalf("Eyrie positive shaping reward = %f, want 2.75", got)
+	}
+}
+
+func TestRewardForTransitionAppliesEyrieBuildDecreePenalty(t *testing.T) {
+	previous := map[game.Faction]int{game.Eyrie: 5}
+	previousState := game.GameState{VictoryPoints: previous}
+	next := game.GameState{
+		GamePhase:     game.LifecyclePlaying,
+		VictoryPoints: map[game.Faction]int{game.Eyrie: 5},
+	}
+	config := VecEnvConfig{
+		StepPenalty:                 0.25,
+		EyrieBuildDecreeCardPenalty: 0.05,
+		EyrieTurmoilPenalty:         1,
+		EyrieTurmoilVPLossPenalty:   0.5,
+		EyrieScoreRoostsBonus:       0.25,
+		EyrieRoostBuildBonus:        0.5,
+		EyrieRoostLossPenalty:       0.75,
+		DisableEyrieRewardShaping:   false,
+	}
+	action := game.Action{
+		Type: game.ActionAddToDecree,
+		AddToDecree: &game.AddToDecreeAction{
+			Faction: game.Eyrie,
+			Columns: []game.DecreeColumn{
+				game.DecreeRecruit,
+				game.DecreeBuild,
+				game.DecreeBuild,
+			},
+		},
+	}
+
+	got := rewardForTransition(previous, previousState, next, action, game.Eyrie, config, false)
+	if got != -0.35 {
+		t.Fatalf("Eyrie build decree penalty reward = %f, want -0.35", got)
+	}
+}
+
+func TestRewardForTransitionCanDisableEyrieShaping(t *testing.T) {
+	previous := map[game.Faction]int{game.Eyrie: 5}
+	previousState := game.GameState{
+		VictoryPoints: previous,
+		Eyrie:         game.EyrieState{RoostsPlaced: 2},
+	}
+	next := game.GameState{
+		GamePhase:     game.LifecyclePlaying,
+		VictoryPoints: map[game.Faction]int{game.Eyrie: 3},
+		Eyrie:         game.EyrieState{RoostsPlaced: 3},
+	}
+	config := VecEnvConfig{
+		StepPenalty:               0.25,
+		DisableEyrieRewardShaping: true,
+	}
+
+	got := rewardForTransition(previous, previousState, next, game.Action{Type: game.ActionTurmoil}, game.Eyrie, config, false)
+	if got != -2.25 {
+		t.Fatalf("disabled Eyrie shaping reward = %f, want -2.25", got)
 	}
 }
 

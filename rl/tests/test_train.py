@@ -189,6 +189,19 @@ def test_cli_args_build_two_player_training_config() -> None:
             "0.02",
             "--truncation-penalty",
             "12",
+            "--disable-eyrie-reward-shaping",
+            "--eyrie-turmoil-penalty",
+            "2",
+            "--eyrie-turmoil-vp-loss-penalty",
+            "0.75",
+            "--eyrie-score-roosts-bonus",
+            "0.4",
+            "--eyrie-roost-build-bonus",
+            "0.8",
+            "--eyrie-roost-loss-penalty",
+            "1.25",
+            "--eyrie-build-decree-card-penalty",
+            "0.1",
             "--track-all-hands",
         ]
     )
@@ -203,6 +216,13 @@ def test_cli_args_build_two_player_training_config() -> None:
     assert config.env_config.track_all_hands
     assert config.env_config.step_penalty == 0.02
     assert config.env_config.truncation_penalty == 12.0
+    assert config.env_config.disable_eyrie_reward_shaping
+    assert config.env_config.eyrie_turmoil_penalty == 2.0
+    assert config.env_config.eyrie_turmoil_vp_loss_penalty == 0.75
+    assert config.env_config.eyrie_score_roosts_bonus == 0.4
+    assert config.env_config.eyrie_roost_build_bonus == 0.8
+    assert config.env_config.eyrie_roost_loss_penalty == 1.25
+    assert config.env_config.eyrie_build_decree_card_penalty == 0.1
     assert config.league_opponent_fraction == 0.5
     assert config.league_max_snapshots == 3
     assert config.league_snapshot_dir == "snapshots"

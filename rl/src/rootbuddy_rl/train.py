@@ -342,6 +342,13 @@ def two_player_train_config(args: argparse.Namespace) -> TrainConfig:
             track_all_hands=not args.partial_observability,
             step_penalty=args.step_penalty,
             truncation_penalty=args.truncation_penalty,
+            disable_eyrie_reward_shaping=args.disable_eyrie_reward_shaping,
+            eyrie_turmoil_penalty=args.eyrie_turmoil_penalty,
+            eyrie_turmoil_vp_loss_penalty=args.eyrie_turmoil_vp_loss_penalty,
+            eyrie_score_roosts_bonus=args.eyrie_score_roosts_bonus,
+            eyrie_roost_build_bonus=args.eyrie_roost_build_bonus,
+            eyrie_roost_loss_penalty=args.eyrie_roost_loss_penalty,
+            eyrie_build_decree_card_penalty=args.eyrie_build_decree_card_penalty,
         ),
         updates=args.updates,
         rollout_steps=args.rollout_steps,
@@ -375,6 +382,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--step-penalty", type=float, default=0.01)
     parser.add_argument("--truncation-penalty", type=float, default=10.0)
+    parser.add_argument("--disable-eyrie-reward-shaping", action="store_true")
+    parser.add_argument("--eyrie-turmoil-penalty", type=float, default=1.0)
+    parser.add_argument("--eyrie-turmoil-vp-loss-penalty", type=float, default=0.5)
+    parser.add_argument("--eyrie-score-roosts-bonus", type=float, default=0.25)
+    parser.add_argument("--eyrie-roost-build-bonus", type=float, default=0.5)
+    parser.add_argument("--eyrie-roost-loss-penalty", type=float, default=0.75)
+    parser.add_argument("--eyrie-build-decree-card-penalty", type=float, default=0.05)
     parser.add_argument(
         "--partial-observability",
         action="store_true",

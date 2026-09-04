@@ -24,6 +24,7 @@ class VecEnvArrays:
     current_phases: np.ndarray
     current_steps: np.ndarray
     round_numbers: np.ndarray
+    eyrie_victory_points: np.ndarray
     eyrie_roosts: np.ndarray
     eyrie_warrior_supply: np.ndarray
     eyrie_decree_counts: np.ndarray
@@ -118,6 +119,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
     current_phases = np.zeros((num_envs,), dtype=np.int64)
     current_steps = np.zeros((num_envs,), dtype=np.int64)
     round_numbers = np.zeros((num_envs,), dtype=np.int64)
+    eyrie_victory_points = np.zeros((num_envs,), dtype=np.int64)
     eyrie_roosts = np.zeros((num_envs,), dtype=np.int64)
     eyrie_warrior_supply = np.zeros((num_envs,), dtype=np.int64)
     eyrie_decree_counts = np.zeros((num_envs, 4), dtype=np.int64)
@@ -141,6 +143,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         current_phases[row] = decision.current_phase
         current_steps[row] = decision.current_step
         round_numbers[row] = decision.round_number
+        eyrie_victory_points[row] = decision.eyrie.victory_points
         eyrie_roosts[row] = decision.eyrie.roosts_placed
         eyrie_warrior_supply[row] = decision.eyrie.warrior_supply
         eyrie_decree_counts[row, :] = np.asarray(decision.eyrie.decree_column_counts, dtype=np.int64)
@@ -176,6 +179,7 @@ def batch_to_arrays(batch: EnvBatch) -> VecEnvArrays:
         current_phases=current_phases,
         current_steps=current_steps,
         round_numbers=round_numbers,
+        eyrie_victory_points=eyrie_victory_points,
         eyrie_roosts=eyrie_roosts,
         eyrie_warrior_supply=eyrie_warrior_supply,
         eyrie_decree_counts=eyrie_decree_counts,
